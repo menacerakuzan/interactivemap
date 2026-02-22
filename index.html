@@ -116,12 +116,16 @@
                 </div>
                 <button id="btn-logout" class="btn-flat">Logout</button>
             </div>
-            <div class="specialist-tabs">
-                <button class="btn-flat active" data-specialist-tab="dashboard">Dashboard</button>
-                <button class="btn-flat" data-specialist-tab="editor">Editor</button>
+            <div class="specialist-actions" id="specialist-actions">
+                <button class="btn-flat" data-specialist-action="dashboard">Огляд</button>
+                <button class="btn-flat" data-specialist-action="add-point">Додати точку</button>
+                <button class="btn-flat" data-specialist-action="edit-point">Редагувати точку</button>
+                <button class="btn-flat" data-specialist-action="route-editor">Маршрути</button>
+                <button class="btn-flat" data-specialist-action="news-editor">Новини</button>
             </div>
+            <button id="btn-specialist-back" class="btn-flat" style="display:none;">Назад до меню</button>
             <div class="specialist-tab-content active" id="specialist-dashboard">
-                <div class="ops-kpi-grid">
+                <div class="ops-kpi-grid" id="dashboard-kpi-block">
                     <article class="ops-kpi">
                         <div class="t-data text-muted">Точки</div>
                         <div id="kpi-points" class="ops-kpi-value">0</div>
@@ -139,7 +143,7 @@
                         <div id="kpi-published" class="ops-kpi-value">0</div>
                     </article>
                 </div>
-                <div class="specialist-block">
+                <div class="specialist-block" id="dashboard-routes-block">
                     <div class="t-label">Маршрути</div>
                     <input id="route-search" type="text" placeholder="Пошук маршруту..." />
                     <div id="route-list" class="route-list"></div>
@@ -149,11 +153,11 @@
                         <button id="route-next" class="btn-flat">Next</button>
                     </div>
                 </div>
-                <div class="specialist-block">
+                <div class="specialist-block" id="dashboard-review-block">
                     <div class="t-label">Review Queue</div>
                     <div id="review-list" class="activity-list"></div>
                 </div>
-                <div class="specialist-block">
+                <div class="specialist-block" id="dashboard-points-block">
                     <div class="t-label">Точки (швидке редагування)</div>
                     <input id="point-search" type="text" placeholder="Пошук точки..." />
                     <div id="point-list" class="route-list"></div>
@@ -163,13 +167,13 @@
                         <button id="point-next" class="btn-flat">Next</button>
                     </div>
                 </div>
-                <div class="specialist-block">
+                <div class="specialist-block" id="dashboard-activity-block">
                     <div class="t-label">Останні дії</div>
                     <div id="activity-list" class="activity-list"></div>
                 </div>
             </div>
             <div class="specialist-tab-content" id="specialist-editor">
-                <div class="specialist-block">
+                <div class="specialist-block" id="editor-add-point-block">
                     <div class="t-label">Додати точку</div>
                     <input id="point-title" type="text" placeholder="Назва точки" />
                     <select id="point-type"></select>
@@ -185,7 +189,7 @@
                     <button id="btn-pick-on-map" class="btn-flat">Вибрати на карті</button>
                     <button id="btn-create-point" class="btn-primary">Створити точку</button>
                 </div>
-                <div class="specialist-block">
+                <div class="specialist-block" id="editor-route-block">
                     <div class="t-label">Редактор маршруту</div>
                     <select id="route-edit-select"></select>
                     <div class="specialist-grid">
@@ -205,10 +209,11 @@
                     </div>
                     <div id="route-point-order" class="route-point-order"></div>
                     <button id="btn-undo-route-order" class="btn-flat">Undo reorder</button>
+                    <button id="btn-create-demo-route" class="btn-flat">Створити DEMO маршрут (10 точок)</button>
                     <button id="btn-create-route" class="btn-primary">Створити маршрут</button>
                     <button id="btn-save-route" class="btn-primary">Зберегти маршрут</button>
                 </div>
-                <div class="specialist-block">
+                <div class="specialist-block" id="editor-edit-point-block">
                     <div class="t-label">Швидке редагування точки</div>
                     <input id="edit-point-title" type="text" placeholder="Назва точки" />
                     <select id="edit-point-type"></select>
@@ -219,7 +224,7 @@
                     <label class="specialist-check"><input id="edit-point-certified" type="checkbox" /> Сертифіковано</label>
                     <button id="btn-save-point" class="btn-primary">Зберегти точку</button>
                 </div>
-                <div class="specialist-block">
+                <div class="specialist-block" id="editor-news-block">
                     <div class="t-label">Додати новину</div>
                     <input id="news-title-input" type="text" placeholder="Заголовок новини" />
                     <textarea id="news-summary-input" placeholder="Короткий опис"></textarea>

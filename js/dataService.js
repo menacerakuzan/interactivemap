@@ -95,7 +95,7 @@ async function supabaseGetPoints(query = {}) {
   let request = supabase
     .from('points')
     .select(
-      'id,title,description,lat,lng,district,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
+      'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
     )
     .order('created_at', { ascending: false });
 
@@ -156,7 +156,7 @@ async function supabaseCreatePoint(payload) {
       created_by: user.id,
     })
     .select(
-      'id,title,description,lat,lng,district,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
+      'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
     )
     .single();
 
@@ -190,7 +190,7 @@ async function supabaseUpdatePoint(pointId, payload) {
     .update(updateData)
     .eq('id', pointId)
     .select(
-      'id,title,description,lat,lng,district,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
+      'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
     )
     .single();
 

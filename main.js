@@ -83,6 +83,7 @@ const PAGE_SIZE = 5;
 const UI_STATE_KEY = 'odesaSpecialistUiState';
 let selectedDistrict = '';
 let selectedCommunity = '';
+let currentSpecialistAction = 'menu';
 
 function updateLanguage(lang) {
   currentLang = lang;
@@ -123,6 +124,19 @@ function setSpecialistMessage(text, isError = false) {
   message.style.color = isError ? 'var(--c-vermillion)' : 'var(--c-text-secondary)';
 }
 
+async function runWithButtonState(button, pendingText, action) {
+  if (!button) return action();
+  const prev = button.innerText;
+  button.disabled = true;
+  button.innerText = pendingText;
+  try {
+    return await action();
+  } finally {
+    button.disabled = false;
+    button.innerText = prev;
+  }
+}
+
 function formatIsoDate(isoString) {
   if (!isoString) return '-';
   const date = new Date(isoString);
@@ -136,10 +150,7 @@ function formatIsoDate(isoString) {
 }
 
 function getActiveSpecialistTab() {
-  return (
-    document.querySelector('[data-specialist-tab].active')?.getAttribute('data-specialist-tab') ||
-    'dashboard'
-  );
+  return currentSpecialistAction;
 }
 
 function saveUiState() {
@@ -186,7 +197,7 @@ function applySavedUiState() {
   if (routeSearch) routeSearch.value = routeSearchTerm;
   if (pointSearch) pointSearch.value = pointSearchTerm;
 
-  setActiveSpecialistTab(saved.activeTab === 'editor' ? 'editor' : 'dashboard');
+  setActiveSpecialistTab(saved.activeTab || 'menu');
 }
 
 function populateCommunitiesSelect() {
@@ -249,20 +260,40 @@ async function geocodeCommunity(district, community) {
 }
 
 function setActiveSpecialistTab(tabName) {
-  const tabButtons = document.querySelectorAll('[data-specialist-tab]');
+  if (tabName === 'editor') tabName = 'route-editor';
+  if (tabName === 'dashboard') tabName = 'dashboard';
+  if (!tabName) tabName = 'menu';
+  const actionButtons = document.querySelectorAll('[data-specialist-action]');
+  const backButton = document.getElementById('btn-specialist-back');
   const dashboard = document.getElementById('specialist-dashboard');
   const editor = document.getElementById('specialist-editor');
+  const focusBlocks = document.querySelectorAll(
+    '#dashboard-kpi-block, #dashboard-routes-block, #dashboard-review-block, #dashboard-points-block, #dashboard-activity-block, #editor-add-point-block, #editor-route-block, #editor-edit-point-block, #editor-news-block'
+  );
+  focusBlocks.forEach((el) => el.classList.remove('action-focus'));
 
-  tabButtons.forEach((b) => b.classList.remove('active'));
-  tabButtons.forEach((b) => {
-    if (b.getAttribute('data-specialist-tab') === tabName) {
-      b.classList.add('active');
+  const action = tabName;
+  currentSpecialistAction = action;
+  actionButtons.forEach((b) => b.classList.toggle('active', b.getAttribute('data-specialist-action') === action));
+
+  if (dashboard && editor && backButton) {
+    if (action === 'menu') {
+      dashboard.classList.remove('active');
+      editor.classList.remove('active');
+      backButton.style.display = 'none';
+    } else if (action === 'dashboard') {
+      dashboard.classList.add('active');
+      editor.classList.remove('active');
+      backButton.style.display = 'block';
+    } else {
+      dashboard.classList.remove('active');
+      editor.classList.add('active');
+      backButton.style.display = 'block';
+      if (action === 'add-point') document.getElementById('editor-add-point-block')?.classList.add('action-focus');
+      if (action === 'route-editor') document.getElementById('editor-route-block')?.classList.add('action-focus');
+      if (action === 'edit-point') document.getElementById('editor-edit-point-block')?.classList.add('action-focus');
+      if (action === 'news-editor') document.getElementById('editor-news-block')?.classList.add('action-focus');
     }
-  });
-
-  if (dashboard && editor) {
-    dashboard.classList.toggle('active', tabName === 'dashboard');
-    editor.classList.toggle('active', tabName === 'editor');
   }
   saveUiState();
 }
@@ -604,14 +635,21 @@ function setAuthState(token, user) {
 }
 
 function bindSpecialistTabs() {
-  const tabButtons = document.querySelectorAll('[data-specialist-tab]');
-  if (!tabButtons.length) return;
+  const actionButtons = document.querySelectorAll('[data-specialist-action]');
+  const backButton = document.getElementById('btn-specialist-back');
+  if (!actionButtons.length) return;
 
-  tabButtons.forEach((btn) => {
+  actionButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
-      setActiveSpecialistTab(btn.getAttribute('data-specialist-tab'));
+      setActiveSpecialistTab(btn.getAttribute('data-specialist-action'));
     });
   });
+
+  if (backButton) {
+    backButton.addEventListener('click', () => {
+      setActiveSpecialistTab('menu');
+    });
+  }
 }
 
 function resetRouteEditor() {
@@ -638,7 +676,7 @@ function openRouteInEditor(routeId, options = {}) {
   routeOrderHistory = [];
   renderRoutePointOrder();
   mapController?.highlightRoute?.(route);
-  setActiveSpecialistTab('editor');
+  setActiveSpecialistTab('route-editor');
   if (!options.silent) {
     setSpecialistMessage(`Редагування маршруту: ${route.name}`);
   }
@@ -656,7 +694,7 @@ function openPointInEditor(pointId) {
   document.getElementById('edit-point-description').value = point.description || '';
   document.getElementById('edit-point-photo-url').value = point.photoUrl || '';
   document.getElementById('edit-point-certified').checked = Boolean(point.isCertified);
-  setActiveSpecialistTab('editor');
+  setActiveSpecialistTab('edit-point');
   setSpecialistMessage(`Редагування точки: ${point.title}`);
   saveUiState();
 }
@@ -805,6 +843,7 @@ function bindAuthFlow() {
 
         if (authView) authView.style.display = 'none';
         setSpecialistMessage(`Вхід виконано: ${data.user.fullName}`);
+        setActiveSpecialistTab(data.user.role === 'viewer' ? 'menu' : 'dashboard');
 
         try {
           await refreshDashboardData();
@@ -952,6 +991,7 @@ function bindSpecialistTools() {
   const btnSavePoint = document.getElementById('btn-save-point');
   const btnUndoRouteOrder = document.getElementById('btn-undo-route-order');
   const btnCreateNews = document.getElementById('btn-create-news');
+  const btnCreateDemoRoute = document.getElementById('btn-create-demo-route');
 
   if (btnPickOnMap) {
     btnPickOnMap.addEventListener('click', () => {
@@ -1015,18 +1055,24 @@ function bindSpecialistTools() {
         isCertified: document.getElementById('point-certified').checked,
       };
 
-      try {
-        const pointPhotoFile = document.getElementById('point-photo-file')?.files?.[0];
-        if (pointPhotoFile) {
-          payload.photoUrl = await dataService.uploadPointPhoto(pointPhotoFile);
+      await runWithButtonState(btnCreatePoint, 'Збереження...', async () => {
+        try {
+          const pointPhotoFile = document.getElementById('point-photo-file')?.files?.[0];
+          if (pointPhotoFile) {
+            try {
+              payload.photoUrl = await dataService.uploadPointPhoto(pointPhotoFile);
+            } catch (uploadError) {
+              setSpecialistMessage(`Фото не завантажено: ${uploadError.message}`, true);
+            }
+          }
+          await apiRequest('/api/points', { method: 'POST', body: JSON.stringify(payload) });
+          await mapController.refresh();
+          await refreshDashboardData();
+          setSpecialistMessage('Точку додано');
+        } catch (error) {
+          setSpecialistMessage(error.message, true);
         }
-        await apiRequest('/api/points', { method: 'POST', body: JSON.stringify(payload) });
-        await mapController.refresh();
-        await refreshDashboardData();
-        setSpecialistMessage('Точку додано');
-      } catch (error) {
-        setSpecialistMessage(error.message, true);
-      }
+      });
     });
   }
 
@@ -1044,17 +1090,19 @@ function bindSpecialistTools() {
         points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
       };
 
-      try {
-        const created = await apiRequest('/api/routes', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-        await refreshDashboardData();
-        openRouteInEditor(created.id);
-        setSpecialistMessage('Маршрут створено');
-      } catch (error) {
-        setSpecialistMessage(error.message, true);
-      }
+      await runWithButtonState(btnCreateRoute, 'Створення...', async () => {
+        try {
+          const created = await apiRequest('/api/routes', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          await refreshDashboardData();
+          openRouteInEditor(created.id);
+          setSpecialistMessage('Маршрут створено');
+        } catch (error) {
+          setSpecialistMessage(error.message, true);
+        }
+      });
     });
   }
 
@@ -1072,17 +1120,19 @@ function bindSpecialistTools() {
         points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
       };
 
-      try {
-        await apiRequest(`/api/routes/${editingRouteId}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
-        await refreshDashboardData();
-        setSpecialistMessage('Маршрут оновлено');
-        saveUiState();
-      } catch (error) {
-        setSpecialistMessage(error.message, true);
-      }
+      await runWithButtonState(btnSaveRoute, 'Оновлення...', async () => {
+        try {
+          await apiRequest(`/api/routes/${editingRouteId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          });
+          await refreshDashboardData();
+          setSpecialistMessage('Маршрут оновлено');
+          saveUiState();
+        } catch (error) {
+          setSpecialistMessage(error.message, true);
+        }
+      });
     });
   }
 
@@ -1122,21 +1172,27 @@ function bindSpecialistTools() {
         isCertified: document.getElementById('edit-point-certified').checked,
       };
 
-      try {
-        const pointPhotoFile = document.getElementById('edit-point-photo-file')?.files?.[0];
-        if (pointPhotoFile) {
-          payload.photoUrl = await dataService.uploadPointPhoto(pointPhotoFile);
+      await runWithButtonState(btnSavePoint, 'Оновлення...', async () => {
+        try {
+          const pointPhotoFile = document.getElementById('edit-point-photo-file')?.files?.[0];
+          if (pointPhotoFile) {
+            try {
+              payload.photoUrl = await dataService.uploadPointPhoto(pointPhotoFile);
+            } catch (uploadError) {
+              setSpecialistMessage(`Фото не завантажено: ${uploadError.message}`, true);
+            }
+          }
+          await apiRequest(`/api/points/${editingPointId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          });
+          await mapController.refresh();
+          await refreshDashboardData();
+          setSpecialistMessage('Точку оновлено');
+        } catch (error) {
+          setSpecialistMessage(error.message, true);
         }
-        await apiRequest(`/api/points/${editingPointId}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
-        await mapController.refresh();
-        await refreshDashboardData();
-        setSpecialistMessage('Точку оновлено');
-      } catch (error) {
-        setSpecialistMessage(error.message, true);
-      }
+      });
     });
   }
 
@@ -1153,13 +1209,76 @@ function bindSpecialistTools() {
         return;
       }
 
-      try {
-        await apiRequest('/api/news', { method: 'POST', body: JSON.stringify(payload) });
-        await refreshDashboardData();
-        setSpecialistMessage('Новину додано');
-      } catch (error) {
-        setSpecialistMessage(error.message, true);
+      await runWithButtonState(btnCreateNews, 'Публікація...', async () => {
+        try {
+          await apiRequest('/api/news', { method: 'POST', body: JSON.stringify(payload) });
+          await refreshDashboardData();
+          setSpecialistMessage('Новину додано');
+        } catch (error) {
+          setSpecialistMessage(error.message, true);
+        }
+      });
+    });
+  }
+
+  if (btnCreateDemoRoute) {
+    btnCreateDemoRoute.addEventListener('click', async () => {
+      if (!authToken) {
+        setSpecialistMessage('Потрібно увійти як спеціаліст', true);
+        return;
       }
+
+      const demoPoints = [
+        ['Оперний театр (вхід)', 46.4851, 30.7405],
+        ['Приморський бульвар', 46.4857, 30.7417],
+        ['Потьомкінські сходи (верх)', 46.4863, 30.7429],
+        ['Думська площа', 46.4859, 30.7423],
+        ['Міський сад', 46.4846, 30.7327],
+        ['Дерибасівська (центр)', 46.4838, 30.7321],
+        ['Соборна площа', 46.4832, 30.7268],
+        ['Одеська філармонія', 46.4789, 30.7442],
+        ['Вокзал Одеса-Головна', 46.4665, 30.7392],
+        ['Парк Шевченка', 46.4777, 30.7535],
+      ];
+
+      await runWithButtonState(btnCreateDemoRoute, 'Генерація...', async () => {
+        try {
+          const createdPointIds = [];
+          for (let i = 0; i < demoPoints.length; i += 1) {
+            const [title, lat, lng] = demoPoints[i];
+            const created = await apiRequest('/api/points', {
+              method: 'POST',
+              body: JSON.stringify({
+                title: `${title} [DEMO]`,
+                lat,
+                lng,
+                district: 'Одеський район',
+                pointTypeCode: i % 2 === 0 ? 'ramp' : 'entrance',
+                description: 'Тестова DEMO точка для перевірки маршруту.',
+                isCertified: i % 3 === 0,
+              }),
+            });
+            createdPointIds.push({ pointId: created.id });
+          }
+
+          const route = await apiRequest('/api/routes', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: `DEMO маршрут Одеса (10 точок) ${new Date().toLocaleTimeString('uk-UA')}`,
+              status: 'draft',
+              description: 'Автоматично створений тестовий маршрут по Одесі.',
+              points: createdPointIds,
+            }),
+          });
+
+          await mapController.refresh();
+          await refreshDashboardData();
+          openRouteInEditor(route.id);
+          setSpecialistMessage('DEMO маршрут на 10 точок створено');
+        } catch (error) {
+          setSpecialistMessage(error.message, true);
+        }
+      });
     });
   }
 }
