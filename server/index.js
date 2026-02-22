@@ -48,7 +48,46 @@ const mapPointRow = (row) => ({
   createdBy: row.created_by,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  sections: Array.isArray(row.sections) ? row.sections : [],
 });
+
+function readPointSections(pointId) {
+  return db
+    .prepare(
+      `SELECT id, point_id, position, title, description, photo_url
+       FROM point_sections
+       WHERE point_id = ?
+       ORDER BY position, id`
+    )
+    .all(pointId)
+    .map((row) => ({
+      id: row.id,
+      pointId: row.point_id,
+      position: row.position,
+      title: row.title || '',
+      description: row.description || '',
+      photoUrl: row.photo_url || null,
+    }));
+}
+
+function normalizePointSections(input) {
+  if (!Array.isArray(input)) return undefined;
+  const normalized = [];
+  input.forEach((section, index) => {
+    if (!section || typeof section !== 'object') return;
+    const title = normalizeOptionalText(section.title, 180) || null;
+    const description = normalizeOptionalText(section.description, 2000) || null;
+    const photoUrl = normalizeOptionalText(section.photoUrl, 1200) || null;
+    if (!title && !description && !photoUrl) return;
+    normalized.push({
+      position: index + 1,
+      title,
+      description,
+      photoUrl,
+    });
+  });
+  return normalized;
+}
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
@@ -121,11 +160,18 @@ app.get('/api/points', (req, res) => {
   sql += ' ORDER BY p.created_at DESC';
 
   const rows = db.prepare(sql).all(...params);
-  res.json(rows.map(mapPointRow));
+  res.json(
+    rows.map((row) =>
+      mapPointRow({
+        ...row,
+        sections: readPointSections(row.id),
+      })
+    )
+  );
 });
 
 app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, res) => {
-  const { title, description, lat, lng, pointTypeCode, isCertified, district, photoUrl } = req.body;
+  const { title, description, lat, lng, pointTypeCode, isCertified, district, photoUrl, sections } = req.body;
 
   if (!isNonEmptyText(title, 160) || !isValidCoordinate(lat, -90, 90) || !isValidCoordinate(lng, -180, 180) || !pointTypeCode) {
     return res.status(400).json({ error: 'title, lat, lng, pointTypeCode are required' });
@@ -136,22 +182,38 @@ app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, 
     return res.status(400).json({ error: 'Invalid pointTypeCode' });
   }
 
-  const result = db
-    .prepare(`
-      INSERT INTO points (title, description, lat, lng, point_type_id, is_certified, district, photo_url, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-    .run(
-      title.trim(),
-      normalizeOptionalText(description, 2000),
-      lat,
-      lng,
-      pointType.id,
-      isCertified ? 1 : 0,
-      normalizeOptionalText(district, 255),
-      normalizeOptionalText(photoUrl, 1200),
-      req.user.id
-    );
+  const normalizedSections = normalizePointSections(sections) || [];
+  const tx = db.transaction(() => {
+    const result = db
+      .prepare(`
+        INSERT INTO points (title, description, lat, lng, point_type_id, is_certified, district, photo_url, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .run(
+        title.trim(),
+        normalizeOptionalText(description, 2000),
+        lat,
+        lng,
+        pointType.id,
+        isCertified ? 1 : 0,
+        normalizeOptionalText(district, 255),
+        normalizeOptionalText(photoUrl, 1200),
+        req.user.id
+      );
+
+    const pointId = Number(result.lastInsertRowid);
+    if (normalizedSections.length) {
+      const insertSection = db.prepare(
+        'INSERT INTO point_sections (point_id, position, title, description, photo_url) VALUES (?, ?, ?, ?, ?)'
+      );
+      normalizedSections.forEach((section) => {
+        insertSection.run(pointId, section.position, section.title, section.description, section.photoUrl);
+      });
+    }
+    return pointId;
+  });
+
+  const pointId = tx();
 
   const row = db
     .prepare(`
@@ -160,9 +222,14 @@ app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, 
       JOIN point_types pt ON pt.id = p.point_type_id
       WHERE p.id = ?
     `)
-    .get(result.lastInsertRowid);
+    .get(pointId);
 
-  return res.status(201).json(mapPointRow(row));
+  return res.status(201).json(
+    mapPointRow({
+      ...row,
+      sections: readPointSections(pointId),
+    })
+  );
 });
 
 app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (req, res) => {
@@ -172,7 +239,7 @@ app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (re
     return res.status(404).json({ error: 'Point not found' });
   }
 
-  const { title, description, lat, lng, pointTypeCode, isCertified, district, photoUrl } = req.body;
+  const { title, description, lat, lng, pointTypeCode, isCertified, district, photoUrl, sections } = req.body;
 
   const pointType = pointTypeCode
     ? db.prepare('SELECT id FROM point_types WHERE code = ?').get(pointTypeCode)
@@ -231,7 +298,22 @@ app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (re
   fields.push("updated_at = datetime('now')");
   values.push(pointId);
 
-  db.prepare(`UPDATE points SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  const normalizedSections = normalizePointSections(sections);
+  const tx = db.transaction(() => {
+    db.prepare(`UPDATE points SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    if (normalizedSections !== undefined) {
+      db.prepare('DELETE FROM point_sections WHERE point_id = ?').run(pointId);
+      if (normalizedSections.length) {
+        const insertSection = db.prepare(
+          'INSERT INTO point_sections (point_id, position, title, description, photo_url) VALUES (?, ?, ?, ?, ?)'
+        );
+        normalizedSections.forEach((section) => {
+          insertSection.run(pointId, section.position, section.title, section.description, section.photoUrl);
+        });
+      }
+    }
+  });
+  tx();
 
   const row = db
     .prepare(`
@@ -242,7 +324,12 @@ app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (re
     `)
     .get(pointId);
 
-  return res.json(mapPointRow(row));
+  return res.json(
+    mapPointRow({
+      ...row,
+      sections: readPointSections(pointId),
+    })
+  );
 });
 
 app.delete('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (req, res) => {

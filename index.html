@@ -85,7 +85,6 @@
 
         <!-- Floating Filter Menu instead of Bar -->
         <div class="filter-menu" id="filter-menu">
-            <button id="btn-hide-filters" class="float-hide-btn" aria-label="Згорнути фільтри">⟩</button>
             <button id="btn-toggle-filters" class="filter-toggle" data-magnetic>
                 <span data-i18n="filters">Фільтри</span>
                 <svg class="arrow-icon" viewBox="0 0 24 24" width="20" height="20">
@@ -191,6 +190,11 @@
                     <textarea id="point-description" placeholder="Коментар"></textarea>
                     <input id="point-photo-file" type="file" accept="image/*" />
                     <input id="point-photo-url" type="text" placeholder="URL фото (опційно)" />
+                    <div class="point-sections-editor">
+                        <div class="t-label">Розділи опису з фото</div>
+                        <div id="point-sections-list" class="point-sections-list"></div>
+                        <button id="btn-add-point-section" class="btn-flat" type="button">+ Додати розділ</button>
+                    </div>
                     <label class="specialist-check"><input id="point-certified" type="checkbox" /> Сертифіковано</label>
                     <button id="btn-pick-on-map" class="btn-flat">Вибрати на карті</button>
                     <button id="btn-create-point" class="btn-primary">Створити точку</button>
@@ -225,6 +229,11 @@
                     <textarea id="edit-point-description" placeholder="Коментар"></textarea>
                     <input id="edit-point-photo-file" type="file" accept="image/*" />
                     <input id="edit-point-photo-url" type="text" placeholder="URL фото (опційно)" />
+                    <div class="point-sections-editor">
+                        <div class="t-label">Розділи опису з фото</div>
+                        <div id="edit-point-sections-list" class="point-sections-list"></div>
+                        <button id="btn-add-edit-point-section" class="btn-flat" type="button">+ Додати розділ</button>
+                    </div>
                     <label class="specialist-check"><input id="edit-point-certified" type="checkbox" /> Сертифіковано</label>
                     <button id="btn-save-point" class="btn-primary">Зберегти точку</button>
                     <button id="btn-delete-point" class="btn-flat">Видалити точку</button>
@@ -293,11 +302,8 @@
             style="display: none; position: fixed; inset: 0; background: var(--c-bg); z-index: 5000; align-items: center; justify-content: center; flex-direction: column;">
             <div class="card card-3d auth-card"
                 style="width: 420px; padding: 56px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: var(--shadow-float);">
-                <svg class="anchor-logo" viewBox="0 0 512 512" width="40" height="40" fill="currentColor"
-                    style="color: var(--c-admiralty); margin-bottom: 16px;">
-                    <path
-                        d="M256 0c-17.7 0-32 14.3-32 32v24.2c-29.4 10.4-50.6 38.3-50.6 71.8 0 42.4 34.4 76.8 76.8 76.8s76.8-34.4 76.8-76.8c0-33.5-21.2-61.4-50.6-71.8V32c0-17.7-14.3-32-32-32zm0 172.8c-24.7 0-44.8-20.1-44.8-44.8 0-24.7 20.1-44.8 44.8-44.8s44.8 20.1 44.8 44.8c0 24.7-20.1 44.8-44.8 44.8zM476.3 226.7C455 205.4 420.3 205.4 399 226.7c-9.4 9.4-14.6 21.8-14.6 35V308c0 23.3-13.6 43.6-33.4 53.6-18.4-15.5-38.6-28.8-60.6-39.2-22-10.4-45-18-68.4-22.3v-49.8c0-17.7-14.3-32-32-32s-32 14.3-32 32v49.8c-23.4 4.3-46.4 11.9-68.4 22.3-22 10.4-42.2 23.7-60.6 39.2C109.2 351.6 95.6 331.3 95.6 308v-46.3c0-13.2-5.3-25.7-14.6-35C59.7 205.4 25 205.4 3.7 226.7-6.2 236.6 0.1 253.6 14.1 254.9c55.3 5.3 98.7 52.8 98.7 109.9v10.3c0 69.1 56.1 125.1 125.2 125.1h18v11.8c0 17.7 14.3 32 32 32s32-14.3 32-32V500h18c69.1 0 125.2-56 125.2-125.1V364.8c0-57.1 43.4-104.6 98.7-109.9 14.1-1.3 20.4-18.3 10.4-28.2z" />
-                </svg>
+                <img src="./assets/newanchor.png" alt="Odesa Anchor" class="auth-logo-img"
+                    onerror="this.style.display='none'" />
                 <div class="t-nav" data-i18n="app_title" style="color: var(--c-text-primary);">ОДЕСЬКА ОБЛАСТЬ</div>
                 <div class="t-data text-muted" data-i18n="app_subtitle"></div>
                 <hr style="width: 100%; border: 0; border-top: 1px solid var(--c-divider); margin-bottom: 24px;">

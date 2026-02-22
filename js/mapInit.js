@@ -13,6 +13,15 @@ let fetchPointsFn = async (filter) => {
   return response.json();
 };
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 const ODESA_BOUNDS = {
   center: [46.7, 30.2],
   defaultZoom: 8,
@@ -56,11 +65,36 @@ function showInfoCard(data) {
   document.querySelector('.map-view')?.classList.add('panel-open');
 
   if (window.gsap) {
-    gsap.to(panel, { opacity: 1, x: 0, duration: 0.5, ease: 'power3.out' });
+    gsap.to(panel, { opacity: 1, x: 0, duration: 0.24, ease: 'power2.out' });
   }
 
   const badge = data.isCertified
     ? `<span style="margin-left: 12px; color: var(--c-brass); border: 1px solid var(--c-brass); border-radius: 100px; padding: 2px 8px; font-family: var(--font-nav); font-size: 11px;">СЕРТИФІКОВАНО ✦</span>`
+    : '';
+
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+  const sectionsMarkup = sections.length
+    ? `
+      <hr style="border: 0; border-top: 1px solid var(--c-divider);">
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div class="t-label text-muted">Детальні пункти</div>
+        ${sections
+          .map((section, idx) => {
+            const sectionPhoto = section.photoUrl
+              ? `<div style="height:120px;border-radius:10px;background:url('${section.photoUrl}') center/cover;border:1px solid var(--c-divider);"></div>`
+              : '';
+            return `
+              <article style="border:1px solid var(--c-divider); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px;">
+                <div class="t-data text-muted">Пункт ${idx + 1}</div>
+                ${section.title ? `<div class="t-body"><strong>${escapeHtml(section.title)}</strong></div>` : ''}
+                ${section.description ? `<div class="t-body">${escapeHtml(section.description)}</div>` : ''}
+                ${sectionPhoto}
+              </article>
+            `;
+          })
+          .join('')}
+      </div>
+    `
     : '';
 
   panel.innerHTML = `
@@ -69,7 +103,7 @@ function showInfoCard(data) {
         data.photoUrl
           ? `url('${data.photoUrl}') center/cover`
           : 'linear-gradient(130deg, #dbeafe 0%, #f8fafc 100%)'
-      }; border-radius: var(--radius-md) var(--radius-md) 0 0;"></div>
+      }; border-radius: var(--radius-md);"></div>
       <div>
         <h2 class="t-h2" style="display: flex; align-items: center;">${data.title} ${badge}</h2>
         <div class="t-label text-muted" style="margin-top: 4px;">${data.district || 'Одеська область'}</div>
@@ -84,6 +118,7 @@ function showInfoCard(data) {
         <div class="t-label text-muted" style="margin-bottom: 4px;">Коментар:</div>
         <div class="t-body">${data.description || 'Без коментаря'}</div>
       </div>
+      ${sectionsMarkup}
       <hr style="border: 0; border-top: 1px solid var(--c-divider);">
       <div style="display:flex; flex-direction: column; gap: 4px;">
         <div class="t-data">Координати: ${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}</div>

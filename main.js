@@ -85,6 +85,7 @@ const UI_STATE_KEY = 'odesaSpecialistUiState';
 let selectedDistrict = '';
 let selectedCommunity = '';
 let currentSpecialistAction = 'menu';
+const MAX_POINT_SECTION_COUNT = 12;
 const dashboardBlockIds = [
   'dashboard-kpi-block',
   'dashboard-routes-block',
@@ -171,6 +172,123 @@ function isValidHttpUrl(value) {
   } catch (_e) {
     return false;
   }
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function makePointSectionMarkup(section = {}, idx = 0) {
+  const title = escapeHtml(section.title || '');
+  const description = escapeHtml(section.description || '');
+  const photoUrl = escapeHtml(section.photoUrl || '');
+  const previewStyle = photoUrl ? ` style="background-image:url('${photoUrl}');"` : '';
+  return `
+    <article class="point-section-item" data-section-index="${idx}">
+      <div class="point-section-head">
+        <div class="t-data text-muted">Розділ ${idx + 1}</div>
+        <button class="btn-flat" type="button" data-action="remove-point-section">Видалити</button>
+      </div>
+      <input type="text" data-field="title" placeholder="Короткий заголовок" value="${title}" />
+      <textarea data-field="description" placeholder="Опис розділу">${description}</textarea>
+      <div class="point-section-grid">
+        <input type="file" data-field="photo-file" accept="image/*" />
+        <input type="text" data-field="photo-url" placeholder="URL фото (опційно)" value="${photoUrl}" />
+      </div>
+      <div class="point-section-preview"${previewStyle}></div>
+    </article>
+  `;
+}
+
+function updateSectionPreview(item) {
+  if (!item) return;
+  const preview = item.querySelector('.point-section-preview');
+  const urlInput = item.querySelector('[data-field="photo-url"]');
+  if (!preview || !urlInput) return;
+  const url = (urlInput.value || '').trim();
+  preview.style.backgroundImage = url ? `url('${url}')` : '';
+}
+
+function renumberPointSections(listEl) {
+  if (!listEl) return;
+  listEl.querySelectorAll('.point-section-item').forEach((item, idx) => {
+    item.dataset.sectionIndex = String(idx);
+    const label = item.querySelector('.point-section-head .t-data');
+    if (label) label.textContent = `Розділ ${idx + 1}`;
+  });
+}
+
+function renderPointSectionsEditor(listEl, sections = []) {
+  if (!listEl) return;
+  const rows = sections.length ? sections : [{}];
+  listEl.innerHTML = rows.slice(0, MAX_POINT_SECTION_COUNT).map((section, idx) => makePointSectionMarkup(section, idx)).join('');
+  renumberPointSections(listEl);
+}
+
+function bindPointSectionsEditor(listEl, addBtn) {
+  if (!listEl) return;
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      const count = listEl.querySelectorAll('.point-section-item').length;
+      if (count >= MAX_POINT_SECTION_COUNT) {
+        setSpecialistMessage(`Максимум ${MAX_POINT_SECTION_COUNT} розділів`, true);
+        return;
+      }
+      listEl.insertAdjacentHTML('beforeend', makePointSectionMarkup({}, count));
+      renumberPointSections(listEl);
+    });
+  }
+  listEl.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('button[data-action="remove-point-section"]');
+    if (!removeBtn) return;
+    const item = removeBtn.closest('.point-section-item');
+    if (!item) return;
+    item.remove();
+    if (!listEl.querySelector('.point-section-item')) {
+      listEl.insertAdjacentHTML('beforeend', makePointSectionMarkup({}, 0));
+    }
+    renumberPointSections(listEl);
+  });
+  listEl.addEventListener('input', (e) => {
+    if (e.target.matches('[data-field="photo-url"]')) {
+      updateSectionPreview(e.target.closest('.point-section-item'));
+    }
+  });
+}
+
+async function collectPointSectionsPayload(listEl) {
+  if (!listEl) return [];
+  const rows = Array.from(listEl.querySelectorAll('.point-section-item'));
+  const sections = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i];
+    const title = row.querySelector('[data-field="title"]')?.value?.trim() || '';
+    const description = row.querySelector('[data-field="description"]')?.value?.trim() || '';
+    let photoUrl = row.querySelector('[data-field="photo-url"]')?.value?.trim() || '';
+    const file = row.querySelector('[data-field="photo-file"]')?.files?.[0];
+
+    if (photoUrl && !isValidHttpUrl(photoUrl)) {
+      throw new Error(`Розділ ${i + 1}: URL фото має починатися з http:// або https://`);
+    }
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        throw new Error(`Розділ ${i + 1}: файл має бути зображенням`);
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        throw new Error(`Розділ ${i + 1}: фото завелике (макс 8MB)`);
+      }
+      photoUrl = await dataService.uploadPointPhoto(file);
+    }
+
+    if (!title && !description && !photoUrl) continue;
+    sections.push({ title, description, photoUrl: photoUrl || null });
+  }
+  return sections;
 }
 
 function getActiveSpecialistTab() {
@@ -811,6 +929,7 @@ function openPointInEditor(pointId) {
   document.getElementById('edit-point-description').value = point.description || '';
   document.getElementById('edit-point-photo-url').value = point.photoUrl || '';
   document.getElementById('edit-point-certified').checked = Boolean(point.isCertified);
+  renderPointSectionsEditor(document.getElementById('edit-point-sections-list'), point.sections || []);
   const editPointSelect = document.getElementById('edit-point-select');
   if (editPointSelect) {
     editPointSelect.value = String(point.id);
@@ -978,12 +1097,12 @@ function bindAuthFlow() {
         gsap.fromTo(
           authView,
           { opacity: 0, backdropFilter: 'blur(0px)' },
-          { opacity: 1, backdropFilter: 'blur(6px)', duration: 0.5, ease: 'power2.out' }
+          { opacity: 1, backdropFilter: 'blur(6px)', duration: 0.26, ease: 'power2.out' }
         );
         gsap.fromTo(
           authView.querySelector('.auth-card'),
           { y: 40, opacity: 0, filter: 'blur(6px)' },
-          { y: 0, opacity: 1, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out', delay: 0.1 }
+          { y: 0, opacity: 1, filter: 'blur(0px)', duration: 0.3, ease: 'power2.out', delay: 0.03 }
         );
       } else {
         authView.style.opacity = '1';
@@ -995,7 +1114,7 @@ function bindAuthFlow() {
         if (window.gsap) {
           gsap.to(authView, {
             opacity: 0,
-            duration: 0.4,
+            duration: 0.22,
             onComplete: () => {
               authView.style.display = 'none';
               setFilterMenuHidden(false);
@@ -1176,20 +1295,11 @@ function bindFilterMenu() {
 
 function bindFloatingUiControls() {
   const filterMenu = document.getElementById('filter-menu');
-  const btnHideFilters = document.getElementById('btn-hide-filters');
   const specialistPanel = document.getElementById('specialist-panel');
   const btnHideSpecialist = document.getElementById('btn-hide-specialist');
   const legendWrap = document.getElementById('map-legend-wrap');
   const btnToggleLegend = document.getElementById('btn-toggle-legend');
   const mapContainer = document.querySelector('.map-container');
-
-  if (btnHideFilters && filterMenu) {
-    btnHideFilters.addEventListener('click', () => {
-      const isCollapsed = filterMenu.classList.toggle('collapsed');
-      filterMenu.classList.remove('active');
-      btnHideFilters.textContent = isCollapsed ? '⟨' : '⟩';
-    });
-  }
 
   if (btnHideSpecialist && specialistPanel) {
     btnHideSpecialist.addEventListener('click', () => {
@@ -1248,6 +1358,15 @@ function bindSpecialistTools() {
   const btnNewNews = document.getElementById('btn-new-news');
   const editPointSelect = document.getElementById('edit-point-select');
   const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
+  const pointSectionsList = document.getElementById('point-sections-list');
+  const editPointSectionsList = document.getElementById('edit-point-sections-list');
+  const btnAddPointSection = document.getElementById('btn-add-point-section');
+  const btnAddEditPointSection = document.getElementById('btn-add-edit-point-section');
+
+  renderPointSectionsEditor(pointSectionsList, []);
+  renderPointSectionsEditor(editPointSectionsList, []);
+  bindPointSectionsEditor(pointSectionsList, btnAddPointSection);
+  bindPointSectionsEditor(editPointSectionsList, btnAddEditPointSection);
 
   if (btnPickOnMap) {
     btnPickOnMap.addEventListener('click', () => {
@@ -1343,9 +1462,19 @@ function bindSpecialistTools() {
               return;
             }
           }
+          payload.sections = await collectPointSectionsPayload(pointSectionsList);
           await apiRequest('/api/points', { method: 'POST', body: JSON.stringify(payload) });
           await mapController.refresh();
           await refreshDashboardData();
+          document.getElementById('point-title').value = '';
+          document.getElementById('point-lat').value = '';
+          document.getElementById('point-lng').value = '';
+          document.getElementById('point-district').value = '';
+          document.getElementById('point-description').value = '';
+          document.getElementById('point-photo-url').value = '';
+          document.getElementById('point-photo-file').value = '';
+          document.getElementById('point-certified').checked = false;
+          renderPointSectionsEditor(pointSectionsList, []);
           setSpecialistMessage('Точку додано');
         } catch (error) {
           setSpecialistMessage(error.message, true);
@@ -1493,12 +1622,25 @@ function bindSpecialistTools() {
               // no-op, point will still be updated without photo
             }
           }
+          payload.sections = await collectPointSectionsPayload(editPointSectionsList);
           await apiRequest(`/api/points/${editingPointId}`, {
             method: 'PUT',
             body: JSON.stringify(payload),
           });
+          const removedSectionPhotos = (existingPoint?.sections || [])
+            .map((section) => section.photoUrl)
+            .filter(Boolean)
+            .filter((url) => !payload.sections.some((next) => next.photoUrl === url));
+          for (const url of removedSectionPhotos) {
+            try {
+              await dataService.deletePointPhoto(url);
+            } catch (_e) {
+              // ignore storage cleanup errors
+            }
+          }
           await mapController.refresh();
           await refreshDashboardData();
+          openPointInEditor(editingPointId);
           setSpecialistMessage('Точку оновлено');
         } catch (error) {
           setSpecialistMessage(error.message, true);
@@ -1510,7 +1652,17 @@ function bindSpecialistTools() {
   if (editPointSelect) {
     editPointSelect.addEventListener('change', () => {
       const pointId = Number(editPointSelect.value);
-      if (!pointId) return;
+      if (!pointId) {
+        editingPointId = null;
+        document.getElementById('edit-point-title').value = '';
+        document.getElementById('edit-point-type').value = pointTypes[0]?.code || '';
+        document.getElementById('edit-point-district').value = '';
+        document.getElementById('edit-point-description').value = '';
+        document.getElementById('edit-point-photo-url').value = '';
+        document.getElementById('edit-point-certified').checked = false;
+        renderPointSectionsEditor(editPointSectionsList, []);
+        return;
+      }
       openPointInEditor(pointId);
     });
   }
@@ -1545,6 +1697,8 @@ function bindSpecialistTools() {
           document.getElementById('edit-point-description').value = '';
           document.getElementById('edit-point-photo-url').value = '';
           document.getElementById('edit-point-certified').checked = false;
+          document.getElementById('edit-point-photo-file').value = '';
+          renderPointSectionsEditor(editPointSectionsList, []);
           await mapController.refresh();
           await refreshDashboardData();
           setActiveSpecialistTab(prevAction || 'edit-point');
@@ -1819,18 +1973,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     gsap.to('.hero', {
       opacity: 0,
       y: -30,
-      duration: 0.4,
-      ease: 'power2.inOut',
+      duration: 0.24,
+      ease: 'power2.out',
       onComplete: async () => {
         heroSection.style.display = 'none';
         appInterface.style.display = 'flex';
 
-        gsap.to(appInterface, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+        gsap.to(appInterface, { opacity: 1, duration: 0.26, ease: 'power2.out' });
         gsap.from('.header, .filter-menu', {
           y: -10,
           opacity: 0,
-          duration: 0.5,
-          stagger: 0.05,
+          duration: 0.28,
+          stagger: 0.04,
           ease: 'power2.out',
         });
 
@@ -1883,15 +2037,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         y: 20,
         opacity: 0,
         scale: 0.95,
-        duration: 0.8,
-        ease: 'power3.inOut',
+        duration: 0.26,
+        ease: 'power2.out',
         onComplete: () => {
           partnerPanel.style.display = 'none';
           btnShowPartners.style.display = 'block';
           gsap.fromTo(
             btnShowPartners,
             { opacity: 0, y: 10 },
-            { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }
+            { opacity: 1, y: 0, duration: 0.24, ease: 'power2.out' }
           );
         },
       });
@@ -1903,7 +2057,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       gsap.fromTo(
         partnerPanel,
         { y: 20, opacity: 0, scale: 0.95 },
-        { y: 0, opacity: 1, scale: 1, duration: 0.8, ease: 'power3.out' }
+        { y: 0, opacity: 1, scale: 1, duration: 0.26, ease: 'power2.out' }
       );
     });
   }

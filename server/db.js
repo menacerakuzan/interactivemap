@@ -4,6 +4,7 @@ const { DB_PATH } = require('./config');
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
@@ -40,6 +41,17 @@ CREATE TABLE IF NOT EXISTS points (
   FOREIGN KEY (point_type_id) REFERENCES point_types(id),
   FOREIGN KEY (created_by) REFERENCES users(id),
   FOREIGN KEY (updated_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS point_sections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  point_id INTEGER NOT NULL,
+  position INTEGER NOT NULL DEFAULT 1,
+  title TEXT,
+  description TEXT,
+  photo_url TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (point_id) REFERENCES points(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS routes (

@@ -7,6 +7,11 @@ const EXPLICIT_MODE = (import.meta.env.VITE_DATA_MODE || '').trim().toLowerCase(
 const DATA_MODE = EXPLICIT_MODE || (SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'local');
 const supabase = DATA_MODE === 'supabase' ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
+function isMissingPointSectionsError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('point_sections') && message.includes('does not exist');
+}
+
 function parsePath(path) {
   const url = new URL(path, 'http://local');
   return { pathname: url.pathname, searchParams: url.searchParams };
@@ -23,6 +28,7 @@ function mapPointType(row) {
 }
 
 function mapPoint(row) {
+  const rawSections = Array.isArray(row.point_sections) ? row.point_sections : [];
   return {
     id: row.id,
     title: row.title,
@@ -42,6 +48,16 @@ function mapPoint(row) {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    sections: rawSections
+      .map((section, index) => ({
+        id: section.id || null,
+        pointId: section.point_id || row.id,
+        position: Number(section.position) || index + 1,
+        title: section.title || '',
+        description: section.description || '',
+        photoUrl: section.photo_url || null,
+      }))
+      .sort((a, b) => a.position - b.position),
   };
 }
 
@@ -95,7 +111,7 @@ async function supabaseGetPoints(query = {}) {
   let request = supabase
     .from('points')
     .select(
-      'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
+      'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color),point_sections(id,point_id,position,title,description,photo_url)'
     )
     .order('created_at', { ascending: false });
 
@@ -107,7 +123,24 @@ async function supabaseGetPoints(query = {}) {
     request = request.eq('is_certified', true);
   }
 
-  const { data, error } = await request;
+  let { data, error } = await request;
+  if (error && isMissingPointSectionsError(error)) {
+    let fallbackRequest = supabase
+      .from('points')
+      .select(
+        'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
+      )
+      .order('created_at', { ascending: false });
+    if (filterPointTypeId) {
+      fallbackRequest = fallbackRequest.eq('point_type_id', filterPointTypeId);
+    }
+    if (query.certified === true) {
+      fallbackRequest = fallbackRequest.eq('is_certified', true);
+    }
+    const fallback = await fallbackRequest;
+    data = fallback.data;
+    error = fallback.error;
+  }
   if (error) throw error;
   return data.map(mapPoint);
 }
@@ -155,13 +188,41 @@ async function supabaseCreatePoint(payload) {
       is_certified: Boolean(payload.isCertified),
       created_by: user.id,
     })
-    .select(
-      'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
-    )
+    .select('id')
     .single();
 
   if (error) throw error;
-  return mapPoint(data);
+  if (Array.isArray(payload.sections) && payload.sections.length) {
+    const sectionRows = payload.sections.map((section, index) => ({
+      point_id: data.id,
+      position: index + 1,
+      title: section.title || null,
+      description: section.description || null,
+      photo_url: section.photoUrl || null,
+    }));
+    const { error: sectionError } = await supabase.from('point_sections').insert(sectionRows);
+    if (sectionError) throw sectionError;
+  }
+  let { data: finalPoint, error: finalError } = await supabase
+    .from('points')
+    .select(
+      'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color),point_sections(id,point_id,position,title,description,photo_url)'
+    )
+    .eq('id', data.id)
+    .single();
+  if (finalError && isMissingPointSectionsError(finalError)) {
+    const fallback = await supabase
+      .from('points')
+      .select(
+        'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
+      )
+      .eq('id', data.id)
+      .single();
+    finalPoint = fallback.data;
+    finalError = fallback.error;
+  }
+  if (finalError) throw finalError;
+  return mapPoint(finalPoint);
 }
 
 async function supabaseUpdatePoint(pointId, payload) {
@@ -185,17 +246,49 @@ async function supabaseUpdatePoint(pointId, payload) {
   if (payload.isCertified !== undefined) updateData.is_certified = Boolean(payload.isCertified);
   if (pointTypeId !== null) updateData.point_type_id = pointTypeId;
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('points')
     .update(updateData)
     .eq('id', pointId)
-    .select(
-      'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
-    )
+    .select('id')
     .single();
 
   if (error) throw error;
-  return mapPoint(data);
+  if (Array.isArray(payload.sections)) {
+    const { error: deleteError } = await supabase.from('point_sections').delete().eq('point_id', pointId);
+    if (deleteError) throw deleteError;
+    if (payload.sections.length > 0) {
+      const sectionRows = payload.sections.map((section, index) => ({
+        point_id: pointId,
+        position: index + 1,
+        title: section.title || null,
+        description: section.description || null,
+        photo_url: section.photoUrl || null,
+      }));
+      const { error: insertError } = await supabase.from('point_sections').insert(sectionRows);
+      if (insertError) throw insertError;
+    }
+  }
+  let { data: finalPoint, error: finalError } = await supabase
+    .from('points')
+    .select(
+      'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color),point_sections(id,point_id,position,title,description,photo_url)'
+    )
+    .eq('id', pointId)
+    .single();
+  if (finalError && isMissingPointSectionsError(finalError)) {
+    const fallback = await supabase
+      .from('points')
+      .select(
+        'id,title,description,lat,lng,district,photo_url,is_certified,created_by,created_at,updated_at,point_type:point_types(id,code,label_uk,label_en,color)'
+      )
+      .eq('id', pointId)
+      .single();
+    finalPoint = fallback.data;
+    finalError = fallback.error;
+  }
+  if (finalError) throw finalError;
+  return mapPoint(finalPoint);
 }
 
 async function supabaseDeletePoint(pointId) {
