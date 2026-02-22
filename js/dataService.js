@@ -198,6 +198,18 @@ async function supabaseUpdatePoint(pointId, payload) {
   return mapPoint(data);
 }
 
+async function supabaseDeletePoint(pointId) {
+  const { error } = await supabase.from('points').delete().eq('id', pointId);
+  if (error) {
+    const msg = String(error.message || error);
+    if (msg.toLowerCase().includes('row-level security')) {
+      throw new Error('Немає прав на видалення точки (RLS policy)');
+    }
+    throw error;
+  }
+  return null;
+}
+
 async function supabaseCreateRoute(payload) {
   const user = await supabaseGetCurrentUser();
 
@@ -260,6 +272,12 @@ async function supabaseUpdateRoute(routeId, payload) {
   }
 
   return { ok: true };
+}
+
+async function supabaseDeleteRoute(routeId) {
+  const { error } = await supabase.from('routes').delete().eq('id', routeId);
+  if (error) throw error;
+  return null;
 }
 
 async function supabaseLogin(email, password) {
@@ -447,6 +465,11 @@ export const dataService = {
       return supabaseUpdatePoint(id, body);
     }
 
+    if (pathname.startsWith('/api/points/') && method === 'DELETE') {
+      const id = Number(pathname.split('/').pop());
+      return supabaseDeletePoint(id);
+    }
+
     if (pathname === '/api/routes' && method === 'GET') {
       return supabaseGetRoutes();
     }
@@ -458,6 +481,11 @@ export const dataService = {
     if (pathname.startsWith('/api/routes/') && method === 'PUT') {
       const id = Number(pathname.split('/').pop());
       return supabaseUpdateRoute(id, body);
+    }
+
+    if (pathname.startsWith('/api/routes/') && method === 'DELETE') {
+      const id = Number(pathname.split('/').pop());
+      return supabaseDeleteRoute(id);
     }
 
     if (pathname === '/api/news' && method === 'GET') {
@@ -502,7 +530,13 @@ export const dataService = {
     const { error: uploadError } = await supabase.storage
       .from('point-photos')
       .upload(filePath, file, { upsert: false });
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      const msg = String(uploadError.message || uploadError);
+      if (msg.toLowerCase().includes('row-level security')) {
+        throw new Error('Немає прав на upload фото (перевір профіль ролі в Supabase і storage policy)');
+      }
+      throw uploadError;
+    }
 
     const { data } = supabase.storage.from('point-photos').getPublicUrl(filePath);
     return data.publicUrl;

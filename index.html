@@ -85,6 +85,7 @@
 
         <!-- Floating Filter Menu instead of Bar -->
         <div class="filter-menu" id="filter-menu">
+            <button id="btn-hide-filters" class="float-hide-btn" aria-label="Згорнути фільтри">⟩</button>
             <button id="btn-toggle-filters" class="filter-toggle" data-magnetic>
                 <span data-i18n="filters">Фільтри</span>
                 <svg class="arrow-icon" viewBox="0 0 24 24" width="20" height="20">
@@ -109,6 +110,7 @@
         </div>
 
         <aside class="specialist-panel" id="specialist-panel">
+            <button id="btn-hide-specialist" class="float-hide-btn" aria-label="Згорнути панель">⟨</button>
             <div class="specialist-head">
                 <div>
                     <div class="t-nav">SPECIALIST OPS</div>
@@ -118,11 +120,13 @@
                 <button id="btn-logout" class="btn-flat">Logout</button>
             </div>
             <div class="specialist-actions" id="specialist-actions">
-                <button class="btn-flat" data-specialist-action="dashboard">Огляд</button>
-                <button class="btn-flat" data-specialist-action="add-point">Додати точку</button>
-                <button class="btn-flat" data-specialist-action="edit-point">Редагувати точку</button>
-                <button class="btn-flat" data-specialist-action="route-editor">Маршрути</button>
-                <button class="btn-flat" data-specialist-action="news-editor">Новини</button>
+                <select id="specialist-action-select">
+                    <option value="dashboard">Огляд</option>
+                    <option value="add-point">Додати точку</option>
+                    <option value="edit-point">Редагувати точку</option>
+                    <option value="route-editor">Маршрути</option>
+                    <option value="news-editor">Новини</option>
+                </select>
             </div>
             <button id="btn-specialist-back" class="btn-flat" style="display:none;">Назад до меню</button>
             <div class="specialist-tab-content active" id="specialist-dashboard">
@@ -176,11 +180,12 @@
             <div class="specialist-tab-content" id="specialist-editor">
                 <div class="specialist-block" id="editor-add-point-block">
                     <div class="t-label">Додати точку</div>
+                    <div class="t-data text-muted">1) Назва і тип 2) Вкажіть місце на карті 3) Додайте фото за бажанням</div>
                     <input id="point-title" type="text" placeholder="Назва точки" />
                     <select id="point-type"></select>
                     <div class="specialist-grid">
-                        <input id="point-lat" type="number" step="0.000001" placeholder="Lat" />
-                        <input id="point-lng" type="number" step="0.000001" placeholder="Lng" />
+                        <input id="point-lat" type="number" step="0.000001" placeholder="Широта (авто з карти)" />
+                        <input id="point-lng" type="number" step="0.000001" placeholder="Довгота (авто з карти)" />
                     </div>
                     <input id="point-district" type="text" placeholder="Район" />
                     <textarea id="point-description" placeholder="Коментар"></textarea>
@@ -193,10 +198,7 @@
                 <div class="specialist-block" id="editor-route-block">
                     <div class="t-label">Редактор маршруту</div>
                     <select id="route-edit-select"></select>
-                    <div class="specialist-grid">
-                        <button id="btn-load-route" class="btn-flat">Завантажити</button>
-                        <button id="btn-new-route" class="btn-flat">Новий</button>
-                    </div>
+                    <button id="btn-new-route" class="btn-flat">Новий маршрут</button>
                     <input id="route-name" type="text" placeholder="Назва маршруту" />
                     <select id="route-status">
                         <option value="draft">Draft</option>
@@ -210,14 +212,13 @@
                     </div>
                     <div id="route-point-order" class="route-point-order"></div>
                     <button id="btn-undo-route-order" class="btn-flat">Undo reorder</button>
-                    <button id="btn-create-demo-route" class="btn-flat">Створити DEMO маршрут (10 точок)</button>
                     <button id="btn-create-route" class="btn-primary">Створити маршрут</button>
                     <button id="btn-save-route" class="btn-primary">Зберегти маршрут</button>
+                    <button id="btn-delete-route" class="btn-flat">Видалити маршрут</button>
                 </div>
                 <div class="specialist-block" id="editor-edit-point-block">
                     <div class="t-label">Швидке редагування точки</div>
                     <select id="edit-point-select"></select>
-                    <button id="btn-load-point" class="btn-flat">Завантажити точку</button>
                     <input id="edit-point-title" type="text" placeholder="Назва точки" />
                     <select id="edit-point-type"></select>
                     <input id="edit-point-district" type="text" placeholder="Район" />
@@ -226,14 +227,12 @@
                     <input id="edit-point-photo-url" type="text" placeholder="URL фото (опційно)" />
                     <label class="specialist-check"><input id="edit-point-certified" type="checkbox" /> Сертифіковано</label>
                     <button id="btn-save-point" class="btn-primary">Зберегти точку</button>
+                    <button id="btn-delete-point" class="btn-flat">Видалити точку</button>
                 </div>
                 <div class="specialist-block" id="editor-news-block">
                     <div class="t-label">Додати новину</div>
                     <select id="news-edit-select"></select>
-                    <div class="specialist-grid">
-                        <button id="btn-load-news" class="btn-flat">Завантажити</button>
-                        <button id="btn-new-news" class="btn-flat">Нова</button>
-                    </div>
+                    <button id="btn-new-news" class="btn-flat">Нова новина</button>
                     <input id="news-title-input" type="text" placeholder="Заголовок новини" />
                     <textarea id="news-summary-input" placeholder="Короткий опис"></textarea>
                     <input id="news-link-input" type="text" placeholder="Посилання (опційно)" />
@@ -248,7 +247,10 @@
         <!-- Map & Context Container -->
         <div class="map-container section-transition section-current">
             <div class="map-view" id="map">
-                <div class="map-legend" id="map-legend"></div>
+                <div class="map-legend" id="map-legend-wrap">
+                    <button id="btn-toggle-legend" class="legend-toggle-btn" aria-label="Згорнути легенду">⟨</button>
+                    <div id="map-legend"></div>
+                </div>
                 <button id="btn-map-fullscreen" class="map-fullscreen-btn">На весь екран</button>
                 <div class="partner-logos" id="partner-panel"
                     style="position: absolute; bottom: 16px; left: 16px; z-index: 1000; background: #FFFFFF; border-radius: 8px; padding: 10px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid var(--c-divider); display: flex; align-items: center; gap: 20px; transition: all 0.5s ease; width: fit-content; max-width: 80vw;">

@@ -216,13 +216,34 @@ body {
 /* Filter Menu (Floating) */
 .filter-menu {
   position: fixed;
-  top: 96px;
-  right: 40px;
+  top: 128px;
+  right: 20px;
   z-index: 2000;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
+  transition: transform 0.35s ease, opacity 0.35s ease;
+}
+
+.filter-menu.collapsed {
+  opacity: 1;
+  transform: none;
+}
+
+.filter-menu.collapsed .filter-options {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  pointer-events: none;
+}
+
+.filter-menu.collapsed .filter-toggle span {
+  display: none;
+}
+
+.filter-menu.collapsed .filter-toggle {
+  padding: 10px 12px;
 }
 
 .filter-toggle {
@@ -270,6 +291,8 @@ body {
   opacity: 0;
   visibility: hidden;
   transform: translateY(-10px);
+  max-height: 65vh;
+  overflow-y: auto;
   transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -337,8 +360,9 @@ body {
 
 .map-legend {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  top: 82px;
+  right: 16px;
+  left: auto;
   z-index: 1200;
   border-radius: 12px;
   border: 1px solid var(--c-divider);
@@ -349,6 +373,17 @@ body {
   flex-direction: column;
   gap: 6px;
   min-width: 180px;
+  max-width: 240px;
+  transition: transform 0.32s ease, opacity 0.32s ease;
+}
+
+.map-legend.collapsed {
+  opacity: 1;
+  transform: none;
+}
+
+.map-legend.collapsed #map-legend {
+  display: none;
 }
 
 .map-fullscreen-btn {
@@ -364,6 +399,37 @@ body {
   font-size: 12px;
   color: var(--c-admiralty);
   cursor: pointer;
+}
+
+.legend-toggle-btn {
+  align-self: flex-end;
+  border: 1px solid var(--c-divider);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--c-admiralty);
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.float-hide-btn {
+  z-index: 3;
+  border: 1px solid var(--c-divider);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--c-admiralty);
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.filter-menu #btn-hide-filters {
+  align-self: flex-end;
+}
+
+#map-legend-wrap #btn-toggle-legend {
+  align-self: flex-end;
 }
 
 .legend-item {
@@ -617,10 +683,27 @@ body {
   display: none;
   gap: 14px;
   flex-direction: column;
+  transition: transform 0.35s ease, opacity 0.35s ease;
 }
 
 .specialist-panel.active {
   display: flex;
+}
+
+.specialist-panel.collapsed {
+  width: 52px;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.specialist-panel.collapsed > *:not(#btn-hide-specialist) {
+  display: none !important;
+}
+
+.specialist-panel #btn-hide-specialist {
+  position: sticky;
+  top: 0;
+  align-self: flex-end;
 }
 
 .specialist-head {
@@ -631,18 +714,13 @@ body {
 
 .specialist-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 
-.specialist-actions .btn-flat {
-  padding: 8px 12px;
-  border-radius: 10px;
-}
-
-.specialist-actions .btn-flat.active {
-  background: var(--c-admiralty);
-  color: #fff;
+.specialist-actions select,
+.specialist-actions .btn-primary {
+  width: 100%;
 }
 
 .specialist-tab-content {
@@ -668,6 +746,7 @@ body {
   gap: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--c-divider);
+  transition: opacity 0.24s ease, transform 0.24s ease;
 }
 
 .specialist-grid {
@@ -690,6 +769,21 @@ body {
 .specialist-panel textarea {
   min-height: 72px;
   resize: vertical;
+}
+
+.specialist-panel::-webkit-scrollbar,
+.route-list::-webkit-scrollbar,
+.activity-list::-webkit-scrollbar,
+.route-point-order::-webkit-scrollbar {
+  width: 8px;
+}
+
+.specialist-panel::-webkit-scrollbar-thumb,
+.route-list::-webkit-scrollbar-thumb,
+.activity-list::-webkit-scrollbar-thumb,
+.route-point-order::-webkit-scrollbar-thumb {
+  background: rgba(11, 37, 69, 0.25);
+  border-radius: 999px;
 }
 
 .specialist-check {

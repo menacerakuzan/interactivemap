@@ -245,7 +245,7 @@ app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (re
   return res.json(mapPointRow(row));
 });
 
-app.delete('/api/points/:id', authenticate, requireRole('admin'), (req, res) => {
+app.delete('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (req, res) => {
   const pointId = Number(req.params.id);
   const result = db.prepare('DELETE FROM points WHERE id = ?').run(pointId);
   if (!result.changes) {
@@ -404,6 +404,15 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
+});
+
+app.delete('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (req, res) => {
+  const routeId = Number(req.params.id);
+  const result = db.prepare('DELETE FROM routes WHERE id = ?').run(routeId);
+  if (!result.changes) {
+    return res.status(404).json({ error: 'Route not found' });
+  }
+  return res.status(204).send();
 });
 
 app.get('/api/news', (_req, res) => {

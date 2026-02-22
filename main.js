@@ -308,6 +308,10 @@ function setActiveSpecialistTab(tabName) {
   const action = tabName;
   currentSpecialistAction = action;
   actionButtons.forEach((b) => b.classList.toggle('active', b.getAttribute('data-specialist-action') === action));
+  const actionSelect = document.getElementById('specialist-action-select');
+  if (actionSelect && actionSelect.value !== action) {
+    actionSelect.value = action;
+  }
   const modeLabel = document.getElementById('specialist-mode-label');
   const modeMap = {
     menu: 'РЕЖИМ: МЕНЮ',
@@ -352,6 +356,10 @@ function setActiveSpecialistTab(tabName) {
 function renderRoutePointOrder() {
   const container = document.getElementById('route-point-order');
   if (!container) return;
+  const undoBtn = document.getElementById('btn-undo-route-order');
+  if (undoBtn) {
+    undoBtn.style.display = routeOrderHistory.length ? '' : 'none';
+  }
 
   if (!routeEditorPoints.length) {
     container.innerHTML = '<div class="activity-item t-body text-muted">Додайте точки до маршруту</div>';
@@ -439,6 +447,7 @@ function refreshRouteSelectors() {
   }
 
   renderRoutePointOrder();
+  syncEditorActionButtons();
 }
 
 function populatePointTypeOptions() {
@@ -653,7 +662,7 @@ async function refreshDashboardData() {
   renderLegend();
   refreshRouteSelectors();
 
-  if (editingRouteId && !routeEditorPoints.length) {
+  if (currentSpecialistAction === 'route-editor' && editingRouteId && !routeEditorPoints.length) {
     openRouteInEditor(editingRouteId, { silent: true });
   }
 }
@@ -693,6 +702,12 @@ function setAuthState(token, user) {
   if (panel) {
     const canEdit = authUser && ['admin', 'specialist'].includes(authUser.role);
     panel.classList.toggle('active', Boolean(canEdit));
+    if (!canEdit) {
+      panel.classList.remove('collapsed');
+      panel.style.display = '';
+      const btnHideSpecialist = document.getElementById('btn-hide-specialist');
+      if (btnHideSpecialist) btnHideSpecialist.textContent = '⟨';
+    }
   }
   if (userLabel) {
     userLabel.textContent = authUser ? `${authUser.fullName} • ${authUser.role}` : 'offline';
@@ -714,8 +729,8 @@ function setAuthState(token, user) {
 
 function bindSpecialistTabs() {
   const actionButtons = document.querySelectorAll('[data-specialist-action]');
+  const actionSelect = document.getElementById('specialist-action-select');
   const backButton = document.getElementById('btn-specialist-back');
-  if (!actionButtons.length) return;
   const actionMessages = {
     dashboard: 'Відкрито панель огляду',
     'add-point': 'Режим: додавання точки',
@@ -724,17 +739,25 @@ function bindSpecialistTabs() {
     'news-editor': 'Режим: редактор новин',
   };
 
-  actionButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const action = btn.getAttribute('data-specialist-action');
-      setActiveSpecialistTab(action);
-      if (action === 'edit-point' && !editingPointId) {
-        setSpecialistMessage('Оберіть точку зі списку та натисніть "Завантажити точку"');
-      } else if (actionMessages[action]) {
-        setSpecialistMessage(actionMessages[action]);
-      }
+  const openAction = (action) => {
+    if (!action) return;
+    setActiveSpecialistTab(action);
+    if (action === 'edit-point' && !editingPointId) {
+      setSpecialistMessage('Оберіть точку зі списку');
+    } else if (actionMessages[action]) {
+      setSpecialistMessage(actionMessages[action]);
+    }
+  };
+
+  if (actionSelect) {
+    actionSelect.addEventListener('change', () => openAction(actionSelect.value));
+  } else if (actionButtons.length) {
+    actionButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        openAction(btn.getAttribute('data-specialist-action'));
+      });
     });
-  });
+  }
 
   if (backButton) {
     backButton.addEventListener('click', () => {
@@ -753,6 +776,7 @@ function resetRouteEditor() {
   document.getElementById('route-status').value = 'draft';
   renderRoutePointOrder();
   mapController?.clearRouteHighlight?.();
+  syncEditorActionButtons();
   saveUiState();
 }
 
@@ -772,6 +796,7 @@ function openRouteInEditor(routeId, options = {}) {
   if (!options.silent) {
     setSpecialistMessage(`Редагування маршруту: ${route.name}`);
   }
+  syncEditorActionButtons();
   saveUiState();
 }
 
@@ -805,6 +830,7 @@ function resetNewsEditor() {
   if (summary) summary.value = '';
   if (link) link.value = '';
   if (select) select.value = '';
+  syncEditorActionButtons();
 }
 
 function openNewsInEditor(newsId) {
@@ -821,6 +847,30 @@ function openNewsInEditor(newsId) {
   if (select) select.value = String(news.id);
   setActiveSpecialistTab('news-editor');
   setSpecialistMessage(`Редагування новини: ${news.title}`);
+  syncEditorActionButtons();
+}
+
+function syncEditorActionButtons() {
+  const btnCreateRoute = document.getElementById('btn-create-route');
+  const btnSaveRoute = document.getElementById('btn-save-route');
+  const btnDeleteRoute = document.getElementById('btn-delete-route');
+  if (btnCreateRoute && btnSaveRoute) {
+    btnCreateRoute.style.display = editingRouteId ? 'none' : '';
+    btnSaveRoute.style.display = editingRouteId ? '' : 'none';
+  }
+  if (btnDeleteRoute) {
+    btnDeleteRoute.style.display = editingRouteId ? '' : 'none';
+  }
+
+  const btnCreateNews = document.getElementById('btn-create-news');
+  const btnSaveNews = document.getElementById('btn-save-news');
+  const btnDeleteNews = document.getElementById('btn-delete-news');
+  if (btnCreateNews && btnSaveNews && btnDeleteNews) {
+    const editMode = Boolean(editingNewsId);
+    btnCreateNews.style.display = editMode ? 'none' : '';
+    btnSaveNews.style.display = editMode ? '' : 'none';
+    btnDeleteNews.style.display = editMode ? '' : 'none';
+  }
 }
 
 function nextRouteStatus(currentStatus) {
@@ -1053,6 +1103,12 @@ function bindFilterMenu() {
       filterMenu.classList.toggle('active');
     });
 
+    document.addEventListener('click', (e) => {
+      if (!filterMenu.contains(e.target)) {
+        filterMenu.classList.remove('active');
+      }
+    });
+
     filterMenu.querySelectorAll('.btn-flat').forEach((btn) => {
       btn.addEventListener('click', async () => {
         filterMenu.querySelectorAll('.btn-flat').forEach((b) => b.classList.remove('active'));
@@ -1118,23 +1174,79 @@ function bindFilterMenu() {
   }
 }
 
+function bindFloatingUiControls() {
+  const filterMenu = document.getElementById('filter-menu');
+  const btnHideFilters = document.getElementById('btn-hide-filters');
+  const specialistPanel = document.getElementById('specialist-panel');
+  const btnHideSpecialist = document.getElementById('btn-hide-specialist');
+  const legendWrap = document.getElementById('map-legend-wrap');
+  const btnToggleLegend = document.getElementById('btn-toggle-legend');
+  const mapContainer = document.querySelector('.map-container');
+
+  if (btnHideFilters && filterMenu) {
+    btnHideFilters.addEventListener('click', () => {
+      const isCollapsed = filterMenu.classList.toggle('collapsed');
+      filterMenu.classList.remove('active');
+      btnHideFilters.textContent = isCollapsed ? '⟨' : '⟩';
+    });
+  }
+
+  if (btnHideSpecialist && specialistPanel) {
+    btnHideSpecialist.addEventListener('click', () => {
+      const isCollapsed = specialistPanel.classList.toggle('collapsed');
+      btnHideSpecialist.textContent = isCollapsed ? '⟩' : '⟨';
+    });
+  }
+
+  if (btnToggleLegend && legendWrap) {
+    btnToggleLegend.addEventListener('click', () => {
+      const isCollapsed = legendWrap.classList.toggle('collapsed');
+      btnToggleLegend.textContent = isCollapsed ? '⟩' : '⟨';
+    });
+  }
+
+  const syncFloatingByScroll = () => {
+    if (!mapContainer) return;
+    const rect = mapContainer.getBoundingClientRect();
+    const mapVisible = rect.bottom > 120 && rect.top < window.innerHeight - 120;
+    if (!mapVisible) {
+      if (filterMenu) filterMenu.style.display = 'none';
+      if (legendWrap) legendWrap.style.display = 'none';
+      if (specialistPanel?.classList.contains('active')) {
+        specialistPanel.style.display = 'none';
+      }
+      return;
+    }
+    if (filterMenu) filterMenu.style.display = '';
+    if (legendWrap) legendWrap.style.display = '';
+    if (specialistPanel?.classList.contains('active')) {
+      specialistPanel.style.display = 'flex';
+    }
+  };
+
+  window.addEventListener('scroll', syncFloatingByScroll, { passive: true });
+  window.addEventListener('resize', syncFloatingByScroll);
+  syncFloatingByScroll();
+}
+
 function bindSpecialistTools() {
   const btnPickOnMap = document.getElementById('btn-pick-on-map');
   const btnCreatePoint = document.getElementById('btn-create-point');
   const btnCreateRoute = document.getElementById('btn-create-route');
   const btnSaveRoute = document.getElementById('btn-save-route');
-  const btnLoadRoute = document.getElementById('btn-load-route');
+  const btnDeleteRoute = document.getElementById('btn-delete-route');
   const btnNewRoute = document.getElementById('btn-new-route');
+  const routeEditSelect = document.getElementById('route-edit-select');
   const btnAddRoutePoint = document.getElementById('btn-add-route-point');
   const btnSavePoint = document.getElementById('btn-save-point');
+  const btnDeletePoint = document.getElementById('btn-delete-point');
   const btnUndoRouteOrder = document.getElementById('btn-undo-route-order');
   const btnCreateNews = document.getElementById('btn-create-news');
   const btnSaveNews = document.getElementById('btn-save-news');
   const btnDeleteNews = document.getElementById('btn-delete-news');
-  const btnLoadNews = document.getElementById('btn-load-news');
+  const newsEditSelect = document.getElementById('news-edit-select');
   const btnNewNews = document.getElementById('btn-new-news');
-  const btnCreateDemoRoute = document.getElementById('btn-create-demo-route');
-  const btnLoadPoint = document.getElementById('btn-load-point');
+  const editPointSelect = document.getElementById('edit-point-select');
   const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
 
   if (btnPickOnMap) {
@@ -1216,10 +1328,19 @@ function bindSpecialistTools() {
         try {
           const pointPhotoFile = document.getElementById('point-photo-file')?.files?.[0];
           if (pointPhotoFile) {
+            if (!pointPhotoFile.type.startsWith('image/')) {
+              setSpecialistMessage('Файл фото має бути зображенням', true);
+              return;
+            }
+            if (pointPhotoFile.size > 8 * 1024 * 1024) {
+              setSpecialistMessage('Фото завелике (макс 8MB)', true);
+              return;
+            }
             try {
               payload.photoUrl = await dataService.uploadPointPhoto(pointPhotoFile);
             } catch (uploadError) {
               setSpecialistMessage(`Фото не завантажено: ${uploadError.message}`, true);
+              return;
             }
           }
           await apiRequest('/api/points', { method: 'POST', body: JSON.stringify(payload) });
@@ -1301,11 +1422,11 @@ function bindSpecialistTools() {
     });
   }
 
-  if (btnLoadRoute) {
-    btnLoadRoute.addEventListener('click', () => {
-      const routeId = Number(document.getElementById('route-edit-select').value);
+  if (routeEditSelect) {
+    routeEditSelect.addEventListener('change', () => {
+      const routeId = Number(routeEditSelect.value);
       if (!routeId) {
-        setSpecialistMessage('Оберіть маршрут', true);
+        resetRouteEditor();
         return;
       }
       openRouteInEditor(routeId);
@@ -1350,10 +1471,19 @@ function bindSpecialistTools() {
         try {
           const pointPhotoFile = document.getElementById('edit-point-photo-file')?.files?.[0];
           if (pointPhotoFile) {
+            if (!pointPhotoFile.type.startsWith('image/')) {
+              setSpecialistMessage('Файл фото має бути зображенням', true);
+              return;
+            }
+            if (pointPhotoFile.size > 8 * 1024 * 1024) {
+              setSpecialistMessage('Фото завелике (макс 8MB)', true);
+              return;
+            }
             try {
               payload.photoUrl = await dataService.uploadPointPhoto(pointPhotoFile);
             } catch (uploadError) {
               setSpecialistMessage(`Фото не завантажено: ${uploadError.message}`, true);
+              return;
             }
           }
           if (!payload.photoUrl && existingPoint?.photoUrl) {
@@ -1377,14 +1507,52 @@ function bindSpecialistTools() {
     });
   }
 
-  if (btnLoadPoint) {
-    btnLoadPoint.addEventListener('click', () => {
-      const pointId = Number(document.getElementById('edit-point-select').value);
-      if (!pointId) {
-        setSpecialistMessage('Оберіть точку зі списку', true);
+  if (editPointSelect) {
+    editPointSelect.addEventListener('change', () => {
+      const pointId = Number(editPointSelect.value);
+      if (!pointId) return;
+      openPointInEditor(pointId);
+    });
+  }
+
+  if (btnDeletePoint) {
+    btnDeletePoint.addEventListener('click', async () => {
+      if (!editingPointId) {
+        setSpecialistMessage('Оберіть точку для видалення', true);
         return;
       }
-      openPointInEditor(pointId);
+      const point = dashboardPoints.find((p) => p.id === editingPointId);
+      const ok = window.confirm(
+        `Видалити точку "${point?.title || editingPointId}"? Цю дію не можна скасувати.`
+      );
+      if (!ok) return;
+
+      await runWithButtonState(btnDeletePoint, 'Видалення...', async () => {
+        try {
+          const prevAction = currentSpecialistAction;
+          if (point?.photoUrl) {
+            try {
+              await dataService.deletePointPhoto(point.photoUrl);
+            } catch (_e) {
+              // ignore storage delete failure, continue DB delete
+            }
+          }
+          await apiRequest(`/api/points/${editingPointId}`, { method: 'DELETE' });
+          editingPointId = null;
+          document.getElementById('edit-point-title').value = '';
+          document.getElementById('edit-point-type').value = pointTypes[0]?.code || '';
+          document.getElementById('edit-point-district').value = '';
+          document.getElementById('edit-point-description').value = '';
+          document.getElementById('edit-point-photo-url').value = '';
+          document.getElementById('edit-point-certified').checked = false;
+          await mapController.refresh();
+          await refreshDashboardData();
+          setActiveSpecialistTab(prevAction || 'edit-point');
+          setSpecialistMessage('Точку видалено');
+        } catch (error) {
+          setSpecialistMessage(error.message, true);
+        }
+      });
     });
   }
 
@@ -1443,11 +1611,11 @@ function bindSpecialistTools() {
     });
   }
 
-  if (btnLoadNews) {
-    btnLoadNews.addEventListener('click', () => {
-      const newsId = Number(document.getElementById('news-edit-select').value);
+  if (newsEditSelect) {
+    newsEditSelect.addEventListener('change', () => {
+      const newsId = Number(newsEditSelect.value);
       if (!newsId) {
-        setSpecialistMessage('Оберіть новину зі списку', true);
+        resetNewsEditor();
         return;
       }
       openNewsInEditor(newsId);
@@ -1514,60 +1682,23 @@ function bindSpecialistTools() {
     });
   }
 
-  if (btnCreateDemoRoute) {
-    btnCreateDemoRoute.addEventListener('click', async () => {
-      if (!authToken) {
-        setSpecialistMessage('Потрібно увійти як спеціаліст', true);
+  if (btnDeleteRoute) {
+    btnDeleteRoute.addEventListener('click', async () => {
+      if (!editingRouteId) {
+        setSpecialistMessage('Оберіть маршрут для видалення', true);
         return;
       }
-
-      const demoPoints = [
-        ['Оперний театр (вхід)', 46.4851, 30.7405],
-        ['Приморський бульвар', 46.4857, 30.7417],
-        ['Потьомкінські сходи (верх)', 46.4863, 30.7429],
-        ['Думська площа', 46.4859, 30.7423],
-        ['Міський сад', 46.4846, 30.7327],
-        ['Дерибасівська (центр)', 46.4838, 30.7321],
-        ['Соборна площа', 46.4832, 30.7268],
-        ['Одеська філармонія', 46.4789, 30.7442],
-        ['Вокзал Одеса-Головна', 46.4665, 30.7392],
-        ['Парк Шевченка', 46.4777, 30.7535],
-      ];
-
-      await runWithButtonState(btnCreateDemoRoute, 'Генерація...', async () => {
+      const route = dashboardRoutes.find((r) => r.id === editingRouteId);
+      const ok = window.confirm(
+        `Видалити маршрут "${route?.name || editingRouteId}"? Цю дію не можна скасувати.`
+      );
+      if (!ok) return;
+      await runWithButtonState(btnDeleteRoute, 'Видалення...', async () => {
         try {
-          const createdPointIds = [];
-          for (let i = 0; i < demoPoints.length; i += 1) {
-            const [title, lat, lng] = demoPoints[i];
-            const created = await apiRequest('/api/points', {
-              method: 'POST',
-              body: JSON.stringify({
-                title: `${title} [DEMO]`,
-                lat,
-                lng,
-                district: 'Одеський район',
-                pointTypeCode: i % 2 === 0 ? 'ramp' : 'entrance',
-                description: 'Тестова DEMO точка для перевірки маршруту.',
-                isCertified: i % 3 === 0,
-              }),
-            });
-            createdPointIds.push({ pointId: created.id });
-          }
-
-          const route = await apiRequest('/api/routes', {
-            method: 'POST',
-            body: JSON.stringify({
-              name: `DEMO маршрут Одеса (10 точок) ${new Date().toLocaleTimeString('uk-UA')}`,
-              status: 'draft',
-              description: 'Автоматично створений тестовий маршрут по Одесі.',
-              points: createdPointIds,
-            }),
-          });
-
-          await mapController.refresh();
+          await apiRequest(`/api/routes/${editingRouteId}`, { method: 'DELETE' });
+          resetRouteEditor();
           await refreshDashboardData();
-          openRouteInEditor(route.id);
-          setSpecialistMessage('DEMO маршрут на 10 точок створено');
+          setSpecialistMessage('Маршрут видалено');
         } catch (error) {
           setSpecialistMessage(error.message, true);
         }
@@ -1660,6 +1791,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindSpecialistTabs();
     bindDashboardActions();
     bindSearchAndPager();
+    bindFloatingUiControls();
     applySavedUiState();
     await refreshPublicData();
 
