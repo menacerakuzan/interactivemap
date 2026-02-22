@@ -1,15 +1,17 @@
 import { initLenis, initInteractions } from './js/globalEffects.js';
 import { initMap } from './js/mapInit.js';
 import { dataService } from './js/dataService.js';
+import { COMMUNITIES_BY_DISTRICT, DISTRICT_CENTERS } from './js/communities.js';
 
 const translations = {
   uk: {
     page_title: 'Одеська область',
-    hero_subtitle: '',
-    hero_description: 'Одеська область',
+    hero_subtitle: 'КАРТА БЕЗБАРʼЄРНИХ МАРШРУТІВ РЕГІОНУ',
+    hero_description:
+      'Єдина система моніторингу доступності в Одеській області: точки інфраструктури, маршрути спеціалістів та перевірені польові описи.',
     swipe_hint: 'СВАЙП АБО КЛІК ДЛЯ ПЕРЕХОДУ',
     app_title: 'ОДЕСЬКА ОБЛАСТЬ',
-    app_subtitle: '',
+    app_subtitle: 'РЕЄСТР БЕЗБАРʼЄРНИХ МАРШРУТІВ',
     search_placeholder: 'Пошук...',
     news_link: 'НОВИНИ',
     login_btn: 'УВІЙТИ &rarr;',
@@ -32,11 +34,12 @@ const translations = {
   },
   en: {
     page_title: 'Odesa Region',
-    hero_subtitle: '',
-    hero_description: 'Odesa Region',
+    hero_subtitle: 'ACCESSIBILITY ROUTE MAP OF THE REGION',
+    hero_description:
+      'A single accessibility monitoring system for Odesa region: infrastructure points, specialist routes, and verified field reports.',
     swipe_hint: 'SWIPE OR CLICK TO ENTER',
     app_title: 'ODESA REGION',
-    app_subtitle: '',
+    app_subtitle: 'ACCESSIBILITY ROUTE REGISTRY',
     search_placeholder: 'Search...',
     news_link: 'NEWS',
     login_btn: 'LOGIN &rarr;',
@@ -77,6 +80,8 @@ let routePage = 1;
 let pointPage = 1;
 const PAGE_SIZE = 5;
 const UI_STATE_KEY = 'odesaSpecialistUiState';
+let selectedDistrict = '';
+let selectedCommunity = '';
 
 function updateLanguage(lang) {
   currentLang = lang;
@@ -147,6 +152,8 @@ function saveUiState() {
         routePage,
         pointPage,
         editingRouteId,
+        selectedDistrict,
+        selectedCommunity,
       })
     );
   } catch (_e) {
@@ -170,6 +177,8 @@ function applySavedUiState() {
   routePage = Number(saved.routePage) > 0 ? Number(saved.routePage) : 1;
   pointPage = Number(saved.pointPage) > 0 ? Number(saved.pointPage) : 1;
   editingRouteId = Number(saved.editingRouteId) > 0 ? Number(saved.editingRouteId) : null;
+  selectedDistrict = saved.selectedDistrict || '';
+  selectedCommunity = saved.selectedCommunity || '';
 
   const routeSearch = document.getElementById('route-search');
   const pointSearch = document.getElementById('point-search');
@@ -177,6 +186,65 @@ function applySavedUiState() {
   if (pointSearch) pointSearch.value = pointSearchTerm;
 
   setActiveSpecialistTab(saved.activeTab === 'editor' ? 'editor' : 'dashboard');
+}
+
+function populateCommunitiesSelect() {
+  const select = document.getElementById('community-select');
+  if (!select) return;
+
+  const options = ['<option value="">Усі громади / райони</option>'];
+  Object.entries(COMMUNITIES_BY_DISTRICT).forEach(([district, communities]) => {
+    options.push(`<optgroup label="${district}">`);
+    options.push(`<option value="district::${district}">• ${district}</option>`);
+    communities.forEach((community) => {
+      options.push(
+        `<option value="community::${district}::${community}">${community}</option>`
+      );
+    });
+    options.push('</optgroup>');
+  });
+
+  select.innerHTML = options.join('');
+
+  if (selectedCommunity) {
+    const target = `community::${selectedDistrict}::${selectedCommunity}`;
+    if (select.querySelector(`option[value="${CSS.escape(target)}"]`)) {
+      select.value = target;
+      return;
+    }
+  }
+  if (selectedDistrict) {
+    const target = `district::${selectedDistrict}`;
+    if (select.querySelector(`option[value="${CSS.escape(target)}"]`)) {
+      select.value = target;
+    }
+  }
+}
+
+async function geocodeCommunity(district, community) {
+  const cacheKey = `geo::${district}::${community}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (_e) {
+      localStorage.removeItem(cacheKey);
+    }
+  }
+
+  try {
+    const query = encodeURIComponent(`${community}, ${district}, Odesa Oblast, Ukraine`);
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${query}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!Array.isArray(data) || !data.length) return null;
+    const result = { lat: Number(data[0].lat), lng: Number(data[0].lon), zoom: 12 };
+    localStorage.setItem(cacheKey, JSON.stringify(result));
+    return result;
+  } catch (_e) {
+    return null;
+  }
 }
 
 function setActiveSpecialistTab(tabName) {
@@ -582,39 +650,62 @@ function bindAuthFlow() {
   const btnAuthSubmit = document.getElementById('btn-auth-submit');
   const btnLogout = document.getElementById('btn-logout');
   const authView = document.getElementById('auth-view');
+  const authError = document.getElementById('auth-error');
+
+  const clearAuthError = () => {
+    if (authError) authError.textContent = '';
+  };
+
+  const setAuthError = (message) => {
+    if (authError) authError.textContent = message || 'Помилка входу';
+  };
 
   if (btnAuth && authView) {
     btnAuth.addEventListener('click', () => {
+      clearAuthError();
       authView.style.display = 'flex';
-      gsap.fromTo(
-        authView,
-        { opacity: 0, backdropFilter: 'blur(0px)' },
-        { opacity: 1, backdropFilter: 'blur(6px)', duration: 0.5, ease: 'power2.out' }
-      );
-      gsap.fromTo(
-        authView.querySelector('.auth-card'),
-        { y: 40, opacity: 0, filter: 'blur(6px)' },
-        { y: 0, opacity: 1, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out', delay: 0.1 }
-      );
+      if (window.gsap) {
+        gsap.fromTo(
+          authView,
+          { opacity: 0, backdropFilter: 'blur(0px)' },
+          { opacity: 1, backdropFilter: 'blur(6px)', duration: 0.5, ease: 'power2.out' }
+        );
+        gsap.fromTo(
+          authView.querySelector('.auth-card'),
+          { y: 40, opacity: 0, filter: 'blur(6px)' },
+          { y: 0, opacity: 1, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out', delay: 0.1 }
+        );
+      } else {
+        authView.style.opacity = '1';
+      }
     });
 
     authView.addEventListener('click', (e) => {
       if (e.target === authView) {
-        gsap.to(authView, {
-          opacity: 0,
-          duration: 0.4,
-          onComplete: () => {
-            authView.style.display = 'none';
-          },
-        });
+        if (window.gsap) {
+          gsap.to(authView, {
+            opacity: 0,
+            duration: 0.4,
+            onComplete: () => {
+              authView.style.display = 'none';
+            },
+          });
+        } else {
+          authView.style.display = 'none';
+        }
       }
     });
   }
 
-  if (btnAuthSubmit) {
-    btnAuthSubmit.addEventListener('click', async () => {
+  const submitAuth = async () => {
       const email = document.getElementById('auth-email')?.value?.trim();
       const password = document.getElementById('auth-password')?.value || '';
+      clearAuthError();
+
+      if (!email || !password) {
+        setAuthError('Введіть email і пароль');
+        return;
+      }
 
       try {
         const data = await apiRequest('/api/auth/login', {
@@ -623,13 +714,46 @@ function bindAuthFlow() {
         });
 
         setAuthState(data.token, data.user);
-        await refreshDashboardData();
-        setSpecialistMessage(`Вхід виконано: ${data.user.fullName}`);
+        clearAuthError();
 
         if (authView) authView.style.display = 'none';
+        setSpecialistMessage(`Вхід виконано: ${data.user.fullName}`);
+
+        try {
+          await refreshDashboardData();
+        } catch (dashboardError) {
+          setSpecialistMessage(
+            `Вхід виконано, але є помилка завантаження даних: ${dashboardError.message}`,
+            true
+          );
+        }
       } catch (error) {
+        setAuthError(error.message);
         setSpecialistMessage(error.message, true);
       }
+  };
+
+  if (btnAuthSubmit) {
+    btnAuthSubmit.addEventListener('click', submitAuth);
+  }
+
+  const authPassword = document.getElementById('auth-password');
+  const authEmail = document.getElementById('auth-email');
+  [authEmail, authPassword].forEach((input) => {
+    if (!input) return;
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitAuth();
+      }
+    });
+  });
+
+  const forgotLink = document.getElementById('forgot-password-link');
+  if (forgotLink) {
+    forgotLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      setAuthError('Скидання пароля: зверніться до адміністратора');
     });
   }
 
@@ -650,6 +774,9 @@ function bindAuthFlow() {
 function bindFilterMenu() {
   const filterMenu = document.getElementById('filter-menu');
   const btnToggleFilters = document.getElementById('btn-toggle-filters');
+  const communitySelect = document.getElementById('community-select');
+
+  populateCommunitiesSelect();
 
   if (filterMenu && btnToggleFilters) {
     btnToggleFilters.addEventListener('click', () => {
@@ -675,6 +802,48 @@ function bindFilterMenu() {
         }
         await mapController.setFilter({ type: key, certified: false });
       });
+    });
+  }
+
+  if (communitySelect) {
+    communitySelect.addEventListener('change', async () => {
+      const value = communitySelect.value;
+      selectedDistrict = '';
+      selectedCommunity = '';
+
+      if (!value) {
+        await mapController?.setFilter({ district: '', community: '' });
+        saveUiState();
+        return;
+      }
+
+      if (value.startsWith('district::')) {
+        const district = value.split('::')[1];
+        selectedDistrict = district;
+        await mapController?.setFilter({ district, community: '' });
+        const center = DISTRICT_CENTERS[district];
+        if (center) {
+          mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
+        }
+        setSpecialistMessage(`Фокус на: ${district}`);
+      }
+
+      if (value.startsWith('community::')) {
+        const [, district, community] = value.split('::');
+        selectedDistrict = district;
+        selectedCommunity = community;
+        await mapController?.setFilter({ district, community });
+
+        const geo = await geocodeCommunity(district, community);
+        if (geo) {
+          mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 12);
+        } else if (DISTRICT_CENTERS[district]) {
+          const center = DISTRICT_CENTERS[district];
+          mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
+        }
+        setSpecialistMessage(`Фокус на громаді: ${community}`);
+      }
+      saveUiState();
     });
   }
 }
@@ -961,6 +1130,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderDashboard([], []);
       resetRouteEditor();
     }
+
+    if (selectedDistrict || selectedCommunity) {
+      await mapController?.setFilter({
+        district: selectedDistrict,
+        community: selectedCommunity,
+      });
+      populateCommunitiesSelect();
+    }
   };
 
   const transitionToMap = () => {
@@ -1060,6 +1237,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const btnLangToggle = document.getElementById('btn-lang-toggle');
+  const btnNewsScroll = document.getElementById('btn-news-scroll');
   if (btnLangToggle) {
     btnLangToggle.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1068,5 +1246,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  if (btnNewsScroll) {
+    btnNewsScroll.addEventListener('click', (e) => {
+      e.preventDefault();
+      const newsSection = document.getElementById('news-section');
+      if (newsSection) {
+        newsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
+
+  updateLanguage(currentLang);
   bindAuthFlow();
 });

@@ -22,8 +22,8 @@
                 type="video/mp4">
         </video>
         <div class="hero-parallax-layer hero-grid parallax-mid"></div>
-        <div class="hero-parallax-layer hero-port parallax-front">ODESA PORT AUTHORITY</div>
-        <div class="hero-parallax-layer hero-coordinates parallax-front">46.4825 N / 30.7233 E</div>
+        <div class="hero-parallax-layer hero-fog parallax-front"></div>
+        <div class="hero-parallax-layer hero-glow parallax-front"></div>
         <div class="hero-gradient"></div>
         <img src="./assets/newanchor.png" alt="Odesa Anchor" class="hero-anchor anchor-logo"
             style="filter: contrast(1.2) brightness(1.1); mix-blend-mode: darken;"
@@ -36,6 +36,11 @@
             style="max-width: 480px; margin-bottom: 48px; font-size: 16px; color: #1A202C;">
             Одеська область
         </p>
+        <div class="hero-highlights reveal">
+            <span>Маршрути доступності</span>
+            <span>Аудит інфраструктури</span>
+            <span>Польові звіти спеціалістів</span>
+        </div>
         <div class="reveal"
             style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; cursor: pointer; color: var(--c-admiralty);">
             <div class="t-nav" data-i18n="swipe_hint" style="margin-bottom: 8px;">СВАЙП АБО КЛІК ДЛЯ ПЕРЕХОДУ</div>
@@ -67,12 +72,8 @@
             </div>
 
             <div style="display: flex; align-items: center; gap: 24px;">
-                <input type="text" placeholder="Пошук..." data-i18n-placeholder="search_placeholder"
-                    style="width: 280px; height: 40px; border: 1px solid var(--c-divider); background: var(--c-surface); padding: 0 16px; font-family: var(--font-ui); font-size: 14px; outline: none; border-radius: 100px; transition: border-color 0.3s;"
-                    onfocus="this.style.borderColor='var(--c-admiralty)'"
-                    onblur="this.style.borderColor='var(--c-divider)'" />
                 <nav style="display: flex; gap: 24px;">
-                    <a href="#" class="t-nav" data-i18n="news_link" data-magnetic
+                    <a href="#news-section" id="btn-news-scroll" class="t-nav" data-i18n="news_link" data-magnetic
                         style="text-decoration: none; color: var(--c-text-primary);">НОВИНИ</a>
                     <a href="#" class="t-nav" id="btn-lang-toggle" data-magnetic
                         style="text-decoration: none; color: var(--c-text-primary);">UA / EN</a>
@@ -99,6 +100,10 @@
                 <button class="btn-flat" data-filter="parking" data-i18n="filter_parking" data-magnetic>Паркування</button>
                 <button class="btn-flat" data-filter="certified" data-i18n="filter_certified"
                     style="border-color: var(--c-brass); color: var(--c-brass);" data-magnetic>Сертифіковані ✦</button>
+                <div class="community-filter">
+                    <label class="t-data text-muted" for="community-select">ГРОМАДА / РАЙОН</label>
+                    <select id="community-select"></select>
+                </div>
             </div>
         </div>
 
@@ -246,7 +251,7 @@
         </div>
 
         <!-- News Section -->
-        <section class="news-section section-next"
+        <section class="news-section section-next" id="news-section"
             style="padding: 120px 32px; background: var(--c-surface); display: flex; flex-direction: column; align-items: center;">
             <h2 class="t-h2 reveal" data-i18n="news_title" style="margin-bottom: 48px;">ОСТАННІ НОВИНИ</h2>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 1000px; width: 100%;">
@@ -260,7 +265,7 @@
                         style="margin-bottom: 24px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                         Перевірено 45 об'єктів соціальної інфраструктури. З них 12 отримали статус сертифікованих.
                         Детальний звіт доступний для спеціалістів.</p>
-                    <a href="#" class="t-body" style="color: var(--c-cerulean); text-decoration: none;"
+                    <a href="https://oda.od.gov.ua/" target="_blank" rel="noopener noreferrer" class="t-body" style="color: var(--c-cerulean); text-decoration: none;"
                         data-magnetic>Читати &rarr;</a>
                 </div>
 
@@ -273,7 +278,7 @@
                         style="margin-bottom: 24px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                         Згідно з новими ДБН В.2.2-40:2018, максимальний ухил зовнішніх пандусів не може перевищувати 8%.
                         Всі нові об'єкти проходять жорстку перевірку.</p>
-                    <a href="#" class="t-body" style="color: var(--c-cerulean); text-decoration: none;"
+                    <a href="https://www.minregion.gov.ua/" target="_blank" rel="noopener noreferrer" class="t-body" style="color: var(--c-cerulean); text-decoration: none;"
                         data-magnetic>Читати &rarr;</a>
                 </div>
 
@@ -314,7 +319,8 @@
 
                 <button id="btn-auth-submit" class="btn-primary" style="width: 100%; margin-bottom: 24px;" data-magnetic>УВІЙТИ ДО
                     СИСТЕМИ</button>
-                <a href="#" class="t-body"
+                <div id="auth-error" class="t-data" style="min-height: 16px; color: var(--c-vermillion); margin-bottom: 12px;"></div>
+                <a href="#" id="forgot-password-link" class="t-body"
                     style="color: var(--c-cerulean); text-decoration: none; margin-bottom: 24px; font-size: 13px;"
                     data-magnetic>Забули пароль?</a>
 

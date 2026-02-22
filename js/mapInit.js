@@ -1,7 +1,7 @@
 let map;
 let markerLayer;
 let routeLayer;
-let currentFilter = { type: 'all', certified: false };
+let currentFilter = { type: 'all', certified: false, district: '', community: '' };
 let pickMode = false;
 let pickCallback = null;
 let fetchPointsFn = async (filter) => {
@@ -94,7 +94,23 @@ async function loadAndRenderPoints() {
     return;
   }
 
-  const points = await fetchPointsFn(currentFilter);
+  let points = await fetchPointsFn(currentFilter);
+  if (currentFilter.district) {
+    points = points.filter((p) =>
+      String(p.district || '')
+        .toLowerCase()
+        .includes(currentFilter.district.toLowerCase())
+    );
+  }
+  if (currentFilter.community) {
+    points = points.filter((p) => {
+      const district = String(p.district || '').toLowerCase();
+      const title = String(p.title || '').toLowerCase();
+      const desc = String(p.description || '').toLowerCase();
+      const q = currentFilter.community.toLowerCase();
+      return district.includes(q) || title.includes(q) || desc.includes(q);
+    });
+  }
   markerLayer.clearLayers();
 
   points.forEach((point) => {
@@ -174,6 +190,14 @@ function highlightRoute(route) {
   map.fitBounds(polyline.getBounds(), { padding: [60, 60], maxZoom: ODESA_BOUNDS.cityZoom });
 }
 
+function focusLocation(lat, lng, zoom = ODESA_BOUNDS.cityZoom) {
+  if (!map) return;
+  map.flyTo([lat, lng], zoom, {
+    duration: 1,
+    easeLinearity: 0.25,
+  });
+}
+
 export async function initMap(options = {}) {
   if (typeof L === 'undefined') return null;
   if (typeof options.fetchPoints === 'function') {
@@ -189,6 +213,7 @@ export async function initMap(options = {}) {
       disablePointPicking,
       highlightRoute,
       clearRouteHighlight,
+      focusLocation,
     };
   }
 
@@ -232,5 +257,6 @@ export async function initMap(options = {}) {
     disablePointPicking,
     highlightRoute,
     clearRouteHighlight,
+    focusLocation,
   };
 }
