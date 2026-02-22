@@ -96,59 +96,69 @@ alter table public.routes enable row level security;
 alter table public.route_points enable row level security;
 
 -- Profiles
-create policy if not exists "profiles_select_self_or_staff"
+drop policy if exists "profiles_select_self_or_staff" on public.profiles;
+create policy "profiles_select_self_or_staff"
 on public.profiles
 for select
 using (id = auth.uid() or public.is_specialist_or_admin());
 
-create policy if not exists "profiles_update_self_or_admin"
+drop policy if exists "profiles_update_self_or_admin" on public.profiles;
+create policy "profiles_update_self_or_admin"
 on public.profiles
 for update
 using (id = auth.uid() or public.current_role() = 'admin')
 with check (id = auth.uid() or public.current_role() = 'admin');
 
 -- Point types are readable by everyone (including anonymous map viewers)
-create policy if not exists "point_types_public_read"
+drop policy if exists "point_types_public_read" on public.point_types;
+create policy "point_types_public_read"
 on public.point_types
 for select
 using (true);
 
 -- Points
-create policy if not exists "points_public_read"
+drop policy if exists "points_public_read" on public.points;
+create policy "points_public_read"
 on public.points
 for select
 using (true);
 
-create policy if not exists "points_staff_write"
+drop policy if exists "points_staff_write" on public.points;
+create policy "points_staff_write"
 on public.points
 for insert
 with check (public.is_specialist_or_admin() and created_by = auth.uid());
 
-create policy if not exists "points_staff_update"
+drop policy if exists "points_staff_update" on public.points;
+create policy "points_staff_update"
 on public.points
 for update
 using (public.is_specialist_or_admin())
 with check (public.is_specialist_or_admin());
 
 -- Routes
-create policy if not exists "routes_public_read_published"
+drop policy if exists "routes_public_read_published" on public.routes;
+create policy "routes_public_read_published"
 on public.routes
 for select
 using (status = 'published' or public.is_specialist_or_admin());
 
-create policy if not exists "routes_staff_insert"
+drop policy if exists "routes_staff_insert" on public.routes;
+create policy "routes_staff_insert"
 on public.routes
 for insert
 with check (public.is_specialist_or_admin() and created_by = auth.uid());
 
-create policy if not exists "routes_staff_update"
+drop policy if exists "routes_staff_update" on public.routes;
+create policy "routes_staff_update"
 on public.routes
 for update
 using (public.is_specialist_or_admin())
 with check (public.is_specialist_or_admin());
 
 -- Route points
-create policy if not exists "route_points_read_if_route_visible"
+drop policy if exists "route_points_read_if_route_visible" on public.route_points;
+create policy "route_points_read_if_route_visible"
 on public.route_points
 for select
 using (
@@ -160,7 +170,8 @@ using (
   )
 );
 
-create policy if not exists "route_points_staff_write"
+drop policy if exists "route_points_staff_write" on public.route_points;
+create policy "route_points_staff_write"
 on public.route_points
 for all
 using (public.is_specialist_or_admin())
