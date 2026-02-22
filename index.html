@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-i18n="page_title">Одеська область</title>
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+</head>
+
+<body>
+    <!-- Custom Cursor -->
+    <div class="custom-cursor"></div>
+    <div class="cursor-follower"></div>
+
+    <!-- Hero Section -->
+    <section class="hero" id="hero">
+        <video autoplay loop muted playsinline class="hero-bg parallax-deep"
+            style="object-fit: cover; width: 100%; height: 100%; filter: brightness(0.7);">
+            <source src="https://cdn.coverr.co/videos/coverr-moving-around-an-old-european-city-1080p.mp4"
+                type="video/mp4">
+        </video>
+        <div class="hero-parallax-layer hero-grid parallax-mid"></div>
+        <div class="hero-parallax-layer hero-port parallax-front">ODESA PORT AUTHORITY</div>
+        <div class="hero-parallax-layer hero-coordinates parallax-front">46.4825 N / 30.7233 E</div>
+        <div class="hero-gradient"></div>
+        <img src="./assets/newanchor.png" alt="Odesa Anchor" class="hero-anchor anchor-logo"
+            style="filter: contrast(1.2) brightness(1.1); mix-blend-mode: darken;"
+            onerror="this.style.display='none'" />
+        <h1 class="t-display masked-reveal" id="hero-title" style="color: var(--c-admiralty);">ОДЕСЬКА ОБЛАСТЬ</h1>
+        <h2 class="t-h2 reveal" data-i18n="hero_subtitle"
+            style="margin-top: 12px; margin-bottom: 32px; font-weight: 300; letter-spacing: 0.25em;">
+        </h2>
+        <p class="t-body text-muted reveal" data-i18n="hero_description"
+            style="max-width: 480px; margin-bottom: 48px; font-size: 16px; color: #1A202C;">
+            Одеська область
+        </p>
+        <div class="reveal"
+            style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; cursor: pointer; color: var(--c-admiralty);">
+            <div class="t-nav" data-i18n="swipe_hint" style="margin-bottom: 8px;">СВАЙП АБО КЛІК ДЛЯ ПЕРЕХОДУ</div>
+            <button class="btn-primary" id="btn-enter" data-magnetic>&darr;</button>
+        </div>
+
+        <div class="hero-waves">
+            <svg viewBox="0 0 1440 120" preserveAspectRatio="none" style="width: 100%; height: 100%;">
+                <path class="wave-1" d="M0,60 C240,100 480,20 720,60 C960,100 1200,20 1440,60 L1440,120 L0,120 Z" />
+                <path class="wave-2" d="M0,70 C200,40 400,90 640,65 C880,40 1100,90 1440,70 L1440,120 L0,120 Z" />
+                <path class="wave-3" d="M0,80 C300,50 600,100 900,75 C1100,55 1300,95 1440,80 L1440,120 L0,120 Z" />
+            </svg>
+        </div>
+    </section>
+
+    <!-- Main App Container -->
+    <main class="app-interface" style="display: none; opacity: 0; flex-direction: column; min-height: 100vh;">
+
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-lockup" style="display: flex; align-items: center; gap: 12px;">
+                <img src="./assets/newanchor.png" alt="Logo" width="32" height="32"
+                    style="object-fit: contain; mix-blend-mode: darken; filter: contrast(1.1) brightness(1.1);">
+                <div style="display: flex; flex-direction: column;">
+                    <span class="t-nav" data-i18n="app_title" style="color: var(--c-text-primary);">ОДЕСЬКА
+                        ОБЛАСТЬ</span>
+                    <span class="t-data text-muted" data-i18n="app_subtitle"></span>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 24px;">
+                <input type="text" placeholder="Пошук..." data-i18n-placeholder="search_placeholder"
+                    style="width: 280px; height: 40px; border: 1px solid var(--c-divider); background: var(--c-surface); padding: 0 16px; font-family: var(--font-ui); font-size: 14px; outline: none; border-radius: 100px; transition: border-color 0.3s;"
+                    onfocus="this.style.borderColor='var(--c-admiralty)'"
+                    onblur="this.style.borderColor='var(--c-divider)'" />
+                <nav style="display: flex; gap: 24px;">
+                    <a href="#" class="t-nav" data-i18n="news_link" data-magnetic
+                        style="text-decoration: none; color: var(--c-text-primary);">НОВИНИ</a>
+                    <a href="#" class="t-nav" id="btn-lang-toggle" data-magnetic
+                        style="text-decoration: none; color: var(--c-text-primary);">UA / EN</a>
+                </nav>
+                <button id="btn-auth" class="btn-primary" data-i18n="login_btn" data-magnetic>УВІЙТИ &rarr;</button>
+            </div>
+        </header>
+
+        <!-- Floating Filter Menu instead of Bar -->
+        <div class="filter-menu" id="filter-menu">
+            <button id="btn-toggle-filters" class="filter-toggle" data-magnetic>
+                <span data-i18n="filters">Фільтри</span>
+                <svg class="arrow-icon" viewBox="0 0 24 24" width="20" height="20">
+                    <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                </svg>
+            </button>
+            <div class="filter-options" id="filter-options">
+                <button class="btn-flat active" data-filter="all" data-i18n="filter_all" data-magnetic>Всі
+                    об'єкти</button>
+                <button class="btn-flat" data-filter="ramp" data-i18n="filter_ramps" data-magnetic>Пандуси</button>
+                <button class="btn-flat" data-filter="elevator" data-i18n="filter_elevators" data-magnetic>Ліфти</button>
+                <button class="btn-flat" data-filter="toilet" data-i18n="filter_toilets" data-magnetic>Туалети</button>
+                <button class="btn-flat" data-filter="parking" data-i18n="filter_parking" data-magnetic>Паркування</button>
+                <button class="btn-flat" data-filter="certified" data-i18n="filter_certified"
+                    style="border-color: var(--c-brass); color: var(--c-brass);" data-magnetic>Сертифіковані ✦</button>
+            </div>
+        </div>
+
+        <aside class="specialist-panel" id="specialist-panel">
+            <div class="specialist-head">
+                <div>
+                    <div class="t-nav">SPECIALIST OPS</div>
+                    <div id="specialist-user" class="t-data text-muted">offline</div>
+                </div>
+                <button id="btn-logout" class="btn-flat">Logout</button>
+            </div>
+            <div class="specialist-tabs">
+                <button class="btn-flat active" data-specialist-tab="dashboard">Dashboard</button>
+                <button class="btn-flat" data-specialist-tab="editor">Editor</button>
+            </div>
+            <div class="specialist-tab-content active" id="specialist-dashboard">
+                <div class="ops-kpi-grid">
+                    <article class="ops-kpi">
+                        <div class="t-data text-muted">Точки</div>
+                        <div id="kpi-points" class="ops-kpi-value">0</div>
+                    </article>
+                    <article class="ops-kpi">
+                        <div class="t-data text-muted">Сертифіковані</div>
+                        <div id="kpi-certified" class="ops-kpi-value">0</div>
+                    </article>
+                    <article class="ops-kpi">
+                        <div class="t-data text-muted">Маршрути</div>
+                        <div id="kpi-routes" class="ops-kpi-value">0</div>
+                    </article>
+                    <article class="ops-kpi">
+                        <div class="t-data text-muted">Published</div>
+                        <div id="kpi-published" class="ops-kpi-value">0</div>
+                    </article>
+                </div>
+                <div class="specialist-block">
+                    <div class="t-label">Маршрути</div>
+                    <input id="route-search" type="text" placeholder="Пошук маршруту..." />
+                    <div id="route-list" class="route-list"></div>
+                    <div class="list-pager">
+                        <button id="route-prev" class="btn-flat">Prev</button>
+                        <span id="route-page-label" class="t-data text-muted">1 / 1</span>
+                        <button id="route-next" class="btn-flat">Next</button>
+                    </div>
+                </div>
+                <div class="specialist-block">
+                    <div class="t-label">Review Queue</div>
+                    <div id="review-list" class="activity-list"></div>
+                </div>
+                <div class="specialist-block">
+                    <div class="t-label">Точки (швидке редагування)</div>
+                    <input id="point-search" type="text" placeholder="Пошук точки..." />
+                    <div id="point-list" class="route-list"></div>
+                    <div class="list-pager">
+                        <button id="point-prev" class="btn-flat">Prev</button>
+                        <span id="point-page-label" class="t-data text-muted">1 / 1</span>
+                        <button id="point-next" class="btn-flat">Next</button>
+                    </div>
+                </div>
+                <div class="specialist-block">
+                    <div class="t-label">Останні дії</div>
+                    <div id="activity-list" class="activity-list"></div>
+                </div>
+            </div>
+            <div class="specialist-tab-content" id="specialist-editor">
+                <div class="specialist-block">
+                    <div class="t-label">Додати точку</div>
+                    <input id="point-title" type="text" placeholder="Назва точки" />
+                    <select id="point-type"></select>
+                    <div class="specialist-grid">
+                        <input id="point-lat" type="number" step="0.000001" placeholder="Lat" />
+                        <input id="point-lng" type="number" step="0.000001" placeholder="Lng" />
+                    </div>
+                    <input id="point-district" type="text" placeholder="Район" />
+                    <textarea id="point-description" placeholder="Коментар"></textarea>
+                    <label class="specialist-check"><input id="point-certified" type="checkbox" /> Сертифіковано</label>
+                    <button id="btn-pick-on-map" class="btn-flat">Вибрати на карті</button>
+                    <button id="btn-create-point" class="btn-primary">Створити точку</button>
+                </div>
+                <div class="specialist-block">
+                    <div class="t-label">Редактор маршруту</div>
+                    <select id="route-edit-select"></select>
+                    <div class="specialist-grid">
+                        <button id="btn-load-route" class="btn-flat">Завантажити</button>
+                        <button id="btn-new-route" class="btn-flat">Новий</button>
+                    </div>
+                    <input id="route-name" type="text" placeholder="Назва маршруту" />
+                    <select id="route-status">
+                        <option value="draft">Draft</option>
+                        <option value="review">Review</option>
+                        <option value="published">Published</option>
+                    </select>
+                    <textarea id="route-description" placeholder="Опис маршруту"></textarea>
+                    <div class="specialist-grid">
+                        <select id="route-point-add"></select>
+                        <button id="btn-add-route-point" class="btn-flat">Додати</button>
+                    </div>
+                    <div id="route-point-order" class="route-point-order"></div>
+                    <button id="btn-undo-route-order" class="btn-flat">Undo reorder</button>
+                    <button id="btn-create-route" class="btn-primary">Створити маршрут</button>
+                    <button id="btn-save-route" class="btn-primary">Зберегти маршрут</button>
+                </div>
+                <div class="specialist-block">
+                    <div class="t-label">Швидке редагування точки</div>
+                    <input id="edit-point-title" type="text" placeholder="Назва точки" />
+                    <select id="edit-point-type"></select>
+                    <input id="edit-point-district" type="text" placeholder="Район" />
+                    <textarea id="edit-point-description" placeholder="Коментар"></textarea>
+                    <label class="specialist-check"><input id="edit-point-certified" type="checkbox" /> Сертифіковано</label>
+                    <button id="btn-save-point" class="btn-primary">Зберегти точку</button>
+                </div>
+            </div>
+            <div id="specialist-message" class="t-data text-muted"></div>
+        </aside>
+
+        <!-- Map & Context Container -->
+        <div class="map-container section-transition section-current">
+            <div class="map-view" id="map">
+                <div class="partner-logos" id="partner-panel"
+                    style="position: absolute; bottom: 16px; left: 16px; z-index: 1000; background: #FFFFFF; border-radius: 8px; padding: 10px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid var(--c-divider); display: flex; align-items: center; gap: 20px; transition: all 0.5s ease; width: fit-content; max-width: 80vw;">
+                    <button id="btn-hide-partners"
+                        style="position: absolute; top: -8px; right: -8px; padding: 4px 10px; border-radius: 100px; background: var(--c-admiralty); color: white; border: none; font-size: 9px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); z-index: 11; text-transform: uppercase;">ПРИХОВАТИ</button>
+                    <div id="partner-logos-inner"
+                        style="display: flex; align-items: center; gap: 20px; overflow: hidden;">
+                        <img src="./assets/barrier-free.svg" alt="Фізична безбар'єрність"
+                            style="height: 28px; object-fit: contain;" onerror="this.style.display='none'" />
+                        <img src="./assets/logo-dark-miu-ukr.svg" alt="Міністерство розвитку громад"
+                            style="height: 30px; object-fit: contain;" onerror="this.style.display='none'" />
+                        <img src="./assets/Одещина.svg" alt="Одещина"
+                            style="height: 60px; object-fit: contain; transform: scale(1.1); filter: drop-shadow(0 0 5px rgba(0,0,0,0.05));"
+                            onerror="this.style.display='none'" />
+                        <img src="./assets/omr.svg" alt="Одеська міська рада" style="height: 40px; object-fit: contain;"
+                            onerror="this.style.display='none'" />
+                    </div>
+                </div>
+                <button id="btn-show-partners"
+                    style="display: none; position: absolute; bottom: 24px; left: 24px; z-index: 999; background: var(--c-surface); backdrop-filter: blur(8px); border-radius: var(--radius-md); padding: 10px 16px; border: 1px solid rgba(255,255,255,0.4); box-shadow: var(--shadow-float); color: var(--c-admiralty); font-size: 12px; font-weight: 600;">ПОКАЗАТИ
+                    ПАРТНЕРІВ</button>
+            </div>
+            <div class="context-panel hidden" id="context-panel">
+                <!-- Information Card will be injected via JS -->
+                <div class="card card-3d" style="padding: 24px;">
+                    <p class="t-body text-muted">Оберіть об'єкт на карті для детальної інформації.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- News Section -->
+        <section class="news-section section-next"
+            style="padding: 120px 32px; background: var(--c-surface); display: flex; flex-direction: column; align-items: center;">
+            <h2 class="t-h2 reveal" data-i18n="news_title" style="margin-bottom: 48px;">ОСТАННІ НОВИНИ</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 1000px; width: 100%;">
+
+                <div class="card reveal news-card" style="padding: 24px; border-top: 1px solid var(--c-divider);">
+                    <div class="t-data text-muted" style="margin-bottom: 16px;">12 ЛЮТОГО 2025</div>
+                    <h3 class="t-h3"
+                        style="font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 12px;">
+                        Завершено аудит Приморського району</h3>
+                    <p class="t-body text-muted"
+                        style="margin-bottom: 24px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                        Перевірено 45 об'єктів соціальної інфраструктури. З них 12 отримали статус сертифікованих.
+                        Детальний звіт доступний для спеціалістів.</p>
+                    <a href="#" class="t-body" style="color: var(--c-cerulean); text-decoration: none;"
+                        data-magnetic>Читати &rarr;</a>
+                </div>
+
+                <div class="card reveal news-card" style="padding: 24px; border-top: 1px solid var(--c-divider);">
+                    <div class="t-data text-muted" style="margin-bottom: 16px;">08 ЛЮТОГО 2025</div>
+                    <h3 class="t-h3"
+                        style="font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 12px;">
+                        Оновлення стандартів пандусів</h3>
+                    <p class="t-body text-muted"
+                        style="margin-bottom: 24px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                        Згідно з новими ДБН В.2.2-40:2018, максимальний ухил зовнішніх пандусів не може перевищувати 8%.
+                        Всі нові об'єкти проходять жорстку перевірку.</p>
+                    <a href="#" class="t-body" style="color: var(--c-cerulean); text-decoration: none;"
+                        data-magnetic>Читати &rarr;</a>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Auth Section -->
+        <section class="auth-section" id="auth-view"
+            style="display: none; position: fixed; inset: 0; background: var(--c-bg); z-index: 1000; align-items: center; justify-content: center; flex-direction: column;">
+            <div class="card card-3d auth-card"
+                style="width: 420px; padding: 56px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: var(--shadow-float);">
+                <svg class="anchor-logo" viewBox="0 0 512 512" width="40" height="40" fill="currentColor"
+                    style="color: var(--c-admiralty); margin-bottom: 16px;">
+                    <path
+                        d="M256 0c-17.7 0-32 14.3-32 32v24.2c-29.4 10.4-50.6 38.3-50.6 71.8 0 42.4 34.4 76.8 76.8 76.8s76.8-34.4 76.8-76.8c0-33.5-21.2-61.4-50.6-71.8V32c0-17.7-14.3-32-32-32zm0 172.8c-24.7 0-44.8-20.1-44.8-44.8 0-24.7 20.1-44.8 44.8-44.8s44.8 20.1 44.8 44.8c0 24.7-20.1 44.8-44.8 44.8zM476.3 226.7C455 205.4 420.3 205.4 399 226.7c-9.4 9.4-14.6 21.8-14.6 35V308c0 23.3-13.6 43.6-33.4 53.6-18.4-15.5-38.6-28.8-60.6-39.2-22-10.4-45-18-68.4-22.3v-49.8c0-17.7-14.3-32-32-32s-32 14.3-32 32v49.8c-23.4 4.3-46.4 11.9-68.4 22.3-22 10.4-42.2 23.7-60.6 39.2C109.2 351.6 95.6 331.3 95.6 308v-46.3c0-13.2-5.3-25.7-14.6-35C59.7 205.4 25 205.4 3.7 226.7-6.2 236.6 0.1 253.6 14.1 254.9c55.3 5.3 98.7 52.8 98.7 109.9v10.3c0 69.1 56.1 125.1 125.2 125.1h18v11.8c0 17.7 14.3 32 32 32s32-14.3 32-32V500h18c69.1 0 125.2-56 125.2-125.1V364.8c0-57.1 43.4-104.6 98.7-109.9 14.1-1.3 20.4-18.3 10.4-28.2z" />
+                </svg>
+                <div class="t-nav" data-i18n="app_title" style="color: var(--c-text-primary);">ОДЕСЬКА ОБЛАСТЬ</div>
+                <div class="t-data text-muted" data-i18n="app_subtitle"></div>
+                <hr style="width: 100%; border: 0; border-top: 1px solid var(--c-divider); margin-bottom: 24px;">
+
+                <h2 class="t-h2" style="font-size: 28px; margin-bottom: 32px;">Вхід для спеціалістів</h2>
+
+                <div style="width: 100%; text-align: left; margin-bottom: 16px;">
+                    <label class="t-label text-muted" style="display: block; margin-bottom: 8px;">Email або
+                        логін</label>
+                    <input id="auth-email" type="text"
+                        style="width: 100%; height: 40px; border: 1px solid var(--c-divider); background: transparent; padding: 0 12px; font-family: var(--font-ui); font-size: 14px; outline: none; border-radius: 0; transition: border-color 0.3s;"
+                        onfocus="this.style.borderColor='var(--c-cerulean)'"
+                        onblur="this.style.borderColor='var(--c-divider)'" />
+                </div>
+                <div style="width: 100%; text-align: left; margin-bottom: 32px;">
+                    <label class="t-label text-muted" style="display: block; margin-bottom: 8px;">Пароль</label>
+                    <input id="auth-password" type="password"
+                        style="width: 100%; height: 40px; border: 1px solid var(--c-divider); background: transparent; padding: 0 12px; font-family: var(--font-ui); font-size: 14px; outline: none; border-radius: 0; transition: border-color 0.3s;"
+                        onfocus="this.style.borderColor='var(--c-cerulean)'"
+                        onblur="this.style.borderColor='var(--c-divider)'" />
+                </div>
+
+                <button id="btn-auth-submit" class="btn-primary" style="width: 100%; margin-bottom: 24px;" data-magnetic>УВІЙТИ ДО
+                    СИСТЕМИ</button>
+                <a href="#" class="t-body"
+                    style="color: var(--c-cerulean); text-decoration: none; margin-bottom: 24px; font-size: 13px;"
+                    data-magnetic>Забули пароль?</a>
+
+                <hr style="width: 100%; border: 0; border-top: 1px solid var(--c-divider); margin-bottom: 16px;">
+                <div class="t-label text-muted">Проблеми з доступом?</div>
+                <div class="t-data text-muted">support@odesa-access.gov.ua</div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="/main.js"></script>
+    <!-- External Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</body>
+
+</html>

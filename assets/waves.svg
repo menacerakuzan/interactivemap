@@ -1,0 +1,5 @@
+<svg viewBox="0 0 1440 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <path class="wave-1" d="M0,60 C240,100 480,20 720,60 C960,100 1200,20 1440,60 L1440,120 L0,120 Z"/>
+  <path class="wave-2" d="M0,70 C200,40 400,90 640,65 C880,40 1100,90 1440,70 L1440,120 L0,120 Z"/>
+  <path class="wave-3" d="M0,80 C300,50 600,100 900,75 C1100,55 1300,95 1440,80 L1440,120 L0,120 Z"/>
+</svg>
