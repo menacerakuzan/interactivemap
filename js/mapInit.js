@@ -62,6 +62,7 @@ function showInfoCard(data) {
   }
 
   panel.classList.add('active');
+  document.body.classList.add('context-open');
   document.querySelector('.map-view')?.classList.add('panel-open');
 
   if (window.gsap) {
@@ -98,7 +99,8 @@ function showInfoCard(data) {
     : '';
 
   panel.innerHTML = `
-    <div class="card card-3d" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+    <div class="card card-3d" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; position: relative;">
+      <button id="btn-close-context-panel" class="btn-flat context-close-btn" type="button">Закрити</button>
       <div style="height: 160px; background: ${
         data.photoUrl
           ? `url('${data.photoUrl}') center/cover`
@@ -126,6 +128,19 @@ function showInfoCard(data) {
       </div>
     </div>
   `;
+
+  panel.querySelector('#btn-close-context-panel')?.addEventListener('click', () => {
+    closeInfoCard();
+  });
+}
+
+function closeInfoCard() {
+  const panel = document.getElementById('context-panel');
+  if (!panel) return;
+  panel.classList.remove('active');
+  panel.style.opacity = '0';
+  document.body.classList.remove('context-open');
+  document.querySelector('.map-view')?.classList.remove('panel-open');
 }
 
 async function loadAndRenderPoints() {
@@ -278,6 +293,7 @@ export async function initMap(options = {}) {
 
   map.on('click', (e) => {
     if (!pickMode || typeof pickCallback !== 'function') {
+      closeInfoCard();
       return;
     }
     pickCallback({ lat: e.latlng.lat, lng: e.latlng.lng });

@@ -7,9 +7,12 @@ create table if not exists public.news (
   title text not null,
   summary text not null,
   link text,
+  image_url text,
   created_by uuid not null references public.profiles(id),
   created_at timestamptz not null default now()
 );
+
+alter table public.news add column if not exists image_url text;
 
 alter table public.news enable row level security;
 

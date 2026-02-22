@@ -12,6 +12,11 @@ function isMissingPointSectionsError(error) {
   return message.includes('point_sections') && message.includes('does not exist');
 }
 
+function isMissingNewsImageError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('image_url') && message.includes('news');
+}
+
 function parsePath(path) {
   const url = new URL(path, 'http://local');
   return { pathname: url.pathname, searchParams: url.searchParams };
@@ -67,9 +72,40 @@ function mapNews(row, authorName = null) {
     title: row.title,
     summary: row.summary,
     link: row.link,
+    imageUrl: row.image_url || null,
     authorName: row.author_name || authorName || null,
     createdAt: row.created_at,
   };
+}
+
+async function tryExtractSourceImage(link) {
+  if (!link) return null;
+  let normalizedLink = null;
+  try {
+    normalizedLink = new URL(link).toString();
+  } catch (_e) {
+    return null;
+  }
+  try {
+    const response = await fetch(normalizedLink, { method: 'GET', mode: 'cors' });
+    if (!response.ok) return null;
+    const html = await response.text();
+    const patterns = [
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
+    ];
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) {
+        return new URL(match[1], normalizedLink).toString();
+      }
+    }
+    return `https://image.thum.io/get/width/1200/noanimate/${encodeURIComponent(normalizedLink)}`;
+  } catch (_e) {
+    return `https://image.thum.io/get/width/1200/noanimate/${encodeURIComponent(normalizedLink)}`;
+  }
 }
 
 function mapRoute(row, authorName = null) {
@@ -413,10 +449,18 @@ async function supabaseGetCurrentUser() {
 }
 
 async function supabaseGetNews() {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('news')
-    .select('id,title,summary,link,created_at,created_by')
+    .select('id,title,summary,link,image_url,created_at,created_by')
     .order('created_at', { ascending: false });
+  if (error && isMissingNewsImageError(error)) {
+    const fallback = await supabase
+      .from('news')
+      .select('id,title,summary,link,created_at,created_by')
+      .order('created_at', { ascending: false });
+    data = fallback.data;
+    error = fallback.error;
+  }
   if (error) throw error;
 
   const authorIds = [...new Set((data || []).map((n) => n.created_by).filter(Boolean))];
@@ -435,16 +479,35 @@ async function supabaseGetNews() {
 
 async function supabaseCreateNews(payload) {
   const user = await supabaseGetCurrentUser();
+  let imageUrl = payload.imageUrl || null;
+  if (!imageUrl && payload.link) {
+    imageUrl = await tryExtractSourceImage(payload.link);
+  }
   const { data, error } = await supabase
     .from('news')
     .insert({
       title: payload.title,
       summary: payload.summary,
       link: payload.link || null,
+      image_url: imageUrl,
       created_by: user.id,
     })
-    .select('id,title,summary,link,created_at')
+    .select('id,title,summary,link,image_url,created_at')
     .single();
+  if (error && isMissingNewsImageError(error)) {
+    const fallback = await supabase
+      .from('news')
+      .insert({
+        title: payload.title,
+        summary: payload.summary,
+        link: payload.link || null,
+        created_by: user.id,
+      })
+      .select('id,title,summary,link,created_at')
+      .single();
+    if (fallback.error) throw fallback.error;
+    return mapNews(fallback.data);
+  }
   if (error) throw error;
   return mapNews(data);
 }
@@ -454,13 +517,31 @@ async function supabaseUpdateNews(newsId, payload) {
   if (payload.title !== undefined) updateData.title = payload.title;
   if (payload.summary !== undefined) updateData.summary = payload.summary;
   if (payload.link !== undefined) updateData.link = payload.link || null;
+  if (payload.imageUrl !== undefined) {
+    updateData.image_url = payload.imageUrl || null;
+  } else if (payload.link) {
+    const extracted = await tryExtractSourceImage(payload.link);
+    if (extracted) updateData.image_url = extracted;
+  }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('news')
     .update(updateData)
     .eq('id', newsId)
-    .select('id,title,summary,link,created_at')
+    .select('id,title,summary,link,image_url,created_at')
     .single();
+  if (error && isMissingNewsImageError(error)) {
+    const fallbackData = { ...updateData };
+    delete fallbackData.image_url;
+    const fallback = await supabase
+      .from('news')
+      .update(fallbackData)
+      .eq('id', newsId)
+      .select('id,title,summary,link,created_at')
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
   if (error) throw error;
   return mapNews(data);
 }

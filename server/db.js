@@ -93,6 +93,11 @@ if (!pointColumns.some((c) => c.name === 'photo_url')) {
   db.exec('ALTER TABLE points ADD COLUMN photo_url TEXT');
 }
 
+const newsColumns = db.prepare("PRAGMA table_info(news)").all();
+if (!newsColumns.some((c) => c.name === 'image_url')) {
+  db.exec('ALTER TABLE news ADD COLUMN image_url TEXT');
+}
+
 const seedPointTypes = [
   ['ramp', 'Пандус', 'Ramp', '#13315C'],
   ['elevator', 'Ліфт', 'Elevator', '#0B2545'],

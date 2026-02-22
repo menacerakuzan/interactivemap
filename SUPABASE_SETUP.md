@@ -11,6 +11,7 @@ Open SQL Editor and run:
 - `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/fix_stack_depth.sql`
 - `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/fix_policies_no_recursion.sql`
 - `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/add_news_and_photos.sql`
+- `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/add_news_image.sql` (if project was initialized earlier)
 - `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/one_shot_permissions_fix.sql`
 - `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/add_point_sections.sql`
 

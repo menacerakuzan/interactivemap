@@ -158,6 +158,7 @@ async function runSmoke() {
         title: 'SMOKE News',
         summary: 'Smoke summary',
         link: 'https://example.com/smoke-news',
+        imageUrl: 'https://example.com/smoke-news-image.jpg',
       }),
     });
     if (!newsCreate.response.ok || !newsCreate.data?.id) {

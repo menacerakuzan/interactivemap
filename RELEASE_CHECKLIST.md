@@ -13,8 +13,9 @@ Run in order:
 2. `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/fix_stack_depth.sql`
 3. `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/fix_policies_no_recursion.sql`
 4. `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/add_news_and_photos.sql`
-5. `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/one_shot_permissions_fix.sql`
-6. `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/add_point_sections.sql`
+5. `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/add_news_image.sql` (legacy projects)
+6. `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/one_shot_permissions_fix.sql`
+7. `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/add_point_sections.sql`
 
 ## 3) Build and static checks
 - `npm run build`
@@ -59,6 +60,9 @@ What it verifies:
 - Edit same point and confirm changes are visible in map context card.
 - Create route from points, save and delete it.
 - Create news, edit and delete it.
+- Verify news image works:
+  - custom image URL
+  - empty image URL with source link (auto-try from `og:image`)
 - Verify status bar messages are clear (`Status/Done/Error`) and mode guide text updates.
 
 ## 7) Go/No-Go

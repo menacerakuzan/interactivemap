@@ -637,6 +637,11 @@ function renderNews() {
     .map(
       (item) => `
       <div class="card reveal news-card">
+        <div class="news-cover" style="background: ${
+          item.imageUrl
+            ? `url('${item.imageUrl}') center/cover`
+            : 'linear-gradient(120deg, rgba(11,37,69,0.18), rgba(197,160,89,0.2))'
+        };"></div>
         <div class="t-data text-muted" style="margin-bottom: 16px;">${formatIsoDate(item.createdAt)}</div>
         <h3 class="t-h3" style="font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 12px;">${item.title}</h3>
         <p class="t-body text-muted" style="margin-bottom: 24px;">${item.summary}</p>
@@ -969,10 +974,12 @@ function resetNewsEditor() {
   const title = document.getElementById('news-title-input');
   const summary = document.getElementById('news-summary-input');
   const link = document.getElementById('news-link-input');
+  const imageUrl = document.getElementById('news-image-url-input');
   const select = document.getElementById('news-edit-select');
   if (title) title.value = '';
   if (summary) summary.value = '';
   if (link) link.value = '';
+  if (imageUrl) imageUrl.value = '';
   if (select) select.value = '';
   syncEditorActionButtons();
 }
@@ -984,10 +991,12 @@ function openNewsInEditor(newsId) {
   const title = document.getElementById('news-title-input');
   const summary = document.getElementById('news-summary-input');
   const link = document.getElementById('news-link-input');
+  const imageUrl = document.getElementById('news-image-url-input');
   const select = document.getElementById('news-edit-select');
   if (title) title.value = news.title || '';
   if (summary) summary.value = news.summary || '';
   if (link) link.value = news.link || '';
+  if (imageUrl) imageUrl.value = news.imageUrl || '';
   if (select) select.value = String(news.id);
   setActiveSpecialistTab('news-editor');
   setSpecialistMessage(`Редагування новини: ${news.title}`);
@@ -1766,6 +1775,7 @@ function bindSpecialistTools() {
         title: document.getElementById('news-title-input').value.trim(),
         summary: document.getElementById('news-summary-input').value.trim(),
         link: document.getElementById('news-link-input').value.trim() || null,
+        imageUrl: document.getElementById('news-image-url-input').value.trim() || null,
       };
 
       if (!payload.title || !payload.summary) {
@@ -1774,6 +1784,10 @@ function bindSpecialistTools() {
       }
       if (!isValidHttpUrl(payload.link)) {
         setSpecialistMessage('Посилання новини має бути http:// або https://', true);
+        return;
+      }
+      if (!isValidHttpUrl(payload.imageUrl)) {
+        setSpecialistMessage('URL картинки новини має бути http:// або https://', true);
         return;
       }
 
@@ -1818,6 +1832,7 @@ function bindSpecialistTools() {
         title: document.getElementById('news-title-input').value.trim(),
         summary: document.getElementById('news-summary-input').value.trim(),
         link: document.getElementById('news-link-input').value.trim() || null,
+        imageUrl: document.getElementById('news-image-url-input').value.trim() || null,
       };
       if (!payload.title || !payload.summary) {
         setSpecialistMessage('Заповніть заголовок і опис новини', true);
@@ -1825,6 +1840,10 @@ function bindSpecialistTools() {
       }
       if (!isValidHttpUrl(payload.link)) {
         setSpecialistMessage('Посилання новини має бути http:// або https://', true);
+        return;
+      }
+      if (!isValidHttpUrl(payload.imageUrl)) {
+        setSpecialistMessage('URL картинки новини має бути http:// або https://', true);
         return;
       }
       await runWithButtonState(btnSaveNews, 'Оновлення...', async () => {

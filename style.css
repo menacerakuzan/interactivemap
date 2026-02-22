@@ -56,6 +56,18 @@ body {
   overflow-x: hidden;
 }
 
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(circle at 14% 16%, rgba(197, 160, 89, 0.08), transparent 34%),
+    radial-gradient(circle at 82% 10%, rgba(11, 37, 69, 0.1), transparent 30%),
+    repeating-linear-gradient(45deg, rgba(11, 37, 69, 0.013) 0 1px, transparent 1px 8px);
+}
+
 /* Typography Classes */
 .t-display {
   font-family: var(--font-display);
@@ -203,6 +215,7 @@ body {
   top: 0;
   width: 100%;
   z-index: 1000;
+  backdrop-filter: blur(10px);
 }
 
 .auth-state-badge {
@@ -227,6 +240,7 @@ body {
   align-items: flex-end;
   gap: 12px;
   transition: opacity var(--t-smooth) var(--ease-smooth), transform var(--t-smooth) var(--ease-smooth);
+  transform-origin: top right;
 }
 
 .filter-toggle {
@@ -269,7 +283,7 @@ body {
   backdrop-filter: blur(20px);
   padding: 16px;
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-hover);
+  box-shadow: 0 22px 48px rgba(11, 37, 69, 0.16);
   border: 1px solid var(--c-divider);
   opacity: 0;
   visibility: hidden;
@@ -328,6 +342,9 @@ body {
   padding: 24px;
   gap: 24px;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(197, 160, 89, 0.12), transparent 42%),
+    radial-gradient(circle at 8% 88%, rgba(11, 37, 69, 0.08), transparent 36%);
 }
 
 .map-view {
@@ -437,7 +454,7 @@ body {
   border-radius: var(--radius-lg);
   padding: 32px;
   overflow-y: auto;
-  box-shadow: var(--shadow-float);
+  box-shadow: 0 18px 42px rgba(11, 37, 69, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.6);
   display: none;
   opacity: 0;
@@ -446,6 +463,21 @@ body {
 
 .context-panel.active {
   display: block;
+}
+
+.context-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
+body.context-open .filter-menu {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(18px);
 }
 
 .status-bar {
@@ -475,6 +507,19 @@ body {
   background: var(--c-bg);
   overflow: hidden;
   z-index: 10;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  width: 460px;
+  height: 460px;
+  border-radius: 50%;
+  top: -170px;
+  right: -120px;
+  background: radial-gradient(circle, rgba(197, 160, 89, 0.22) 0%, rgba(197, 160, 89, 0.04) 55%, transparent 75%);
+  filter: blur(2px);
+  z-index: -1;
 }
 
 .hero-bg {
@@ -535,6 +580,27 @@ body {
   color: var(--c-admiralty);
   filter: contrast(1.5) brightness(1.2);
   mix-blend-mode: darken;
+  filter: drop-shadow(0 10px 24px rgba(11, 37, 69, 0.16));
+}
+
+#hero-title {
+  text-shadow: 0 8px 24px rgba(11, 37, 69, 0.18);
+}
+
+.hero-marquee {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(11, 37, 69, 0.2);
+  border-radius: 999px;
+  padding: 6px 14px;
+  margin-bottom: 22px;
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(8px);
+  color: var(--c-admiralty);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .hero-waves {
@@ -564,6 +630,20 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--c-admiralty);
+  position: relative;
+  padding-left: 24px;
+}
+
+.hero-highlights span::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #d9bb74, #b4882f);
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* Waves animation paths */
@@ -658,7 +738,7 @@ body {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--c-divider);
   backdrop-filter: blur(16px);
-  box-shadow: var(--shadow-hover);
+  box-shadow: 0 24px 52px rgba(11, 37, 69, 0.2);
   display: none;
   gap: 14px;
   flex-direction: column;
@@ -926,8 +1006,41 @@ body {
 
 .news-card {
   padding: 24px;
-  border-top: 1px solid var(--c-divider);
+  border: 1px solid rgba(11, 37, 69, 0.1);
   border-radius: var(--radius-md);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(241, 246, 252, 0.92)),
+    radial-gradient(circle at 90% 12%, rgba(197, 160, 89, 0.16), transparent 36%);
+  position: relative;
+  overflow: hidden;
+}
+
+.news-card::after {
+  content: '';
+  position: absolute;
+  inset: -120% -40%;
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.34) 45%, transparent 60%);
+  transform: translateX(-55%);
+  transition: transform 0.9s var(--ease-smooth);
+  pointer-events: none;
+}
+
+.news-card:hover::after {
+  transform: translateX(55%);
+}
+
+.news-cover {
+  width: 100%;
+  height: 160px;
+  border-radius: 10px;
+  border: 1px solid var(--c-divider);
+  margin-bottom: 14px;
+  box-shadow: inset 0 -50px 80px rgba(11, 37, 69, 0.16);
+}
+
+.news-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 44px rgba(11, 37, 69, 0.16);
 }
 
 .auth-logo-img {
@@ -995,6 +1108,12 @@ body {
 
   .hero-highlights {
     max-width: 92vw;
+  }
+
+  .hero-marquee {
+    font-size: 10px;
+    letter-spacing: 0.11em;
+    padding: 6px 10px;
   }
 
   .point-section-grid {

@@ -29,6 +29,44 @@ function normalizeOptionalText(value, maxLen = 2000) {
   return trimmed.slice(0, maxLen);
 }
 
+async function resolveSourceImage(link) {
+  if (!link) return null;
+  let normalizedLink = null;
+  try {
+    normalizedLink = new URL(link).toString();
+  } catch (_e) {
+    return null;
+  }
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4500);
+    const response = await fetch(normalizedLink, { signal: controller.signal, redirect: 'follow' });
+    clearTimeout(timeout);
+    if (!response.ok) return null;
+    const html = await response.text();
+    const candidates = [
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
+      /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
+    ];
+    for (const pattern of candidates) {
+      const match = html.match(pattern);
+      if (match?.[1]) {
+        try {
+          return new URL(match[1], link).toString();
+        } catch (_e) {
+          // continue
+        }
+      }
+    }
+    return `https://image.thum.io/get/width/1200/noanimate/${encodeURIComponent(normalizedLink)}`;
+  } catch (_e) {
+    return `https://image.thum.io/get/width/1200/noanimate/${encodeURIComponent(normalizedLink)}`;
+  }
+}
+
 const mapPointRow = (row) => ({
   id: row.id,
   title: row.title,
@@ -505,7 +543,7 @@ app.delete('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), 
 app.get('/api/news', (_req, res) => {
   const rows = db
     .prepare(
-      `SELECT n.id, n.title, n.summary, n.link, n.created_at, u.full_name AS author_name
+      `SELECT n.id, n.title, n.summary, n.link, n.image_url, n.created_at, u.full_name AS author_name
        FROM news n
        JOIN users u ON u.id = n.created_by
        ORDER BY n.created_at DESC`
@@ -518,25 +556,31 @@ app.get('/api/news', (_req, res) => {
       title: r.title,
       summary: r.summary,
       link: r.link,
+      imageUrl: r.image_url || null,
       authorName: r.author_name,
       createdAt: r.created_at,
     }))
   );
 });
 
-app.post('/api/news', authenticate, requireRole('admin', 'specialist'), (req, res) => {
-  const { title, summary, link } = req.body;
+app.post('/api/news', authenticate, requireRole('admin', 'specialist'), async (req, res) => {
+  const { title, summary, link, imageUrl } = req.body;
   if (!isNonEmptyText(title, 180) || !isNonEmptyText(summary, 1000)) {
     return res.status(400).json({ error: 'title and summary are required' });
   }
+  const normalizedLink = normalizeOptionalText(link, 1200);
+  let normalizedImage = normalizeOptionalText(imageUrl, 1200);
+  if (!normalizedImage && normalizedLink) {
+    normalizedImage = await resolveSourceImage(normalizedLink);
+  }
 
   const result = db
-    .prepare(`INSERT INTO news (title, summary, link, created_by) VALUES (?, ?, ?, ?)`)
-    .run(title.trim(), summary.trim(), normalizeOptionalText(link, 1200), req.user.id);
+    .prepare(`INSERT INTO news (title, summary, link, image_url, created_by) VALUES (?, ?, ?, ?, ?)`)
+    .run(title.trim(), summary.trim(), normalizedLink, normalizedImage, req.user.id);
 
   const row = db
     .prepare(
-      `SELECT n.id, n.title, n.summary, n.link, n.created_at, u.full_name AS author_name
+      `SELECT n.id, n.title, n.summary, n.link, n.image_url, n.created_at, u.full_name AS author_name
        FROM news n
        JOIN users u ON u.id = n.created_by
        WHERE n.id = ?`
@@ -548,19 +592,20 @@ app.post('/api/news', authenticate, requireRole('admin', 'specialist'), (req, re
     title: row.title,
     summary: row.summary,
     link: row.link,
+    imageUrl: row.image_url || null,
     authorName: row.author_name,
     createdAt: row.created_at,
   });
 });
 
-app.put('/api/news/:id', authenticate, requireRole('admin', 'specialist'), (req, res) => {
+app.put('/api/news/:id', authenticate, requireRole('admin', 'specialist'), async (req, res) => {
   const newsId = Number(req.params.id);
-  const existing = db.prepare('SELECT id FROM news WHERE id = ?').get(newsId);
+  const existing = db.prepare('SELECT id, link, image_url FROM news WHERE id = ?').get(newsId);
   if (!existing) {
     return res.status(404).json({ error: 'News not found' });
   }
 
-  const { title, summary, link } = req.body;
+  const { title, summary, link, imageUrl } = req.body;
   if (title !== undefined && !isNonEmptyText(title, 180)) {
     return res.status(400).json({ error: 'Invalid title' });
   }
@@ -582,6 +627,19 @@ app.put('/api/news/:id', authenticate, requireRole('admin', 'specialist'), (req,
     fields.push('link = ?');
     values.push(normalizeOptionalText(link, 1200));
   }
+  if (imageUrl !== undefined) {
+    fields.push('image_url = ?');
+    values.push(normalizeOptionalText(imageUrl, 1200));
+  } else if (link !== undefined) {
+    const normalizedLink = normalizeOptionalText(link, 1200);
+    if (normalizedLink) {
+      const extractedImage = await resolveSourceImage(normalizedLink);
+      if (extractedImage) {
+        fields.push('image_url = ?');
+        values.push(extractedImage);
+      }
+    }
+  }
   if (!fields.length) {
     return res.status(400).json({ error: 'No fields to update' });
   }
@@ -590,7 +648,7 @@ app.put('/api/news/:id', authenticate, requireRole('admin', 'specialist'), (req,
 
   const row = db
     .prepare(
-      `SELECT n.id, n.title, n.summary, n.link, n.created_at, u.full_name AS author_name
+      `SELECT n.id, n.title, n.summary, n.link, n.image_url, n.created_at, u.full_name AS author_name
        FROM news n
        JOIN users u ON u.id = n.created_by
        WHERE n.id = ?`
@@ -602,6 +660,7 @@ app.put('/api/news/:id', authenticate, requireRole('admin', 'specialist'), (req,
     title: row.title,
     summary: row.summary,
     link: row.link,
+    imageUrl: row.image_url || null,
     authorName: row.author_name,
     createdAt: row.created_at,
   });

@@ -141,6 +141,7 @@ async function run() {
         title: `${prefix} NEWS`,
         summary: 'Smoke summary',
         link: 'https://example.com/smoke-news',
+        image_url: 'https://example.com/smoke-news-image.jpg',
         created_by: userId,
       })
       .select('id')
@@ -204,18 +205,38 @@ async function run() {
   } finally {
     // best-effort cleanup
     if (storagePath) {
-      await supabase.storage.from('point-photos').remove([storagePath]).catch(() => null);
+      try {
+        await supabase.storage.from('point-photos').remove([storagePath]);
+      } catch (_e) {
+        // ignore cleanup error
+      }
     }
     if (newsId) {
-      await supabase.from('news').delete().eq('id', newsId).catch(() => null);
+      try {
+        await supabase.from('news').delete().eq('id', newsId);
+      } catch (_e) {
+        // ignore cleanup error
+      }
     }
     if (routeId) {
-      await supabase.from('routes').delete().eq('id', routeId).catch(() => null);
+      try {
+        await supabase.from('routes').delete().eq('id', routeId);
+      } catch (_e) {
+        // ignore cleanup error
+      }
     }
     if (pointId) {
-      await supabase.from('points').delete().eq('id', pointId).catch(() => null);
+      try {
+        await supabase.from('points').delete().eq('id', pointId);
+      } catch (_e) {
+        // ignore cleanup error
+      }
     }
-    await supabase.auth.signOut().catch(() => null);
+    try {
+      await supabase.auth.signOut();
+    } catch (_e) {
+      // ignore sign out error
+    }
   }
 }
 
