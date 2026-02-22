@@ -120,12 +120,15 @@
             </div>
             <div class="specialist-actions" id="specialist-actions">
                 <select id="specialist-action-select">
-                    <option value="dashboard">Огляд</option>
+                    <option value="dashboard">Огляд системи</option>
                     <option value="add-point">Додати точку</option>
                     <option value="edit-point">Редагувати точку</option>
                     <option value="route-editor">Маршрути</option>
                     <option value="news-editor">Новини</option>
                 </select>
+            </div>
+            <div id="specialist-action-guide" class="specialist-action-guide t-body text-muted">
+                Оберіть режим роботи. Після кожної дії знизу зʼявиться статус результату.
             </div>
             <button id="btn-specialist-back" class="btn-flat" style="display:none;">Назад до меню</button>
             <div class="specialist-tab-content active" id="specialist-dashboard">
@@ -250,7 +253,7 @@
                     <button id="btn-delete-news" class="btn-flat">Видалити новину</button>
                 </div>
             </div>
-            <div id="specialist-message" class="t-data text-muted"></div>
+            <div id="specialist-message" class="specialist-message t-body text-muted">Статус: очікування дій</div>
         </aside>
 
         <!-- Map & Context Container -->

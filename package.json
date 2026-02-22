@@ -8,7 +8,10 @@
     "server": "node server/index.js",
     "dev:full": "sh -c 'node server/index.js & vite'",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "smoke:local": "node scripts/smoke-local.cjs",
+    "smoke:supabase": "node scripts/smoke-supabase.cjs",
+    "security:scan": "node scripts/security-scan.cjs"
   },
   "keywords": [],
   "author": "",

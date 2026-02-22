@@ -130,13 +130,37 @@ async function apiRequest(path, options = {}) {
   return dataService.request(path, { ...options, headers });
 }
 
-function setSpecialistMessage(text, isError = false) {
+function setSpecialistMessage(text, isError = false, variant = 'info') {
   const message = document.getElementById('specialist-message');
   if (!message) {
     return;
   }
-  message.textContent = text;
-  message.style.color = isError ? 'var(--c-vermillion)' : 'var(--c-text-secondary)';
+  const prefix = isError ? 'Помилка' : variant === 'success' ? 'Готово' : 'Статус';
+  message.textContent = `${prefix}: ${text}`;
+  message.classList.remove('is-error', 'is-success');
+  if (isError) {
+    message.classList.add('is-error');
+  } else if (variant === 'success') {
+    message.classList.add('is-success');
+  }
+}
+
+function setSpecialistSuccess(text) {
+  setSpecialistMessage(text, false, 'success');
+}
+
+function setSpecialistGuide(action) {
+  const guide = document.getElementById('specialist-action-guide');
+  if (!guide) return;
+  const hints = {
+    menu: 'Оберіть режим роботи. Після кожної дії знизу зʼявиться статус результату.',
+    dashboard: 'Огляд: перевіряйте маршрути/точки, відкривайте потрібний обʼєкт і переходьте до редагування.',
+    'add-point': 'Додавання точки: заповніть назву, тип, координати, головне фото та за потреби додайте розділи з фото.',
+    'edit-point': 'Редагування точки: виберіть точку зі списку, змініть дані, фото або розділи та натисніть «Зберегти точку».',
+    'route-editor': 'Маршрути: оберіть існуючий маршрут або створіть новий, додайте точки, збережіть або видаліть.',
+    'news-editor': 'Новини: створюйте новини з коротким описом і посиланням, або редагуйте/видаляйте існуючі.',
+  };
+  guide.textContent = hints[action] || hints.menu;
 }
 
 async function runWithButtonState(button, pendingText, action) {
@@ -442,6 +466,7 @@ function setActiveSpecialistTab(tabName) {
   if (modeLabel) {
     modeLabel.textContent = modeMap[action] || 'РЕЖИМ: МЕНЮ';
   }
+  setSpecialistGuide(action);
 
   if (dashboard && editor && backButton) {
     if (action === 'menu') {
@@ -1023,7 +1048,7 @@ function bindDashboardActions() {
           body: JSON.stringify({ status: nextRouteStatus(route.status) }),
         });
         await refreshDashboardData();
-        setSpecialistMessage('Статус маршруту оновлено');
+        setSpecialistSuccess('Статус маршруту оновлено');
       }
 
       if (action === 'set-route-status') {
@@ -1032,7 +1057,7 @@ function bindDashboardActions() {
           body: JSON.stringify({ status: button.dataset.status }),
         });
         await refreshDashboardData();
-        setSpecialistMessage('Маршрут перенесено в новий статус');
+        setSpecialistSuccess('Маршрут перенесено в новий статус');
       }
 
       if (action === 'edit-point') {
@@ -1087,7 +1112,7 @@ function bindAuthFlow() {
         renderDashboard([], []);
         renderNews();
         resetRouteEditor();
-        setSpecialistMessage('Сесію завершено');
+        setSpecialistSuccess('Сесію завершено');
         return;
       }
       clearAuthError();
@@ -1149,7 +1174,7 @@ function bindAuthFlow() {
 
         if (authView) authView.style.display = 'none';
         setFilterMenuHidden(false);
-        setSpecialistMessage(`Вхід виконано: ${data.user.fullName}`);
+        setSpecialistSuccess(`Вхід виконано: ${data.user.fullName}`);
         setActiveSpecialistTab(data.user.role === 'viewer' ? 'menu' : 'dashboard');
 
         try {
@@ -1205,7 +1230,7 @@ function bindAuthFlow() {
       renderDashboard([], []);
       renderNews();
       resetRouteEditor();
-      setSpecialistMessage('Сесію завершено');
+      setSpecialistSuccess('Сесію завершено');
     });
   }
 }
@@ -1378,7 +1403,7 @@ function bindSpecialistTools() {
       mapController.enablePointPicking(({ lat, lng }) => {
         document.getElementById('point-lat').value = lat.toFixed(6);
         document.getElementById('point-lng').value = lng.toFixed(6);
-        setSpecialistMessage('Координати вибрано');
+        setSpecialistSuccess('Координати вибрано');
       });
     });
   }
@@ -1407,7 +1432,7 @@ function bindSpecialistTools() {
       }
       routeEditorPoints = prev;
       renderRoutePointOrder();
-      setSpecialistMessage('Останню зміну скасовано');
+      setSpecialistSuccess('Останню зміну скасовано');
       saveUiState();
     });
   }
@@ -1475,7 +1500,7 @@ function bindSpecialistTools() {
           document.getElementById('point-photo-file').value = '';
           document.getElementById('point-certified').checked = false;
           renderPointSectionsEditor(pointSectionsList, []);
-          setSpecialistMessage('Точку додано');
+          setSpecialistSuccess('Точку додано');
         } catch (error) {
           setSpecialistMessage(error.message, true);
         }
@@ -1509,7 +1534,7 @@ function bindSpecialistTools() {
           });
           await refreshDashboardData();
           openRouteInEditor(created.id);
-          setSpecialistMessage('Маршрут створено');
+          setSpecialistSuccess('Маршрут створено');
         } catch (error) {
           setSpecialistMessage(error.message, true);
         }
@@ -1542,7 +1567,7 @@ function bindSpecialistTools() {
             body: JSON.stringify(payload),
           });
           await refreshDashboardData();
-          setSpecialistMessage('Маршрут оновлено');
+          setSpecialistSuccess('Маршрут оновлено');
           saveUiState();
         } catch (error) {
           setSpecialistMessage(error.message, true);
@@ -1641,7 +1666,7 @@ function bindSpecialistTools() {
           await mapController.refresh();
           await refreshDashboardData();
           openPointInEditor(editingPointId);
-          setSpecialistMessage('Точку оновлено');
+          setSpecialistSuccess('Точку оновлено');
         } catch (error) {
           setSpecialistMessage(error.message, true);
         }
@@ -1702,7 +1727,7 @@ function bindSpecialistTools() {
           await mapController.refresh();
           await refreshDashboardData();
           setActiveSpecialistTab(prevAction || 'edit-point');
-          setSpecialistMessage('Точку видалено');
+          setSpecialistSuccess('Точку видалено');
         } catch (error) {
           setSpecialistMessage(error.message, true);
         }
@@ -1757,7 +1782,7 @@ function bindSpecialistTools() {
           await apiRequest('/api/news', { method: 'POST', body: JSON.stringify(payload) });
           resetNewsEditor();
           await refreshDashboardData();
-          setSpecialistMessage('Новину додано');
+          setSpecialistSuccess('Новину додано');
         } catch (error) {
           setSpecialistMessage(error.message, true);
         }
@@ -1809,7 +1834,7 @@ function bindSpecialistTools() {
             body: JSON.stringify(payload),
           });
           await refreshDashboardData();
-          setSpecialistMessage('Новину оновлено');
+          setSpecialistSuccess('Новину оновлено');
         } catch (error) {
           setSpecialistMessage(error.message, true);
         }
@@ -1828,7 +1853,7 @@ function bindSpecialistTools() {
           await apiRequest(`/api/news/${editingNewsId}`, { method: 'DELETE' });
           resetNewsEditor();
           await refreshDashboardData();
-          setSpecialistMessage('Новину видалено');
+          setSpecialistSuccess('Новину видалено');
         } catch (error) {
           setSpecialistMessage(error.message, true);
         }
@@ -1852,7 +1877,7 @@ function bindSpecialistTools() {
           await apiRequest(`/api/routes/${editingRouteId}`, { method: 'DELETE' });
           resetRouteEditor();
           await refreshDashboardData();
-          setSpecialistMessage('Маршрут видалено');
+          setSpecialistSuccess('Маршрут видалено');
         } catch (error) {
           setSpecialistMessage(error.message, true);
         }
