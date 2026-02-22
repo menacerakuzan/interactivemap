@@ -73,6 +73,7 @@ let dashboardNews = [];
 let pointTypes = [];
 let editingRouteId = null;
 let editingPointId = null;
+let editingNewsId = null;
 let routeEditorPoints = [];
 let routeOrderHistory = [];
 let routeSearchTerm = '';
@@ -84,6 +85,19 @@ const UI_STATE_KEY = 'odesaSpecialistUiState';
 let selectedDistrict = '';
 let selectedCommunity = '';
 let currentSpecialistAction = 'menu';
+const dashboardBlockIds = [
+  'dashboard-kpi-block',
+  'dashboard-routes-block',
+  'dashboard-review-block',
+  'dashboard-points-block',
+  'dashboard-activity-block',
+];
+const editorActionToBlockId = {
+  'add-point': 'editor-add-point-block',
+  'route-editor': 'editor-route-block',
+  'edit-point': 'editor-edit-point-block',
+  'news-editor': 'editor-news-block',
+};
 
 function updateLanguage(lang) {
   currentLang = lang;
@@ -149,6 +163,16 @@ function formatIsoDate(isoString) {
   });
 }
 
+function isValidHttpUrl(value) {
+  if (!value) return true;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch (_e) {
+    return false;
+  }
+}
+
 function getActiveSpecialistTab() {
   return currentSpecialistAction;
 }
@@ -164,6 +188,7 @@ function saveUiState() {
         routePage,
         pointPage,
         editingRouteId,
+        editingNewsId,
         selectedDistrict,
         selectedCommunity,
       })
@@ -189,6 +214,7 @@ function applySavedUiState() {
   routePage = Number(saved.routePage) > 0 ? Number(saved.routePage) : 1;
   pointPage = Number(saved.pointPage) > 0 ? Number(saved.pointPage) : 1;
   editingRouteId = Number(saved.editingRouteId) > 0 ? Number(saved.editingRouteId) : null;
+  editingNewsId = Number(saved.editingNewsId) > 0 ? Number(saved.editingNewsId) : null;
   selectedDistrict = saved.selectedDistrict || '';
   selectedCommunity = saved.selectedCommunity || '';
 
@@ -268,31 +294,56 @@ function setActiveSpecialistTab(tabName) {
   const dashboard = document.getElementById('specialist-dashboard');
   const editor = document.getElementById('specialist-editor');
   const focusBlocks = document.querySelectorAll(
-    '#dashboard-kpi-block, #dashboard-routes-block, #dashboard-review-block, #dashboard-points-block, #dashboard-activity-block, #editor-add-point-block, #editor-route-block, #editor-edit-point-block, #editor-news-block'
+    [...dashboardBlockIds.map((id) => `#${id}`), ...Object.values(editorActionToBlockId).map((id) => `#${id}`)].join(
+      ', '
+    )
   );
   focusBlocks.forEach((el) => el.classList.remove('action-focus'));
+  const setVisible = (id, isVisible) => {
+    const node = document.getElementById(id);
+    if (!node) return;
+    node.style.display = isVisible ? '' : 'none';
+  };
 
   const action = tabName;
   currentSpecialistAction = action;
   actionButtons.forEach((b) => b.classList.toggle('active', b.getAttribute('data-specialist-action') === action));
+  const modeLabel = document.getElementById('specialist-mode-label');
+  const modeMap = {
+    menu: 'РЕЖИМ: МЕНЮ',
+    dashboard: 'РЕЖИМ: ОГЛЯД',
+    'add-point': 'РЕЖИМ: ДОДАТИ ТОЧКУ',
+    'edit-point': 'РЕЖИМ: РЕДАГУВАТИ ТОЧКУ',
+    'route-editor': 'РЕЖИМ: МАРШРУТИ',
+    'news-editor': 'РЕЖИМ: НОВИНИ',
+  };
+  if (modeLabel) {
+    modeLabel.textContent = modeMap[action] || 'РЕЖИМ: МЕНЮ';
+  }
 
   if (dashboard && editor && backButton) {
     if (action === 'menu') {
       dashboard.classList.remove('active');
       editor.classList.remove('active');
       backButton.style.display = 'none';
+      dashboardBlockIds.forEach((id) => setVisible(id, true));
+      Object.values(editorActionToBlockId).forEach((id) => setVisible(id, false));
     } else if (action === 'dashboard') {
       dashboard.classList.add('active');
       editor.classList.remove('active');
       backButton.style.display = 'block';
+      dashboardBlockIds.forEach((id) => setVisible(id, true));
+      Object.values(editorActionToBlockId).forEach((id) => setVisible(id, false));
     } else {
       dashboard.classList.remove('active');
       editor.classList.add('active');
       backButton.style.display = 'block';
-      if (action === 'add-point') document.getElementById('editor-add-point-block')?.classList.add('action-focus');
-      if (action === 'route-editor') document.getElementById('editor-route-block')?.classList.add('action-focus');
-      if (action === 'edit-point') document.getElementById('editor-edit-point-block')?.classList.add('action-focus');
-      if (action === 'news-editor') document.getElementById('editor-news-block')?.classList.add('action-focus');
+      dashboardBlockIds.forEach((id) => setVisible(id, false));
+      Object.entries(editorActionToBlockId).forEach(([actionName, id]) => {
+        setVisible(id, actionName === action);
+      });
+      const focusId = editorActionToBlockId[action];
+      if (focusId) document.getElementById(focusId)?.classList.add('action-focus');
     }
   }
   saveUiState();
@@ -351,6 +402,8 @@ function renderRoutePointOrder() {
 function refreshRouteSelectors() {
   const routeEditSelect = document.getElementById('route-edit-select');
   const routePointAdd = document.getElementById('route-point-add');
+  const editPointSelect = document.getElementById('edit-point-select');
+  const newsEditSelect = document.getElementById('news-edit-select');
 
   if (routeEditSelect) {
     routeEditSelect.innerHTML = [
@@ -363,6 +416,26 @@ function refreshRouteSelectors() {
     routePointAdd.innerHTML = dashboardPoints
       .map((p) => `<option value="${p.id}">${p.title} (${p.pointType.labelUk})</option>`)
       .join('');
+  }
+
+  if (editPointSelect) {
+    editPointSelect.innerHTML = [
+      '<option value="">Оберіть точку...</option>',
+      ...dashboardPoints.map((p) => `<option value="${p.id}">${p.title} (${p.pointType.labelUk})</option>`),
+    ].join('');
+    if (editingPointId) {
+      editPointSelect.value = String(editingPointId);
+    }
+  }
+
+  if (newsEditSelect) {
+    newsEditSelect.innerHTML = [
+      '<option value="">Оберіть новину...</option>',
+      ...dashboardNews.map((n) => `<option value="${n.id}">${n.title}</option>`),
+    ].join('');
+    if (editingNewsId) {
+      newsEditSelect.value = String(editingNewsId);
+    }
   }
 
   renderRoutePointOrder();
@@ -632,22 +705,41 @@ function setAuthState(token, user) {
   if (btnAuth) {
     btnAuth.innerHTML = authUser ? 'ВИЙТИ' : translations[currentLang].login_btn;
   }
+  if (!authUser) {
+    editingPointId = null;
+    editingRouteId = null;
+    resetNewsEditor();
+  }
 }
 
 function bindSpecialistTabs() {
   const actionButtons = document.querySelectorAll('[data-specialist-action]');
   const backButton = document.getElementById('btn-specialist-back');
   if (!actionButtons.length) return;
+  const actionMessages = {
+    dashboard: 'Відкрито панель огляду',
+    'add-point': 'Режим: додавання точки',
+    'edit-point': 'Режим: редагування точки',
+    'route-editor': 'Режим: редактор маршрутів',
+    'news-editor': 'Режим: редактор новин',
+  };
 
   actionButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
-      setActiveSpecialistTab(btn.getAttribute('data-specialist-action'));
+      const action = btn.getAttribute('data-specialist-action');
+      setActiveSpecialistTab(action);
+      if (action === 'edit-point' && !editingPointId) {
+        setSpecialistMessage('Оберіть точку зі списку та натисніть "Завантажити точку"');
+      } else if (actionMessages[action]) {
+        setSpecialistMessage(actionMessages[action]);
+      }
     });
   });
 
   if (backButton) {
     backButton.addEventListener('click', () => {
       setActiveSpecialistTab('menu');
+      setSpecialistMessage('Повернення до меню дій');
     });
   }
 }
@@ -694,9 +786,41 @@ function openPointInEditor(pointId) {
   document.getElementById('edit-point-description').value = point.description || '';
   document.getElementById('edit-point-photo-url').value = point.photoUrl || '';
   document.getElementById('edit-point-certified').checked = Boolean(point.isCertified);
+  const editPointSelect = document.getElementById('edit-point-select');
+  if (editPointSelect) {
+    editPointSelect.value = String(point.id);
+  }
   setActiveSpecialistTab('edit-point');
   setSpecialistMessage(`Редагування точки: ${point.title}`);
   saveUiState();
+}
+
+function resetNewsEditor() {
+  editingNewsId = null;
+  const title = document.getElementById('news-title-input');
+  const summary = document.getElementById('news-summary-input');
+  const link = document.getElementById('news-link-input');
+  const select = document.getElementById('news-edit-select');
+  if (title) title.value = '';
+  if (summary) summary.value = '';
+  if (link) link.value = '';
+  if (select) select.value = '';
+}
+
+function openNewsInEditor(newsId) {
+  const news = dashboardNews.find((n) => n.id === Number(newsId));
+  if (!news) return;
+  editingNewsId = news.id;
+  const title = document.getElementById('news-title-input');
+  const summary = document.getElementById('news-summary-input');
+  const link = document.getElementById('news-link-input');
+  const select = document.getElementById('news-edit-select');
+  if (title) title.value = news.title || '';
+  if (summary) summary.value = news.summary || '';
+  if (link) link.value = news.link || '';
+  if (select) select.value = String(news.id);
+  setActiveSpecialistTab('news-editor');
+  setSpecialistMessage(`Редагування новини: ${news.title}`);
 }
 
 function nextRouteStatus(currentStatus) {
@@ -763,6 +887,7 @@ function bindAuthFlow() {
   const btnLogout = document.getElementById('btn-logout');
   const authView = document.getElementById('auth-view');
   const authError = document.getElementById('auth-error');
+  const filterMenu = document.getElementById('filter-menu');
 
   const clearAuthError = () => {
     if (authError) authError.textContent = '';
@@ -770,6 +895,15 @@ function bindAuthFlow() {
 
   const setAuthError = (message) => {
     if (authError) authError.textContent = message || 'Помилка входу';
+  };
+  const setFilterMenuHidden = (isHidden) => {
+    if (!filterMenu) return;
+    if (isHidden) {
+      filterMenu.classList.remove('active');
+      filterMenu.style.display = 'none';
+    } else {
+      filterMenu.style.display = '';
+    }
   };
 
   if (btnAuth && authView) {
@@ -788,6 +922,7 @@ function bindAuthFlow() {
         return;
       }
       clearAuthError();
+      setFilterMenuHidden(true);
       authView.style.display = 'flex';
       if (window.gsap) {
         gsap.fromTo(
@@ -813,10 +948,12 @@ function bindAuthFlow() {
             duration: 0.4,
             onComplete: () => {
               authView.style.display = 'none';
+              setFilterMenuHidden(false);
             },
           });
         } else {
           authView.style.display = 'none';
+          setFilterMenuHidden(false);
         }
       }
     });
@@ -842,6 +979,7 @@ function bindAuthFlow() {
         clearAuthError();
 
         if (authView) authView.style.display = 'none';
+        setFilterMenuHidden(false);
         setSpecialistMessage(`Вхід виконано: ${data.user.fullName}`);
         setActiveSpecialistTab(data.user.role === 'viewer' ? 'menu' : 'dashboard');
 
@@ -991,7 +1129,13 @@ function bindSpecialistTools() {
   const btnSavePoint = document.getElementById('btn-save-point');
   const btnUndoRouteOrder = document.getElementById('btn-undo-route-order');
   const btnCreateNews = document.getElementById('btn-create-news');
+  const btnSaveNews = document.getElementById('btn-save-news');
+  const btnDeleteNews = document.getElementById('btn-delete-news');
+  const btnLoadNews = document.getElementById('btn-load-news');
+  const btnNewNews = document.getElementById('btn-new-news');
   const btnCreateDemoRoute = document.getElementById('btn-create-demo-route');
+  const btnLoadPoint = document.getElementById('btn-load-point');
+  const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
 
   if (btnPickOnMap) {
     btnPickOnMap.addEventListener('click', () => {
@@ -1055,6 +1199,19 @@ function bindSpecialistTools() {
         isCertified: document.getElementById('point-certified').checked,
       };
 
+      if (!payload.title || !payload.pointTypeCode || !Number.isFinite(payload.lat) || !Number.isFinite(payload.lng)) {
+        setSpecialistMessage('Заповніть назву, тип і координати точки', true);
+        return;
+      }
+      if (payload.lat < -90 || payload.lat > 90 || payload.lng < -180 || payload.lng > 180) {
+        setSpecialistMessage('Координати поза допустимим діапазоном', true);
+        return;
+      }
+      if (!isValidHttpUrl(payload.photoUrl)) {
+        setSpecialistMessage('URL фото має починатися з http:// або https://', true);
+        return;
+      }
+
       await runWithButtonState(btnCreatePoint, 'Збереження...', async () => {
         try {
           const pointPhotoFile = document.getElementById('point-photo-file')?.files?.[0];
@@ -1089,6 +1246,10 @@ function bindSpecialistTools() {
         status: document.getElementById('route-status').value,
         points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
       };
+      if (!payload.name) {
+        setSpecialistMessage('Вкажіть назву маршруту', true);
+        return;
+      }
 
       await runWithButtonState(btnCreateRoute, 'Створення...', async () => {
         try {
@@ -1119,6 +1280,10 @@ function bindSpecialistTools() {
         status: document.getElementById('route-status').value,
         points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
       };
+      if (!payload.name) {
+        setSpecialistMessage('Вкажіть назву маршруту', true);
+        return;
+      }
 
       await runWithButtonState(btnSaveRoute, 'Оновлення...', async () => {
         try {
@@ -1171,6 +1336,15 @@ function bindSpecialistTools() {
         photoUrl: document.getElementById('edit-point-photo-url').value.trim() || null,
         isCertified: document.getElementById('edit-point-certified').checked,
       };
+      const existingPoint = dashboardPoints.find((p) => p.id === editingPointId);
+      if (!payload.title || !payload.pointTypeCode) {
+        setSpecialistMessage('Назва і тип точки обовʼязкові', true);
+        return;
+      }
+      if (!isValidHttpUrl(payload.photoUrl)) {
+        setSpecialistMessage('URL фото має починатися з http:// або https://', true);
+        return;
+      }
 
       await runWithButtonState(btnSavePoint, 'Оновлення...', async () => {
         try {
@@ -1180,6 +1354,13 @@ function bindSpecialistTools() {
               payload.photoUrl = await dataService.uploadPointPhoto(pointPhotoFile);
             } catch (uploadError) {
               setSpecialistMessage(`Фото не завантажено: ${uploadError.message}`, true);
+            }
+          }
+          if (!payload.photoUrl && existingPoint?.photoUrl) {
+            try {
+              await dataService.deletePointPhoto(existingPoint.photoUrl);
+            } catch (_e) {
+              // no-op, point will still be updated without photo
             }
           }
           await apiRequest(`/api/points/${editingPointId}`, {
@@ -1196,6 +1377,42 @@ function bindSpecialistTools() {
     });
   }
 
+  if (btnLoadPoint) {
+    btnLoadPoint.addEventListener('click', () => {
+      const pointId = Number(document.getElementById('edit-point-select').value);
+      if (!pointId) {
+        setSpecialistMessage('Оберіть точку зі списку', true);
+        return;
+      }
+      openPointInEditor(pointId);
+    });
+  }
+
+  if (btnMapFullscreen) {
+    const fullscreenNode = document.querySelector('.map-container .map-view') || document.getElementById('map');
+    const updateFullscreenLabel = () => {
+      btnMapFullscreen.textContent = document.fullscreenElement ? 'Вийти з повного екрана' : 'На весь екран';
+    };
+
+    btnMapFullscreen.addEventListener('click', async () => {
+      if (!fullscreenNode) return;
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+        } else {
+          await fullscreenNode.requestFullscreen();
+        }
+      } catch (_e) {
+        setSpecialistMessage('Не вдалося змінити режим екрана', true);
+      } finally {
+        updateFullscreenLabel();
+      }
+    });
+
+    document.addEventListener('fullscreenchange', updateFullscreenLabel);
+    updateFullscreenLabel();
+  }
+
   if (btnCreateNews) {
     btnCreateNews.addEventListener('click', async () => {
       const payload = {
@@ -1208,12 +1425,88 @@ function bindSpecialistTools() {
         setSpecialistMessage('Заповніть заголовок і опис новини', true);
         return;
       }
+      if (!isValidHttpUrl(payload.link)) {
+        setSpecialistMessage('Посилання новини має бути http:// або https://', true);
+        return;
+      }
 
       await runWithButtonState(btnCreateNews, 'Публікація...', async () => {
         try {
           await apiRequest('/api/news', { method: 'POST', body: JSON.stringify(payload) });
+          resetNewsEditor();
           await refreshDashboardData();
           setSpecialistMessage('Новину додано');
+        } catch (error) {
+          setSpecialistMessage(error.message, true);
+        }
+      });
+    });
+  }
+
+  if (btnLoadNews) {
+    btnLoadNews.addEventListener('click', () => {
+      const newsId = Number(document.getElementById('news-edit-select').value);
+      if (!newsId) {
+        setSpecialistMessage('Оберіть новину зі списку', true);
+        return;
+      }
+      openNewsInEditor(newsId);
+    });
+  }
+
+  if (btnNewNews) {
+    btnNewNews.addEventListener('click', () => {
+      resetNewsEditor();
+      setSpecialistMessage('Режим створення нової новини');
+    });
+  }
+
+  if (btnSaveNews) {
+    btnSaveNews.addEventListener('click', async () => {
+      if (!editingNewsId) {
+        setSpecialistMessage('Спочатку завантажте новину для редагування', true);
+        return;
+      }
+      const payload = {
+        title: document.getElementById('news-title-input').value.trim(),
+        summary: document.getElementById('news-summary-input').value.trim(),
+        link: document.getElementById('news-link-input').value.trim() || null,
+      };
+      if (!payload.title || !payload.summary) {
+        setSpecialistMessage('Заповніть заголовок і опис новини', true);
+        return;
+      }
+      if (!isValidHttpUrl(payload.link)) {
+        setSpecialistMessage('Посилання новини має бути http:// або https://', true);
+        return;
+      }
+      await runWithButtonState(btnSaveNews, 'Оновлення...', async () => {
+        try {
+          await apiRequest(`/api/news/${editingNewsId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          });
+          await refreshDashboardData();
+          setSpecialistMessage('Новину оновлено');
+        } catch (error) {
+          setSpecialistMessage(error.message, true);
+        }
+      });
+    });
+  }
+
+  if (btnDeleteNews) {
+    btnDeleteNews.addEventListener('click', async () => {
+      if (!editingNewsId) {
+        setSpecialistMessage('Оберіть новину для видалення', true);
+        return;
+      }
+      await runWithButtonState(btnDeleteNews, 'Видалення...', async () => {
+        try {
+          await apiRequest(`/api/news/${editingNewsId}`, { method: 'DELETE' });
+          resetNewsEditor();
+          await refreshDashboardData();
+          setSpecialistMessage('Новину видалено');
         } catch (error) {
           setSpecialistMessage(error.message, true);
         }

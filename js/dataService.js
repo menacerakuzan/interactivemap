@@ -338,6 +338,40 @@ async function supabaseCreateNews(payload) {
   return mapNews(data);
 }
 
+async function supabaseUpdateNews(newsId, payload) {
+  const updateData = {};
+  if (payload.title !== undefined) updateData.title = payload.title;
+  if (payload.summary !== undefined) updateData.summary = payload.summary;
+  if (payload.link !== undefined) updateData.link = payload.link || null;
+
+  const { data, error } = await supabase
+    .from('news')
+    .update(updateData)
+    .eq('id', newsId)
+    .select('id,title,summary,link,created_at')
+    .single();
+  if (error) throw error;
+  return mapNews(data);
+}
+
+async function supabaseDeleteNews(newsId) {
+  const { error } = await supabase.from('news').delete().eq('id', newsId);
+  if (error) throw error;
+  return null;
+}
+
+async function supabaseDeletePointPhoto(photoUrl) {
+  if (!photoUrl) return { ok: true };
+  const marker = '/storage/v1/object/public/point-photos/';
+  const markerIndex = photoUrl.indexOf(marker);
+  if (markerIndex === -1) return { ok: true };
+  const filePath = decodeURIComponent(photoUrl.slice(markerIndex + marker.length));
+  if (!filePath) return { ok: true };
+  const { error } = await supabase.storage.from('point-photos').remove([filePath]);
+  if (error) throw error;
+  return { ok: true };
+}
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -434,6 +468,16 @@ export const dataService = {
       return supabaseCreateNews(body);
     }
 
+    if (pathname.startsWith('/api/news/') && method === 'PUT') {
+      const id = Number(pathname.split('/').pop());
+      return supabaseUpdateNews(id, body);
+    }
+
+    if (pathname.startsWith('/api/news/') && method === 'DELETE') {
+      const id = Number(pathname.split('/').pop());
+      return supabaseDeleteNews(id);
+    }
+
     throw new Error(`Unsupported endpoint in supabase mode: ${method} ${pathname}`);
   },
 
@@ -462,5 +506,10 @@ export const dataService = {
 
     const { data } = supabase.storage.from('point-photos').getPublicUrl(filePath);
     return data.publicUrl;
+  },
+
+  async deletePointPhoto(photoUrl) {
+    if (DATA_MODE === 'local') return { ok: true };
+    return supabaseDeletePointPhoto(photoUrl);
   },
 };

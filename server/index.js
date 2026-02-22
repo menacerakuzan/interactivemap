@@ -10,6 +10,24 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+const ROUTE_STATUSES = new Set(['draft', 'review', 'published']);
+
+function isNonEmptyText(value, maxLen = 255) {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= maxLen;
+}
+
+function isValidCoordinate(value, min, max) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function normalizeOptionalText(value, maxLen = 2000) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLen);
+}
 
 const mapPointRow = (row) => ({
   id: row.id,
@@ -109,7 +127,7 @@ app.get('/api/points', (req, res) => {
 app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, res) => {
   const { title, description, lat, lng, pointTypeCode, isCertified, district, photoUrl } = req.body;
 
-  if (!title || typeof lat !== 'number' || typeof lng !== 'number' || !pointTypeCode) {
+  if (!isNonEmptyText(title, 160) || !isValidCoordinate(lat, -90, 90) || !isValidCoordinate(lng, -180, 180) || !pointTypeCode) {
     return res.status(400).json({ error: 'title, lat, lng, pointTypeCode are required' });
   }
 
@@ -124,14 +142,14 @@ app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .run(
-      title,
-      description || null,
+      title.trim(),
+      normalizeOptionalText(description, 2000),
       lat,
       lng,
       pointType.id,
       isCertified ? 1 : 0,
-      district || null,
-      photoUrl || null,
+      normalizeOptionalText(district, 255),
+      normalizeOptionalText(photoUrl, 1200),
       req.user.id
     );
 
@@ -164,32 +182,56 @@ app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (re
     return res.status(400).json({ error: 'Invalid pointTypeCode' });
   }
 
-  db.prepare(`
-    UPDATE points
-    SET
-      title = COALESCE(?, title),
-      description = COALESCE(?, description),
-      lat = COALESCE(?, lat),
-      lng = COALESCE(?, lng),
-      point_type_id = COALESCE(?, point_type_id),
-      is_certified = COALESCE(?, is_certified),
-      district = COALESCE(?, district),
-      photo_url = COALESCE(?, photo_url),
-      updated_by = ?,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    title ?? null,
-    description ?? null,
-    lat ?? null,
-    lng ?? null,
-    pointType ? pointType.id : null,
-    typeof isCertified === 'boolean' ? (isCertified ? 1 : 0) : null,
-    district ?? null,
-    photoUrl ?? null,
-    req.user.id,
-    pointId
-  );
+  if (title !== undefined && !isNonEmptyText(title, 160)) {
+    return res.status(400).json({ error: 'Invalid title' });
+  }
+  if (lat !== undefined && !isValidCoordinate(lat, -90, 90)) {
+    return res.status(400).json({ error: 'Invalid latitude' });
+  }
+  if (lng !== undefined && !isValidCoordinate(lng, -180, 180)) {
+    return res.status(400).json({ error: 'Invalid longitude' });
+  }
+
+  const fields = [];
+  const values = [];
+  if (title !== undefined) {
+    fields.push('title = ?');
+    values.push(String(title).trim());
+  }
+  if (description !== undefined) {
+    fields.push('description = ?');
+    values.push(normalizeOptionalText(description, 2000));
+  }
+  if (lat !== undefined) {
+    fields.push('lat = ?');
+    values.push(lat);
+  }
+  if (lng !== undefined) {
+    fields.push('lng = ?');
+    values.push(lng);
+  }
+  if (pointType) {
+    fields.push('point_type_id = ?');
+    values.push(pointType.id);
+  }
+  if (typeof isCertified === 'boolean') {
+    fields.push('is_certified = ?');
+    values.push(isCertified ? 1 : 0);
+  }
+  if (district !== undefined) {
+    fields.push('district = ?');
+    values.push(normalizeOptionalText(district, 255));
+  }
+  if (photoUrl !== undefined) {
+    fields.push('photo_url = ?');
+    values.push(normalizeOptionalText(photoUrl, 1200));
+  }
+  fields.push('updated_by = ?');
+  values.push(req.user.id);
+  fields.push("updated_at = datetime('now')");
+  values.push(pointId);
+
+  db.prepare(`UPDATE points SET ${fields.join(', ')} WHERE id = ?`).run(...values);
 
   const row = db
     .prepare(`
@@ -265,11 +307,11 @@ app.get('/api/routes', authenticate, (req, res) => {
 
 app.post('/api/routes', authenticate, requireRole('admin', 'specialist'), (req, res) => {
   const { name, description, status = 'draft', points = [] } = req.body;
-  if (!name) {
+  if (!isNonEmptyText(name, 180)) {
     return res.status(400).json({ error: 'name is required' });
   }
 
-  if (!['draft', 'review', 'published'].includes(status)) {
+  if (!ROUTE_STATUSES.has(status)) {
     return res.status(400).json({ error: 'Invalid route status' });
   }
 
@@ -278,7 +320,7 @@ app.post('/api/routes', authenticate, requireRole('admin', 'specialist'), (req, 
       .prepare(
         'INSERT INTO routes (name, description, status, created_by) VALUES (?, ?, ?, ?)'
       )
-      .run(name, description || null, status, req.user.id);
+      .run(name.trim(), normalizeOptionalText(description, 3000), status, req.user.id);
 
     const routeId = routeResult.lastInsertRowid;
 
@@ -314,8 +356,11 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
   }
 
   const { name, description, status, points } = req.body;
-  if (status && !['draft', 'review', 'published'].includes(status)) {
+  if (status && !ROUTE_STATUSES.has(status)) {
     return res.status(400).json({ error: 'Invalid route status' });
+  }
+  if (name !== undefined && !isNonEmptyText(name, 180)) {
+    return res.status(400).json({ error: 'Invalid route name' });
   }
 
   const tx = db.transaction(() => {
@@ -328,7 +373,13 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
         updated_by = ?,
         updated_at = datetime('now')
       WHERE id = ?
-    `).run(name ?? null, description ?? null, status ?? null, req.user.id, routeId);
+    `).run(
+      name !== undefined ? String(name).trim() : null,
+      description !== undefined ? normalizeOptionalText(description, 3000) : null,
+      status ?? null,
+      req.user.id,
+      routeId
+    );
 
     if (Array.isArray(points)) {
       db.prepare('DELETE FROM route_points WHERE route_id = ?').run(routeId);
@@ -379,13 +430,13 @@ app.get('/api/news', (_req, res) => {
 
 app.post('/api/news', authenticate, requireRole('admin', 'specialist'), (req, res) => {
   const { title, summary, link } = req.body;
-  if (!title || !summary) {
+  if (!isNonEmptyText(title, 180) || !isNonEmptyText(summary, 1000)) {
     return res.status(400).json({ error: 'title and summary are required' });
   }
 
   const result = db
     .prepare(`INSERT INTO news (title, summary, link, created_by) VALUES (?, ?, ?, ?)`)
-    .run(title, summary, link || null, req.user.id);
+    .run(title.trim(), summary.trim(), normalizeOptionalText(link, 1200), req.user.id);
 
   const row = db
     .prepare(
@@ -404,6 +455,69 @@ app.post('/api/news', authenticate, requireRole('admin', 'specialist'), (req, re
     authorName: row.author_name,
     createdAt: row.created_at,
   });
+});
+
+app.put('/api/news/:id', authenticate, requireRole('admin', 'specialist'), (req, res) => {
+  const newsId = Number(req.params.id);
+  const existing = db.prepare('SELECT id FROM news WHERE id = ?').get(newsId);
+  if (!existing) {
+    return res.status(404).json({ error: 'News not found' });
+  }
+
+  const { title, summary, link } = req.body;
+  if (title !== undefined && !isNonEmptyText(title, 180)) {
+    return res.status(400).json({ error: 'Invalid title' });
+  }
+  if (summary !== undefined && !isNonEmptyText(summary, 1000)) {
+    return res.status(400).json({ error: 'Invalid summary' });
+  }
+
+  const fields = [];
+  const values = [];
+  if (title !== undefined) {
+    fields.push('title = ?');
+    values.push(title.trim());
+  }
+  if (summary !== undefined) {
+    fields.push('summary = ?');
+    values.push(summary.trim());
+  }
+  if (link !== undefined) {
+    fields.push('link = ?');
+    values.push(normalizeOptionalText(link, 1200));
+  }
+  if (!fields.length) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+  values.push(newsId);
+  db.prepare(`UPDATE news SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+
+  const row = db
+    .prepare(
+      `SELECT n.id, n.title, n.summary, n.link, n.created_at, u.full_name AS author_name
+       FROM news n
+       JOIN users u ON u.id = n.created_by
+       WHERE n.id = ?`
+    )
+    .get(newsId);
+
+  return res.json({
+    id: row.id,
+    title: row.title,
+    summary: row.summary,
+    link: row.link,
+    authorName: row.author_name,
+    createdAt: row.created_at,
+  });
+});
+
+app.delete('/api/news/:id', authenticate, requireRole('admin', 'specialist'), (req, res) => {
+  const newsId = Number(req.params.id);
+  const result = db.prepare('DELETE FROM news WHERE id = ?').run(newsId);
+  if (!result.changes) {
+    return res.status(404).json({ error: 'News not found' });
+  }
+  return res.status(204).send();
 });
 
 app.listen(PORT, () => {

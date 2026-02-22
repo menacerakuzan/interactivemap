@@ -351,6 +351,21 @@ body {
   min-width: 180px;
 }
 
+.map-fullscreen-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1200;
+  border-radius: 100px;
+  border: 1px solid var(--c-divider);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--c-admiralty);
+  cursor: pointer;
+}
+
 .legend-item {
   display: flex;
   align-items: center;

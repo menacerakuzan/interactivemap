@@ -113,6 +113,7 @@
                 <div>
                     <div class="t-nav">SPECIALIST OPS</div>
                     <div id="specialist-user" class="t-data text-muted">offline</div>
+                    <div id="specialist-mode-label" class="t-data text-muted">РЕЖИМ: МЕНЮ</div>
                 </div>
                 <button id="btn-logout" class="btn-flat">Logout</button>
             </div>
@@ -215,6 +216,8 @@
                 </div>
                 <div class="specialist-block" id="editor-edit-point-block">
                     <div class="t-label">Швидке редагування точки</div>
+                    <select id="edit-point-select"></select>
+                    <button id="btn-load-point" class="btn-flat">Завантажити точку</button>
                     <input id="edit-point-title" type="text" placeholder="Назва точки" />
                     <select id="edit-point-type"></select>
                     <input id="edit-point-district" type="text" placeholder="Район" />
@@ -226,10 +229,17 @@
                 </div>
                 <div class="specialist-block" id="editor-news-block">
                     <div class="t-label">Додати новину</div>
+                    <select id="news-edit-select"></select>
+                    <div class="specialist-grid">
+                        <button id="btn-load-news" class="btn-flat">Завантажити</button>
+                        <button id="btn-new-news" class="btn-flat">Нова</button>
+                    </div>
                     <input id="news-title-input" type="text" placeholder="Заголовок новини" />
                     <textarea id="news-summary-input" placeholder="Короткий опис"></textarea>
                     <input id="news-link-input" type="text" placeholder="Посилання (опційно)" />
                     <button id="btn-create-news" class="btn-primary">Опублікувати новину</button>
+                    <button id="btn-save-news" class="btn-primary">Оновити новину</button>
+                    <button id="btn-delete-news" class="btn-flat">Видалити новину</button>
                 </div>
             </div>
             <div id="specialist-message" class="t-data text-muted"></div>
@@ -239,6 +249,7 @@
         <div class="map-container section-transition section-current">
             <div class="map-view" id="map">
                 <div class="map-legend" id="map-legend"></div>
+                <button id="btn-map-fullscreen" class="map-fullscreen-btn">На весь екран</button>
                 <div class="partner-logos" id="partner-panel"
                     style="position: absolute; bottom: 16px; left: 16px; z-index: 1000; background: #FFFFFF; border-radius: 8px; padding: 10px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid var(--c-divider); display: flex; align-items: center; gap: 20px; transition: all 0.5s ease; width: fit-content; max-width: 80vw;">
                     <button id="btn-hide-partners"
@@ -277,7 +288,7 @@
 
         <!-- Auth Section -->
         <section class="auth-section" id="auth-view"
-            style="display: none; position: fixed; inset: 0; background: var(--c-bg); z-index: 1000; align-items: center; justify-content: center; flex-direction: column;">
+            style="display: none; position: fixed; inset: 0; background: var(--c-bg); z-index: 5000; align-items: center; justify-content: center; flex-direction: column;">
             <div class="card card-3d auth-card"
                 style="width: 420px; padding: 56px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: var(--shadow-float);">
                 <svg class="anchor-logo" viewBox="0 0 512 512" width="40" height="40" fill="currentColor"
