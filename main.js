@@ -69,6 +69,7 @@ let mapController = null;
 
 let dashboardPoints = [];
 let dashboardRoutes = [];
+let dashboardNews = [];
 let pointTypes = [];
 let editingRouteId = null;
 let editingPointId = null;
@@ -348,6 +349,48 @@ function populatePointTypeOptions() {
   if (editTypeSelect) editTypeSelect.innerHTML = options;
 }
 
+function renderLegend() {
+  const legend = document.getElementById('map-legend');
+  if (!legend) return;
+
+  if (!pointTypes.length) {
+    legend.innerHTML = '<div class="t-data text-muted">Немає типів точок</div>';
+    return;
+  }
+
+  legend.innerHTML = [
+    '<div class="t-data text-muted">ЛЕГЕНДА ТОЧОК</div>',
+    ...pointTypes.map(
+      (pt) =>
+        `<div class="legend-item"><span class="legend-dot" style="background:${pt.color}"></span><span>${pt.labelUk}</span></div>`
+    ),
+    '<div class="legend-item"><span class="legend-dot" style="background:#C5A059"></span><span>Сертифікована точка</span></div>',
+  ].join('');
+}
+
+function renderNews() {
+  const newsList = document.getElementById('news-list');
+  if (!newsList) return;
+
+  if (!dashboardNews.length) {
+    newsList.innerHTML = '<div class="card news-card"><p class="t-body text-muted">Новин поки немає.</p></div>';
+    return;
+  }
+
+  newsList.innerHTML = dashboardNews
+    .map(
+      (item) => `
+      <div class="card reveal news-card">
+        <div class="t-data text-muted" style="margin-bottom: 16px;">${formatIsoDate(item.createdAt)}</div>
+        <h3 class="t-h3" style="font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 12px;">${item.title}</h3>
+        <p class="t-body text-muted" style="margin-bottom: 24px;">${item.summary}</p>
+        <a href="${item.link || '#'}" ${item.link ? 'target="_blank" rel="noopener noreferrer"' : ''} class="t-body" style="color: var(--c-cerulean); text-decoration: none;">Читати &rarr;</a>
+      </div>
+    `
+    )
+    .join('');
+}
+
 function renderDashboard(points, routes) {
   const certifiedPoints = points.filter((p) => p.isCertified).length;
   const publishedRoutes = routes.filter((r) => r.status === 'published').length;
@@ -490,20 +533,40 @@ async function refreshDashboardData() {
     return;
   }
 
-  const [types, points, routes] = await Promise.all([
+  const [news, typeRows, pointRows, routeRows] = await Promise.all([
+    apiRequest('/api/news'),
     apiRequest('/api/point-types'),
     apiRequest('/api/points'),
     apiRequest('/api/routes'),
   ]);
-  pointTypes = types;
-  dashboardPoints = points;
-  dashboardRoutes = routes;
-  renderDashboard(points, routes);
+  dashboardNews = news || [];
+  pointTypes = typeRows || [];
+  dashboardPoints = pointRows || [];
+  dashboardRoutes = routeRows || [];
+  renderDashboard(dashboardPoints, dashboardRoutes);
+  renderNews();
   populatePointTypeOptions();
+  renderLegend();
   refreshRouteSelectors();
 
   if (editingRouteId && !routeEditorPoints.length) {
     openRouteInEditor(editingRouteId, { silent: true });
+  }
+}
+
+async function refreshPublicData() {
+  try {
+    const [news, typeRows] = await Promise.all([
+      apiRequest('/api/news'),
+      apiRequest('/api/point-types'),
+    ]);
+    dashboardNews = news || [];
+    pointTypes = typeRows || [];
+    renderNews();
+    renderLegend();
+    populatePointTypeOptions();
+  } catch (_e) {
+    // Keep UI functional even if public data fails
   }
 }
 
@@ -521,12 +584,22 @@ function setAuthState(token, user) {
 
   const panel = document.getElementById('specialist-panel');
   const userLabel = document.getElementById('specialist-user');
+  const authBadge = document.getElementById('auth-state-badge');
+  const btnAuth = document.getElementById('btn-auth');
   if (panel) {
     const canEdit = authUser && ['admin', 'specialist'].includes(authUser.role);
     panel.classList.toggle('active', Boolean(canEdit));
   }
   if (userLabel) {
     userLabel.textContent = authUser ? `${authUser.fullName} • ${authUser.role}` : 'offline';
+  }
+  if (authBadge) {
+    authBadge.textContent = authUser
+      ? `УВІЙШЛИ: ${authUser.fullName} (${authUser.role})`
+      : 'НЕ АВТОРИЗОВАНО';
+  }
+  if (btnAuth) {
+    btnAuth.innerHTML = authUser ? 'ВИЙТИ' : translations[currentLang].login_btn;
   }
 }
 
@@ -581,6 +654,7 @@ function openPointInEditor(pointId) {
   document.getElementById('edit-point-type').value = point.pointType.code;
   document.getElementById('edit-point-district').value = point.district || '';
   document.getElementById('edit-point-description').value = point.description || '';
+  document.getElementById('edit-point-photo-url').value = point.photoUrl || '';
   document.getElementById('edit-point-certified').checked = Boolean(point.isCertified);
   setActiveSpecialistTab('editor');
   setSpecialistMessage(`Редагування точки: ${point.title}`);
@@ -662,6 +736,19 @@ function bindAuthFlow() {
 
   if (btnAuth && authView) {
     btnAuth.addEventListener('click', () => {
+      if (authUser) {
+        dataService.logout().catch(() => null);
+        setAuthState('', null);
+        pointTypes = [];
+        dashboardPoints = [];
+        dashboardRoutes = [];
+        dashboardNews = [];
+        renderDashboard([], []);
+        renderNews();
+        resetRouteEditor();
+        setSpecialistMessage('Сесію завершено');
+        return;
+      }
       clearAuthError();
       authView.style.display = 'flex';
       if (window.gsap) {
@@ -728,8 +815,12 @@ function bindAuthFlow() {
           );
         }
       } catch (error) {
-        setAuthError(error.message);
-        setSpecialistMessage(error.message, true);
+        const uiMessage =
+          error.message === 'Load failed' || error.message === 'Failed to fetch'
+            ? 'Немає зʼєднання з Supabase або заблоковано мережевий запит.'
+            : error.message;
+        setAuthError(uiMessage);
+        setSpecialistMessage(uiMessage, true);
       }
   };
 
@@ -764,7 +855,9 @@ function bindAuthFlow() {
       pointTypes = [];
       dashboardPoints = [];
       dashboardRoutes = [];
+      dashboardNews = [];
       renderDashboard([], []);
+      renderNews();
       resetRouteEditor();
       setSpecialistMessage('Сесію завершено');
     });
@@ -858,6 +951,7 @@ function bindSpecialistTools() {
   const btnAddRoutePoint = document.getElementById('btn-add-route-point');
   const btnSavePoint = document.getElementById('btn-save-point');
   const btnUndoRouteOrder = document.getElementById('btn-undo-route-order');
+  const btnCreateNews = document.getElementById('btn-create-news');
 
   if (btnPickOnMap) {
     btnPickOnMap.addEventListener('click', () => {
@@ -917,10 +1011,15 @@ function bindSpecialistTools() {
         lng: Number(document.getElementById('point-lng').value),
         district: document.getElementById('point-district').value.trim(),
         description: document.getElementById('point-description').value.trim(),
+        photoUrl: document.getElementById('point-photo-url').value.trim() || null,
         isCertified: document.getElementById('point-certified').checked,
       };
 
       try {
+        const pointPhotoFile = document.getElementById('point-photo-file')?.files?.[0];
+        if (pointPhotoFile) {
+          payload.photoUrl = await dataService.uploadPointPhoto(pointPhotoFile);
+        }
         await apiRequest('/api/points', { method: 'POST', body: JSON.stringify(payload) });
         await mapController.refresh();
         await refreshDashboardData();
@@ -1019,10 +1118,15 @@ function bindSpecialistTools() {
         pointTypeCode: document.getElementById('edit-point-type').value,
         district: document.getElementById('edit-point-district').value.trim(),
         description: document.getElementById('edit-point-description').value.trim(),
+        photoUrl: document.getElementById('edit-point-photo-url').value.trim() || null,
         isCertified: document.getElementById('edit-point-certified').checked,
       };
 
       try {
+        const pointPhotoFile = document.getElementById('edit-point-photo-file')?.files?.[0];
+        if (pointPhotoFile) {
+          payload.photoUrl = await dataService.uploadPointPhoto(pointPhotoFile);
+        }
         await apiRequest(`/api/points/${editingPointId}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
@@ -1030,6 +1134,29 @@ function bindSpecialistTools() {
         await mapController.refresh();
         await refreshDashboardData();
         setSpecialistMessage('Точку оновлено');
+      } catch (error) {
+        setSpecialistMessage(error.message, true);
+      }
+    });
+  }
+
+  if (btnCreateNews) {
+    btnCreateNews.addEventListener('click', async () => {
+      const payload = {
+        title: document.getElementById('news-title-input').value.trim(),
+        summary: document.getElementById('news-summary-input').value.trim(),
+        link: document.getElementById('news-link-input').value.trim() || null,
+      };
+
+      if (!payload.title || !payload.summary) {
+        setSpecialistMessage('Заповніть заголовок і опис новини', true);
+        return;
+      }
+
+      try {
+        await apiRequest('/api/news', { method: 'POST', body: JSON.stringify(payload) });
+        await refreshDashboardData();
+        setSpecialistMessage('Новину додано');
       } catch (error) {
         setSpecialistMessage(error.message, true);
       }
@@ -1122,6 +1249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindDashboardActions();
     bindSearchAndPager();
     applySavedUiState();
+    await refreshPublicData();
 
     if (authUser && ['admin', 'specialist'].includes(authUser.role)) {
       setAuthState(authToken, authUser);
@@ -1243,6 +1371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       e.preventDefault();
       const nextLang = currentLang === 'uk' ? 'en' : 'uk';
       updateLanguage(nextLang);
+      setAuthState(authToken, authUser);
     });
   }
 

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS points (
   point_type_id INTEGER NOT NULL,
   is_certified INTEGER NOT NULL DEFAULT 0,
   district TEXT,
+  photo_url TEXT,
   created_by INTEGER NOT NULL,
   updated_by INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -63,7 +64,22 @@ CREATE TABLE IF NOT EXISTS route_points (
   FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE CASCADE,
   FOREIGN KEY (point_id) REFERENCES points(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS news (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  link TEXT,
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
 `);
+
+const pointColumns = db.prepare("PRAGMA table_info(points)").all();
+if (!pointColumns.some((c) => c.name === 'photo_url')) {
+  db.exec('ALTER TABLE points ADD COLUMN photo_url TEXT');
+}
 
 const seedPointTypes = [
   ['ramp', 'Пандус', 'Ramp', '#13315C'],
@@ -102,8 +118,8 @@ if (pointsCount === 0) {
     .get();
 
   const insertPoint = db.prepare(`
-    INSERT INTO points (title, description, lat, lng, point_type_id, is_certified, district, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO points (title, description, lat, lng, point_type_id, is_certified, district, photo_url, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   insertPoint.run(
@@ -114,6 +130,7 @@ if (pointsCount === 0) {
     getTypeId.get('ramp').id,
     1,
     'Приморський район',
+    'https://images.unsplash.com/photo-1552845108-5f775a2ccb9b?auto=format&fit=crop&w=900&q=80',
     specialist.id
   );
   insertPoint.run(
@@ -124,6 +141,7 @@ if (pointsCount === 0) {
     getTypeId.get('toilet').id,
     0,
     'Одеський район',
+    'https://images.unsplash.com/photo-1473116763249-2faaef81ccda?auto=format&fit=crop&w=900&q=80',
     specialist.id
   );
   insertPoint.run(
@@ -134,6 +152,32 @@ if (pointsCount === 0) {
     getTypeId.get('entrance').id,
     0,
     'Білгород-Дністровський район',
+    'https://images.unsplash.com/photo-1590490359854-dfba19688d70?auto=format&fit=crop&w=900&q=80',
+    specialist.id
+  );
+}
+
+const newsCount = db.prepare('SELECT COUNT(*) AS count FROM news').get().count;
+if (newsCount === 0) {
+  const specialist = db
+    .prepare("SELECT id FROM users WHERE email = 'specialist@odesa-map.local'")
+    .get();
+
+  const insertNews = db.prepare(`
+    INSERT INTO news (title, summary, link, created_by)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  insertNews.run(
+    'Завершено аудит Приморського району',
+    "Перевірено 45 об'єктів соціальної інфраструктури. З них 12 отримали статус сертифікованих.",
+    'https://oda.od.gov.ua/',
+    specialist.id
+  );
+  insertNews.run(
+    'Оновлення стандартів пандусів',
+    'Згідно з ДБН В.2.2-40:2018, максимальний ухил зовнішніх пандусів не може перевищувати 8%.',
+    'https://www.minregion.gov.ua/',
     specialist.id
   );
 }

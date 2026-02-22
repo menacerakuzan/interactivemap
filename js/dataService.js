@@ -30,6 +30,7 @@ function mapPoint(row) {
     lat: row.lat,
     lng: row.lng,
     district: row.district,
+    photoUrl: row.photo_url || null,
     isCertified: Boolean(row.is_certified),
     pointType: {
       id: row.point_type?.id,
@@ -41,6 +42,17 @@ function mapPoint(row) {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapNews(row, authorName = null) {
+  return {
+    id: row.id,
+    title: row.title,
+    summary: row.summary,
+    link: row.link,
+    authorName: row.author_name || authorName || null,
+    createdAt: row.created_at,
   };
 }
 
@@ -138,6 +150,7 @@ async function supabaseCreatePoint(payload) {
       lat: payload.lat,
       lng: payload.lng,
       district: payload.district || null,
+      photo_url: payload.photoUrl || null,
       point_type_id: pointTypeId,
       is_certified: Boolean(payload.isCertified),
       created_by: user.id,
@@ -168,6 +181,7 @@ async function supabaseUpdatePoint(pointId, payload) {
   if (payload.lat !== undefined) updateData.lat = payload.lat;
   if (payload.lng !== undefined) updateData.lng = payload.lng;
   if (payload.district !== undefined) updateData.district = payload.district || null;
+  if (payload.photoUrl !== undefined) updateData.photo_url = payload.photoUrl || null;
   if (payload.isCertified !== undefined) updateData.is_certified = Boolean(payload.isCertified);
   if (pointTypeId !== null) updateData.point_type_id = pointTypeId;
 
@@ -287,6 +301,52 @@ async function supabaseGetCurrentUser() {
   return data.user;
 }
 
+async function supabaseGetNews() {
+  const { data, error } = await supabase
+    .from('news')
+    .select('id,title,summary,link,created_at,created_by')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const authorIds = [...new Set((data || []).map((n) => n.created_by).filter(Boolean))];
+  let authorNameById = {};
+  if (authorIds.length) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id,full_name')
+      .in('id', authorIds);
+    if (profilesError) throw profilesError;
+    authorNameById = Object.fromEntries((profiles || []).map((p) => [p.id, p.full_name]));
+  }
+
+  return (data || []).map((row) => mapNews(row, authorNameById[row.created_by] || null));
+}
+
+async function supabaseCreateNews(payload) {
+  const user = await supabaseGetCurrentUser();
+  const { data, error } = await supabase
+    .from('news')
+    .insert({
+      title: payload.title,
+      summary: payload.summary,
+      link: payload.link || null,
+      created_by: user.id,
+    })
+    .select('id,title,summary,link,created_at')
+    .single();
+  if (error) throw error;
+  return mapNews(data);
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 async function localFetch(path, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
@@ -366,6 +426,14 @@ export const dataService = {
       return supabaseUpdateRoute(id, body);
     }
 
+    if (pathname === '/api/news' && method === 'GET') {
+      return supabaseGetNews();
+    }
+
+    if (pathname === '/api/news' && method === 'POST') {
+      return supabaseCreateNews(body);
+    }
+
     throw new Error(`Unsupported endpoint in supabase mode: ${method} ${pathname}`);
   },
 
@@ -374,5 +442,25 @@ export const dataService = {
       return supabaseLogout();
     }
     return { ok: true };
+  },
+
+  async uploadPointPhoto(file) {
+    if (!file) return null;
+
+    if (DATA_MODE === 'local') {
+      return fileToDataUrl(file);
+    }
+
+    const user = await supabaseGetCurrentUser();
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const filePath = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('point-photos')
+      .upload(filePath, file, { upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from('point-photos').getPublicUrl(filePath);
+    return data.publicUrl;
   },
 };

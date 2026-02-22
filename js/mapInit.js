@@ -65,7 +65,11 @@ function showInfoCard(data) {
 
   panel.innerHTML = `
     <div class="card card-3d" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-      <div style="height: 140px; background: linear-gradient(130deg, #dbeafe 0%, #f8fafc 100%); border-radius: var(--radius-md) var(--radius-md) 0 0;"></div>
+      <div style="height: 160px; background: ${
+        data.photoUrl
+          ? `url('${data.photoUrl}') center/cover`
+          : 'linear-gradient(130deg, #dbeafe 0%, #f8fafc 100%)'
+      }; border-radius: var(--radius-md) var(--radius-md) 0 0;"></div>
       <div>
         <h2 class="t-h2" style="display: flex; align-items: center;">${data.title} ${badge}</h2>
         <div class="t-label text-muted" style="margin-top: 4px;">${data.district || 'Одеська область'}</div>

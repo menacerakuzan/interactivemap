@@ -8,6 +8,9 @@ Create a Supabase project and copy:
 ## 2. Apply schema
 Open SQL Editor and run:
 - `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/schema.sql`
+- `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/fix_stack_depth.sql`
+- `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/fix_policies_no_recursion.sql`
+- `/Users/iladovzenko/Desktop/lux/odesa-map/supabase/add_news_and_photos.sql`
 
 ## 3. Create users
 Create auth users in Supabase Auth (email/password).

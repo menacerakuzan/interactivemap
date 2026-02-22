@@ -18,6 +18,7 @@ const mapPointRow = (row) => ({
   lat: row.lat,
   lng: row.lng,
   district: row.district,
+  photoUrl: row.photo_url || null,
   isCertified: Boolean(row.is_certified),
   pointType: {
     id: row.point_type_id,
@@ -106,7 +107,7 @@ app.get('/api/points', (req, res) => {
 });
 
 app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, res) => {
-  const { title, description, lat, lng, pointTypeCode, isCertified, district } = req.body;
+  const { title, description, lat, lng, pointTypeCode, isCertified, district, photoUrl } = req.body;
 
   if (!title || typeof lat !== 'number' || typeof lng !== 'number' || !pointTypeCode) {
     return res.status(400).json({ error: 'title, lat, lng, pointTypeCode are required' });
@@ -119,8 +120,8 @@ app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, 
 
   const result = db
     .prepare(`
-      INSERT INTO points (title, description, lat, lng, point_type_id, is_certified, district, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO points (title, description, lat, lng, point_type_id, is_certified, district, photo_url, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .run(
       title,
@@ -130,6 +131,7 @@ app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, 
       pointType.id,
       isCertified ? 1 : 0,
       district || null,
+      photoUrl || null,
       req.user.id
     );
 
@@ -152,7 +154,7 @@ app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (re
     return res.status(404).json({ error: 'Point not found' });
   }
 
-  const { title, description, lat, lng, pointTypeCode, isCertified, district } = req.body;
+  const { title, description, lat, lng, pointTypeCode, isCertified, district, photoUrl } = req.body;
 
   const pointType = pointTypeCode
     ? db.prepare('SELECT id FROM point_types WHERE code = ?').get(pointTypeCode)
@@ -172,6 +174,7 @@ app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (re
       point_type_id = COALESCE(?, point_type_id),
       is_certified = COALESCE(?, is_certified),
       district = COALESCE(?, district),
+      photo_url = COALESCE(?, photo_url),
       updated_by = ?,
       updated_at = datetime('now')
     WHERE id = ?
@@ -183,6 +186,7 @@ app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (re
     pointType ? pointType.id : null,
     typeof isCertified === 'boolean' ? (isCertified ? 1 : 0) : null,
     district ?? null,
+    photoUrl ?? null,
     req.user.id,
     pointId
   );
@@ -349,6 +353,57 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
+});
+
+app.get('/api/news', (_req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT n.id, n.title, n.summary, n.link, n.created_at, u.full_name AS author_name
+       FROM news n
+       JOIN users u ON u.id = n.created_by
+       ORDER BY n.created_at DESC`
+    )
+    .all();
+
+  res.json(
+    rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      summary: r.summary,
+      link: r.link,
+      authorName: r.author_name,
+      createdAt: r.created_at,
+    }))
+  );
+});
+
+app.post('/api/news', authenticate, requireRole('admin', 'specialist'), (req, res) => {
+  const { title, summary, link } = req.body;
+  if (!title || !summary) {
+    return res.status(400).json({ error: 'title and summary are required' });
+  }
+
+  const result = db
+    .prepare(`INSERT INTO news (title, summary, link, created_by) VALUES (?, ?, ?, ?)`)
+    .run(title, summary, link || null, req.user.id);
+
+  const row = db
+    .prepare(
+      `SELECT n.id, n.title, n.summary, n.link, n.created_at, u.full_name AS author_name
+       FROM news n
+       JOIN users u ON u.id = n.created_by
+       WHERE n.id = ?`
+    )
+    .get(result.lastInsertRowid);
+
+  return res.status(201).json({
+    id: row.id,
+    title: row.title,
+    summary: row.summary,
+    link: row.link,
+    authorName: row.author_name,
+    createdAt: row.created_at,
+  });
 });
 
 app.listen(PORT, () => {
