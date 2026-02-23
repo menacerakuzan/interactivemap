@@ -645,7 +645,11 @@ function renderNews() {
         <div class="t-data text-muted" style="margin-bottom: 16px;">${formatIsoDate(item.createdAt)}</div>
         <h3 class="t-h3" style="font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 12px;">${item.title}</h3>
         <p class="t-body text-muted" style="margin-bottom: 24px;">${item.summary}</p>
-        <a href="${item.link || '#'}" ${item.link ? 'target="_blank" rel="noopener noreferrer"' : ''} class="t-body" style="color: var(--c-cerulean); text-decoration: none;">Читати &rarr;</a>
+        ${
+          item.link
+            ? `<a href="${item.link}" target="_blank" rel="noopener noreferrer" class="t-body" style="color: var(--c-cerulean); text-decoration: none;">Читати &rarr;</a>`
+            : '<span class="t-body text-muted">Джерело не вказано</span>'
+        }
       </div>
     `
     )

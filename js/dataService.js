@@ -102,9 +102,9 @@ async function tryExtractSourceImage(link) {
         return new URL(match[1], normalizedLink).toString();
       }
     }
-    return `https://image.thum.io/get/width/1200/noanimate/${encodeURIComponent(normalizedLink)}`;
+    return `https://image.thum.io/get/width/1200/noanimate/${normalizedLink}`;
   } catch (_e) {
-    return `https://image.thum.io/get/width/1200/noanimate/${encodeURIComponent(normalizedLink)}`;
+    return `https://image.thum.io/get/width/1200/noanimate/${normalizedLink}`;
   }
 }
 
@@ -517,11 +517,15 @@ async function supabaseUpdateNews(newsId, payload) {
   if (payload.title !== undefined) updateData.title = payload.title;
   if (payload.summary !== undefined) updateData.summary = payload.summary;
   if (payload.link !== undefined) updateData.link = payload.link || null;
-  if (payload.imageUrl !== undefined) {
-    updateData.image_url = payload.imageUrl || null;
+  const hasCustomImage = typeof payload.imageUrl === 'string' && payload.imageUrl.trim().length > 0;
+  if (hasCustomImage) {
+    updateData.image_url = payload.imageUrl.trim();
   } else if (payload.link) {
+    // If image URL field is empty, try to derive image from source link.
     const extracted = await tryExtractSourceImage(payload.link);
-    if (extracted) updateData.image_url = extracted;
+    updateData.image_url = extracted || null;
+  } else if (payload.imageUrl !== undefined) {
+    updateData.image_url = null;
   }
 
   let { data, error } = await supabase

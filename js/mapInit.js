@@ -249,25 +249,36 @@ function highlightRoute(route) {
   }
 
   const latLngs = route.points.map((p) => [p.lat, p.lng]);
+  // Route style: yellow lane stripes for high visibility.
+  const baseLine = L.polyline(latLngs, {
+    color: '#6F5628',
+    weight: 8,
+    opacity: 0.85,
+    lineCap: 'round',
+    lineJoin: 'round',
+  }).addTo(routeLayer);
+
   const polyline = L.polyline(latLngs, {
-    color: '#0B2545',
-    weight: 4,
-    opacity: 0.9,
-    dashArray: '8,6',
+    color: '#E7C769',
+    weight: 5,
+    opacity: 1,
+    dashArray: '12,8',
+    lineCap: 'round',
+    lineJoin: 'round',
   }).addTo(routeLayer);
 
   route.points.forEach((p, idx) => {
     const marker = L.circleMarker([p.lat, p.lng], {
-      radius: 10,
-      color: '#C5A059',
-      fillColor: '#fff',
+      radius: 9,
+      color: '#8A6A2A',
+      fillColor: '#F6E4A8',
       fillOpacity: 1,
       weight: 2,
     }).addTo(routeLayer);
     marker.bindTooltip(String(idx + 1), { permanent: true, direction: 'center', className: 'route-order-label' });
   });
 
-  map.fitBounds(polyline.getBounds(), { padding: [60, 60], maxZoom: ODESA_BOUNDS.cityZoom });
+  map.fitBounds(baseLine.getBounds(), { padding: [60, 60], maxZoom: ODESA_BOUNDS.cityZoom });
 }
 
 function focusLocation(lat, lng, zoom = ODESA_BOUNDS.cityZoom) {

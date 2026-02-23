@@ -7,6 +7,14 @@ export function initLenis() {
         smooth: true,
         mouseMultiplier: 0.8,
         touchMultiplier: 1.5,
+        prevent: (node) => {
+            if (!node || typeof node.closest !== 'function') return false;
+            return Boolean(
+                node.closest(
+                    '.leaflet-container, .map-view, .map-container, .context-panel, .specialist-panel, .filter-options'
+                )
+            );
+        },
     });
 
     function raf(time) {
@@ -15,6 +23,7 @@ export function initLenis() {
     }
 
     requestAnimationFrame(raf);
+    return lenis;
 }
 
 export function initInteractions() {
