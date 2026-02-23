@@ -268,6 +268,25 @@ function setPublishedRoutes(routes = []) {
       direction: 'top',
       className: 'route-order-label',
     });
+
+    // Show the same point order markers for public users as in specialist mode.
+    route.points.forEach((p, idx) => {
+      const lat = Number(p?.lat);
+      const lng = Number(p?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const marker = L.circleMarker([lat, lng], {
+        radius: 7,
+        color: '#1E3A5F',
+        fillColor: color,
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(publishedRouteLayer);
+      marker.bindTooltip(String(idx + 1), {
+        permanent: true,
+        direction: 'center',
+        className: 'route-order-label',
+      });
+    });
   });
 }
 
