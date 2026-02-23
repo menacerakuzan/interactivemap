@@ -2,16 +2,16 @@ import Lenis from 'lenis';
 
 export function initLenis() {
     const lenis = new Lenis({
-        duration: 1.4,
+        duration: 0.8,
         easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Expo ease-out
         smooth: true,
-        mouseMultiplier: 0.8,
-        touchMultiplier: 1.5,
+        mouseMultiplier: 1,
+        touchMultiplier: 1,
         prevent: (node) => {
             if (!node || typeof node.closest !== 'function') return false;
             return Boolean(
                 node.closest(
-                    '.leaflet-container, .map-view, .map-container, .context-panel, .specialist-panel, .filter-options'
+                    '.leaflet-container, .leaflet-control-container, .map-view, .map-container, .context-panel, .specialist-panel, .filter-menu, .filter-options'
                 )
             );
         },

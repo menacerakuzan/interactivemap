@@ -1452,9 +1452,7 @@ function bindFloatingUiControls() {
   const btnHideSpecialist = document.getElementById('btn-hide-specialist');
   const legendWrap = document.getElementById('map-legend-wrap');
   const btnToggleLegend = document.getElementById('btn-toggle-legend');
-  const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
   const routeColorInput = document.getElementById('route-color');
-  const mapContainer = document.querySelector('.map-container');
 
   if (btnHideSpecialist && specialistPanel) {
     btnHideSpecialist.addEventListener('click', () => {
@@ -1469,31 +1467,11 @@ function bindFloatingUiControls() {
       btnToggleLegend.textContent = isCollapsed ? '⟩' : '⟨';
     });
   }
-
-  const syncFloatingByScroll = () => {
-    if (!mapContainer) return;
-    const rect = mapContainer.getBoundingClientRect();
-    const mapVisible = rect.bottom > 120 && rect.top < window.innerHeight - 80;
-    if (!mapVisible) {
-      if (filterMenu) filterMenu.style.display = 'none';
-      if (legendWrap) legendWrap.style.display = 'none';
-      if (btnMapFullscreen) btnMapFullscreen.style.display = 'none';
-      if (specialistPanel?.classList.contains('active')) {
-        specialistPanel.style.display = 'none';
-      }
-      return;
-    }
-    if (filterMenu) filterMenu.style.display = '';
-    if (legendWrap) legendWrap.style.display = '';
-    if (btnMapFullscreen) btnMapFullscreen.style.display = '';
-    if (specialistPanel?.classList.contains('active')) {
-      specialistPanel.style.display = 'flex';
-    }
-  };
-
-  window.addEventListener('scroll', syncFloatingByScroll, { passive: true });
-  window.addEventListener('resize', syncFloatingByScroll);
-  syncFloatingByScroll();
+  if (filterMenu) filterMenu.style.display = '';
+  if (legendWrap) legendWrap.style.display = '';
+  if (specialistPanel?.classList.contains('active')) {
+    specialistPanel.style.display = 'flex';
+  }
 }
 
 function bindSpecialistTools() {

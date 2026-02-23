@@ -233,16 +233,15 @@ body::before {
 /* Filter Menu (Floating) */
 .filter-menu {
   position: fixed;
-  top: auto;
-  bottom: 76px;
+  top: calc(var(--header-h) + 12px);
   right: 16px;
-  z-index: 980;
+  z-index: 930;
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   align-items: flex-end;
   gap: 12px;
-  transition: opacity var(--t-smooth) var(--ease-smooth), transform var(--t-smooth) var(--ease-smooth);
-  transform-origin: bottom right;
+  transition: opacity var(--t-smooth) var(--ease-smooth);
+  transform-origin: top right;
 }
 
 .filter-toggle {
@@ -362,10 +361,10 @@ body::before {
 
 .map-legend {
   position: absolute;
-  top: 88px;
+  top: 16px;
   right: 16px;
   left: auto;
-  z-index: 940;
+  z-index: 935;
   border-radius: 12px;
   border: 1px solid var(--c-divider);
   background: rgba(255, 255, 255, 0.92);
@@ -380,11 +379,11 @@ body::before {
 }
 
 .map-legend.collapsed {
-  opacity: 0.98;
+  opacity: 1;
   transform: none;
   min-width: 0;
   max-width: none;
-  padding: 6px;
+  padding: 4px;
 }
 
 .map-legend.collapsed #map-legend {
@@ -398,7 +397,7 @@ body::before {
 .map-fullscreen-btn {
   position: absolute;
   top: 16px;
-  right: 16px;
+  right: 68px;
   z-index: 940;
   border-radius: 100px;
   border: 1px solid var(--c-divider);
@@ -416,8 +415,13 @@ body::before {
   border-radius: 999px;
   background: #fff;
   color: var(--c-admiralty);
-  font-size: 12px;
-  padding: 2px 8px;
+  font-size: 13px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 
@@ -686,7 +690,7 @@ body.context-open .filter-menu {
   background: var(--c-bg) !important;
   font-family: var(--font-ui) !important;
   overscroll-behavior: contain;
-  touch-action: pan-x pan-y;
+  touch-action: pinch-zoom;
 }
 
 .leaflet-tile-pane {
@@ -707,9 +711,7 @@ body.context-open .filter-menu {
   border-bottom: 1px solid var(--c-divider) !important;
 }
 
-.custom-map-marker {
-  transition: transform var(--t-fast) var(--ease-smooth);
-}
+.custom-map-marker { }
 
 .leaflet-container.point-pick {
   cursor: crosshair;
@@ -1425,14 +1427,14 @@ body.context-open .filter-menu {
 
   .map-fullscreen-btn {
     top: 10px;
-    right: 10px;
+    right: 56px;
     font-size: 10px;
     padding: 6px 8px;
   }
 
   .map-legend {
     right: 10px;
-    bottom: 10px;
+    top: 10px;
     max-width: min(68vw, 200px);
     min-width: 136px;
   }

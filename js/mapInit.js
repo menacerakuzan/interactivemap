@@ -186,8 +186,9 @@ async function loadAndRenderPoints() {
 
       const marker = L.marker([lat, lng], { icon }).addTo(markerLayer);
       marker.on('click', () => {
-        map.flyTo([lat, lng], ODESA_BOUNDS.cityZoom, {
-          duration: 1,
+        map.panTo([lat, lng], {
+          animate: true,
+          duration: 0.35,
           easeLinearity: 0.25,
         });
         showInfoCard(point);
@@ -312,14 +313,14 @@ export async function initMap(options = {}) {
     zoomControl: false,
     attributionControl: false,
     zoomAnimation: true,
-    markerZoomAnimation: true,
+    markerZoomAnimation: false,
     fadeAnimation: true,
-    zoomSnap: 0.1,
-    zoomDelta: 0.25,
+    zoomSnap: 0,
+    zoomDelta: 0.5,
     wheelDebounceTime: 40,
-    wheelPxPerZoomLevel: 90,
+    wheelPxPerZoomLevel: 60,
     inertia: true,
-    inertiaDeceleration: 2800,
+    inertiaDeceleration: 1800,
     easeLinearity: 0.2,
   }).setView(ODESA_BOUNDS.center, ODESA_BOUNDS.defaultZoom);
 
