@@ -365,7 +365,7 @@ export async function initMap(options = {}) {
     zoomAnimation: true,
     markerZoomAnimation: false,
     fadeAnimation: true,
-    zoomSnap: 0.25,
+    zoomSnap: 0.01,
     zoomDelta: 0.25,
     scrollWheelZoom: false,
     touchZoom: 'center',
@@ -392,13 +392,13 @@ export async function initMap(options = {}) {
   routeLayer = L.layerGroup().addTo(map);
   publishedRouteLayer = L.layerGroup().addTo(map);
 
-  // Custom trackpad-friendly wheel zoom: stable step zoom without map jumps.
+  // Custom trackpad-friendly wheel zoom: continuous and stable like modern map UIs.
   const mapContainer = map.getContainer();
-  let wheelAccumulator = 0;
-  let wheelLocked = false;
-  const wheelThreshold = 16;
-  const wheelStep = 0.25;
-  const lockMs = 50;
+  let targetZoom = map.getZoom();
+  let zoomAnimationFrame = null;
+  const minStep = 0.03;
+  const maxStep = 0.6;
+  const zoomSensitivity = 0.0022;
 
   const normalizeWheelDelta = (event) => {
     if (event.deltaMode === 1) return event.deltaY * 16;
@@ -411,30 +411,28 @@ export async function initMap(options = {}) {
     (event) => {
       event.preventDefault();
       event.stopPropagation();
-      wheelAccumulator += normalizeWheelDelta(event);
-
-      if (wheelLocked || Math.abs(wheelAccumulator) < wheelThreshold) {
-        return;
+      const delta = normalizeWheelDelta(event);
+      let step = -delta * zoomSensitivity;
+      if (Math.abs(step) > 0 && Math.abs(step) < minStep) {
+        step = Math.sign(step) * minStep;
       }
+      step = Math.max(-maxStep, Math.min(maxStep, step));
+      targetZoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), targetZoom + step));
 
-      const direction = wheelAccumulator > 0 ? -1 : 1;
-      const currentZoom = map.getZoom();
-      const nextZoom = Math.max(
-        map.getMinZoom(),
-        Math.min(map.getMaxZoom(), currentZoom + direction * wheelStep)
-      );
-
-      wheelAccumulator -= Math.sign(wheelAccumulator) * wheelThreshold;
-      if (nextZoom === currentZoom) {
-        wheelAccumulator = 0;
-        return;
-      }
-
-      wheelLocked = true;
-      map.setZoom(nextZoom, { animate: true });
-      setTimeout(() => {
-        wheelLocked = false;
-      }, lockMs);
+      if (zoomAnimationFrame) return;
+      const animateWheelZoom = () => {
+        const currentZoom = map.getZoom();
+        const diff = targetZoom - currentZoom;
+        if (Math.abs(diff) < 0.005) {
+          map.setZoomAround(map.getCenter(), targetZoom, { animate: false });
+          zoomAnimationFrame = null;
+          return;
+        }
+        const nextZoom = currentZoom + diff * 0.28;
+        map.setZoomAround(map.getCenter(), nextZoom, { animate: false });
+        zoomAnimationFrame = requestAnimationFrame(animateWheelZoom);
+      };
+      zoomAnimationFrame = requestAnimationFrame(animateWheelZoom);
     },
     { passive: false }
   );
