@@ -1453,7 +1453,6 @@ function bindFloatingUiControls() {
   const legendWrap = document.getElementById('map-legend-wrap');
   const btnToggleLegend = document.getElementById('btn-toggle-legend');
   const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
-  const routeColorInput = document.getElementById('route-color');
   const mapContainer = document.querySelector('.map-container');
 
   if (btnHideSpecialist && specialistPanel) {
@@ -1515,6 +1514,7 @@ function bindSpecialistTools() {
   const btnNewNews = document.getElementById('btn-new-news');
   const editPointSelect = document.getElementById('edit-point-select');
   const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
+  const routeColorInput = document.getElementById('route-color');
   const pointSectionsList = document.getElementById('point-sections-list');
   const editPointSectionsList = document.getElementById('edit-point-sections-list');
   const btnAddPointSection = document.getElementById('btn-add-point-section');
