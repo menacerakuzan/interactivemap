@@ -2016,10 +2016,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   const transitionToMap = () => {
     if (isTransitioning || !heroSection || heroSection.style.display === 'none') return;
     isTransitioning = true;
+    // Prevent residual page scroll from moving map viewport on touch devices.
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
     const finishTransition = async () => {
       heroSection.style.display = 'none';
       appInterface.style.display = 'flex';
       appInterface.style.opacity = '1';
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
 
       if (window.gsap) {
         gsap.to(appInterface, { opacity: 1, duration: 0.22, ease: 'power2.out' });
@@ -2092,10 +2099,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       'touchend',
       (e) => {
         if (touchStartY - e.changedTouches[0].clientY > 50 && heroSection.style.display !== 'none') {
+          e.preventDefault?.();
           transitionToMap();
         }
       },
-      { passive: true }
+      { passive: false }
     );
   } else if (isMapApp) {
     await initMapAndTools();

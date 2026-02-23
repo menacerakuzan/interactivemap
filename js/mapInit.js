@@ -4,6 +4,8 @@ let routeLayer;
 let currentFilter = { type: 'all', certified: false, district: '', community: '' };
 let pickMode = false;
 let pickCallback = null;
+let lastStablePoints = [];
+let reloadRetryTimer = null;
 let fetchPointsFn = async (filter) => {
   const query = getQueryFromFilter(filter);
   const response = await fetch(`/api/points${query ? `?${query}` : ''}`);
@@ -147,43 +149,67 @@ async function loadAndRenderPoints() {
   if (!map || !markerLayer) {
     return;
   }
+  try {
+    let points = await fetchPointsFn(currentFilter);
+    if (!Array.isArray(points)) {
+      points = [];
+    }
 
-  let points = await fetchPointsFn(currentFilter);
-  if (currentFilter.district) {
-    points = points.filter((p) =>
-      String(p.district || '')
-        .toLowerCase()
-        .includes(currentFilter.district.toLowerCase())
-    );
-  }
-  if (currentFilter.community) {
-    points = points.filter((p) => {
-      const district = String(p.district || '').toLowerCase();
-      const title = String(p.title || '').toLowerCase();
-      const desc = String(p.description || '').toLowerCase();
-      const q = currentFilter.community.toLowerCase();
-      return district.includes(q) || title.includes(q) || desc.includes(q);
-    });
-  }
-  markerLayer.clearLayers();
-
-  points.forEach((point) => {
-    const icon = createIcon(
-      point.pointType.color || '#3D5263',
-      point.isCertified ? '#B8965A' : 'none'
-    );
-
-    const marker = L.marker([point.lat, point.lng], { icon }).addTo(markerLayer);
-    marker.on('click', () => {
-      map.flyTo([point.lat, point.lng], ODESA_BOUNDS.cityZoom, {
-        duration: 1,
-        easeLinearity: 0.25,
+    if (currentFilter.district) {
+      points = points.filter((p) =>
+        String(p.district || '')
+          .toLowerCase()
+          .includes(currentFilter.district.toLowerCase())
+      );
+    }
+    if (currentFilter.community) {
+      points = points.filter((p) => {
+        const district = String(p.district || '').toLowerCase();
+        const title = String(p.title || '').toLowerCase();
+        const desc = String(p.description || '').toLowerCase();
+        const q = currentFilter.community.toLowerCase();
+        return district.includes(q) || title.includes(q) || desc.includes(q);
       });
-      showInfoCard(point);
-    });
-  });
+    }
 
-  window.dispatchEvent(new CustomEvent('map:points-updated', { detail: points }));
+    markerLayer.clearLayers();
+    points.forEach((point) => {
+      const lat = Number(point?.lat);
+      const lng = Number(point?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return;
+      }
+      const icon = createIcon(
+        point?.pointType?.color || '#3D5263',
+        point?.isCertified ? '#B8965A' : 'none'
+      );
+
+      const marker = L.marker([lat, lng], { icon }).addTo(markerLayer);
+      marker.on('click', () => {
+        map.flyTo([lat, lng], ODESA_BOUNDS.cityZoom, {
+          duration: 1,
+          easeLinearity: 0.25,
+        });
+        showInfoCard(point);
+      });
+    });
+
+    lastStablePoints = points;
+    if (reloadRetryTimer) {
+      clearTimeout(reloadRetryTimer);
+      reloadRetryTimer = null;
+    }
+    window.dispatchEvent(new CustomEvent('map:points-updated', { detail: points }));
+  } catch (error) {
+    console.warn('Points load failed, keeping previous markers', error);
+    if (!reloadRetryTimer) {
+      reloadRetryTimer = setTimeout(() => {
+        reloadRetryTimer = null;
+        loadAndRenderPoints().catch(() => null);
+      }, 1500);
+    }
+    window.dispatchEvent(new CustomEvent('map:points-updated', { detail: lastStablePoints || [] }));
+  }
 }
 
 function setFilter(filter) {

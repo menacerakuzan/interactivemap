@@ -381,11 +381,18 @@ body::before {
 
 .map-legend.collapsed {
   opacity: 0.98;
-  transform: translateX(72%);
+  transform: none;
+  min-width: 0;
+  max-width: none;
+  padding: 6px;
 }
 
 .map-legend.collapsed #map-legend {
   display: none;
+}
+
+.map-legend.collapsed #btn-toggle-legend {
+  align-self: center;
 }
 
 .map-fullscreen-btn {
@@ -1339,6 +1346,10 @@ body.context-open .filter-menu {
     bottom: 10px;
     max-width: min(68vw, 200px);
     min-width: 136px;
+  }
+
+  .map-legend.collapsed {
+    min-width: 0;
   }
 
   .specialist-panel {
