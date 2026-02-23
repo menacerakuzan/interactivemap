@@ -77,6 +77,8 @@
                 <nav style="display: flex; gap: 24px;">
                     <a href="#news-section" id="btn-news-scroll" class="t-nav" data-i18n="news_link" data-magnetic
                         style="text-decoration: none; color: var(--c-text-primary);">НОВИНИ</a>
+                    <a href="#proposal-section" id="btn-proposal-scroll" class="t-nav" data-magnetic
+                        style="text-decoration: none; color: var(--c-text-primary);">ЗАПРОПОНУВАТИ ТОЧКУ</a>
                     <a href="#" class="t-nav" id="btn-lang-toggle" data-magnetic
                         style="text-decoration: none; color: var(--c-text-primary);">UA / EN</a>
                 </nav>
@@ -209,6 +211,8 @@
                     <select id="route-edit-select"></select>
                     <button id="btn-new-route" class="btn-flat">Новий маршрут</button>
                     <input id="route-name" type="text" placeholder="Назва маршруту" />
+                    <label class="t-data text-muted" for="route-color" style="margin-top: 4px;">Колір лінії маршруту</label>
+                    <input id="route-color" type="color" value="#E7C769" />
                     <select id="route-status">
                         <option value="draft">Draft</option>
                         <option value="review">Review</option>
@@ -302,6 +306,42 @@
             style="padding: 120px 32px; background: var(--c-surface); display: flex; flex-direction: column; align-items: center;">
             <h2 class="t-h2 reveal" data-i18n="news_title" style="margin-bottom: 48px;">ОСТАННІ НОВИНИ</h2>
             <div id="news-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 1000px; width: 100%;"></div>
+        </section>
+
+        <section id="proposal-section" style="padding: 96px 20px; background: #fff;">
+            <div class="proposal-card">
+                <h2 class="t-h2" style="margin-bottom: 10px;">Запропонувати точку безбарʼєрності</h2>
+                <p class="t-body text-muted" style="margin-bottom: 18px;">
+                    Заповніть коротку заявку: спеціалісти перевірять дані та додадуть точку на карту після валідації.
+                </p>
+                <div id="proposal-feedback" class="t-data text-muted" style="min-height: 16px; margin-bottom: 12px;"></div>
+                <div class="proposal-grid">
+                    <input id="proposal-name" type="text" placeholder="Назва обʼєкта*" />
+                    <select id="proposal-space-type">
+                        <option value="buildings">Будівлі і споруди</option>
+                        <option value="transport_hubs">Вокзали/автостанції/порти</option>
+                        <option value="streets">Вулиці і дороги</option>
+                        <option value="stops">Зупинки транспорту</option>
+                        <option value="amenities">Об’єкти благоустрою</option>
+                    </select>
+                    <input id="proposal-district" type="text" placeholder="Район / громада*" />
+                    <input id="proposal-address" type="text" placeholder="Адреса*" />
+                    <input id="proposal-lat" type="number" step="0.000001" placeholder="Широта*" />
+                    <input id="proposal-lng" type="number" step="0.000001" placeholder="Довгота*" />
+                    <input id="proposal-contact-email" type="email" placeholder="Email для сповіщень*" />
+                    <input id="proposal-photo-url" type="text" placeholder="Посилання на фото (опційно)" />
+                </div>
+                <textarea id="proposal-comment" placeholder="Короткий опис проблеми/стану доступності"></textarea>
+                <div class="proposal-checklist">
+                    <div class="t-label">Міні-чеклист (первинна оцінка)</div>
+                    <label><span>Доступний вхід без барʼєрів</span><select data-check="entry"><option value="yes">так</option><option value="no">ні</option><option value="na">не застосовується</option></select></label>
+                    <label><span>Безпечний шлях руху до обʼєкта</span><select data-check="path"><option value="yes">так</option><option value="no">ні</option><option value="na">не застосовується</option></select></label>
+                    <label><span>Контрастне маркування/навігація</span><select data-check="navigation"><option value="yes">так</option><option value="no">ні</option><option value="na">не застосовується</option></select></label>
+                    <label><span>Доступний санітарний вузол (за наявності)</span><select data-check="toilet"><option value="yes">так</option><option value="no">ні</option><option value="na">не застосовується</option></select></label>
+                    <label><span>Транспортна доступність поблизу</span><select data-check="transport"><option value="yes">так</option><option value="no">ні</option><option value="na">не застосовується</option></select></label>
+                </div>
+                <button id="btn-submit-proposal" class="btn-primary" style="margin-top: 10px;">Надіслати заявку</button>
+            </div>
         </section>
 
         <!-- Auth Section -->

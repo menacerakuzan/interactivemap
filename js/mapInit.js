@@ -32,17 +32,17 @@ const ODESA_BOUNDS = {
 
 function createIcon(fillColor, borderColor = 'none') {
   const svgMarker = `
-    <svg width="24" height="32" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">
-      <rect x="2" y="2" width="20" height="20" fill="${fillColor}" stroke="${borderColor}" stroke-width="2"/>
-      <polygon points="12,32 6,22 18,22" fill="${fillColor}"/>
-      <rect x="8" y="8" width="8" height="8" fill="#F4F1EC"/>
+    <svg width="28" height="38" viewBox="0 0 28 38" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M14 1.5C7.1 1.5 1.5 7.1 1.5 14c0 9.8 11 20.6 11.5 21.1a1.5 1.5 0 0 0 2 0C15.5 34.6 26.5 23.8 26.5 14 26.5 7.1 20.9 1.5 14 1.5Z"
+            fill="${fillColor}" stroke="${borderColor}" stroke-width="2"/>
+      <circle cx="14" cy="14" r="5.2" fill="#F4F1EC" opacity="0.95"/>
     </svg>`;
 
   return L.divIcon({
     className: 'custom-map-marker',
     html: svgMarker,
-    iconSize: [24, 32],
-    iconAnchor: [12, 32],
+    iconSize: [28, 38],
+    iconAnchor: [14, 37],
   });
 }
 
@@ -249,20 +249,20 @@ function highlightRoute(route) {
   }
 
   const latLngs = route.points.map((p) => [p.lat, p.lng]);
-  // Route style: yellow lane stripes for high visibility.
+  const color = route?.routeColor || '#E7C769';
   const baseLine = L.polyline(latLngs, {
-    color: '#6F5628',
+    color: '#1E3A5F',
     weight: 8,
-    opacity: 0.85,
+    opacity: 0.55,
     lineCap: 'round',
     lineJoin: 'round',
   }).addTo(routeLayer);
 
-  const polyline = L.polyline(latLngs, {
-    color: '#E7C769',
+  L.polyline(latLngs, {
+    color,
     weight: 5,
     opacity: 1,
-    dashArray: '12,8',
+    dashArray: '10,7',
     lineCap: 'round',
     lineJoin: 'round',
   }).addTo(routeLayer);
@@ -270,8 +270,8 @@ function highlightRoute(route) {
   route.points.forEach((p, idx) => {
     const marker = L.circleMarker([p.lat, p.lng], {
       radius: 9,
-      color: '#8A6A2A',
-      fillColor: '#F6E4A8',
+      color: '#1E3A5F',
+      fillColor: color,
       fillOpacity: 1,
       weight: 2,
     }).addTo(routeLayer);
@@ -311,6 +311,16 @@ export async function initMap(options = {}) {
   map = L.map('map', {
     zoomControl: false,
     attributionControl: false,
+    zoomAnimation: true,
+    markerZoomAnimation: true,
+    fadeAnimation: true,
+    zoomSnap: 0.1,
+    zoomDelta: 0.25,
+    wheelDebounceTime: 40,
+    wheelPxPerZoomLevel: 90,
+    inertia: true,
+    inertiaDeceleration: 2800,
+    easeLinearity: 0.2,
   }).setView(ODESA_BOUNDS.center, ODESA_BOUNDS.defaultZoom);
 
   L.control

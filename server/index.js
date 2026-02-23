@@ -413,6 +413,7 @@ app.get('/api/routes', authenticate, (req, res) => {
       id: r.id,
       name: r.name,
       description: r.description,
+      routeColor: r.route_color || null,
       status: r.status,
       createdBy: r.created_by,
       authorName: r.author_name,
@@ -431,7 +432,7 @@ app.get('/api/routes', authenticate, (req, res) => {
 });
 
 app.post('/api/routes', authenticate, requireRole('admin', 'specialist'), (req, res) => {
-  const { name, description, status = 'draft', points = [] } = req.body;
+  const { name, description, routeColor, status = 'draft', points = [] } = req.body;
   if (!isNonEmptyText(name, 180)) {
     return res.status(400).json({ error: 'name is required' });
   }
@@ -443,9 +444,9 @@ app.post('/api/routes', authenticate, requireRole('admin', 'specialist'), (req, 
   const tx = db.transaction(() => {
     const routeResult = db
       .prepare(
-        'INSERT INTO routes (name, description, status, created_by) VALUES (?, ?, ?, ?)'
+        'INSERT INTO routes (name, description, route_color, status, created_by) VALUES (?, ?, ?, ?, ?)'
       )
-      .run(name.trim(), normalizeOptionalText(description, 3000), status, req.user.id);
+      .run(name.trim(), normalizeOptionalText(description, 3000), normalizeOptionalText(routeColor, 16), status, req.user.id);
 
     const routeId = routeResult.lastInsertRowid;
 
@@ -480,7 +481,7 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
     return res.status(404).json({ error: 'Route not found' });
   }
 
-  const { name, description, status, points } = req.body;
+  const { name, description, routeColor, status, points } = req.body;
   if (status && !ROUTE_STATUSES.has(status)) {
     return res.status(400).json({ error: 'Invalid route status' });
   }
@@ -494,6 +495,7 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
       SET
         name = COALESCE(?, name),
         description = COALESCE(?, description),
+        route_color = COALESCE(?, route_color),
         status = COALESCE(?, status),
         updated_by = ?,
         updated_at = datetime('now')
@@ -501,6 +503,7 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
     `).run(
       name !== undefined ? String(name).trim() : null,
       description !== undefined ? normalizeOptionalText(description, 3000) : null,
+      routeColor !== undefined ? normalizeOptionalText(routeColor, 16) : null,
       status ?? null,
       req.user.id,
       routeId
@@ -673,6 +676,68 @@ app.delete('/api/news/:id', authenticate, requireRole('admin', 'specialist'), (r
     return res.status(404).json({ error: 'News not found' });
   }
   return res.status(204).send();
+});
+
+app.post('/api/proposals', (req, res) => {
+  const { name, spaceType, district, address, lat, lng, email, photoUrl, comment, checklist } = req.body || {};
+  if (
+    !isNonEmptyText(name, 240) ||
+    !isNonEmptyText(spaceType, 80) ||
+    !isNonEmptyText(district, 240) ||
+    !isNonEmptyText(address, 500) ||
+    !isValidCoordinate(Number(lat), -90, 90) ||
+    !isValidCoordinate(Number(lng), -180, 180) ||
+    !isNonEmptyText(email, 320)
+  ) {
+    return res.status(400).json({ error: 'Invalid proposal payload' });
+  }
+
+  const result = db
+    .prepare(
+      `INSERT INTO point_proposals (name, space_type, district, address, lat, lng, email, photo_url, comment, checklist_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      name.trim(),
+      spaceType.trim(),
+      district.trim(),
+      address.trim(),
+      Number(lat),
+      Number(lng),
+      email.trim(),
+      normalizeOptionalText(photoUrl, 1200),
+      normalizeOptionalText(comment, 6000),
+      checklist ? JSON.stringify(checklist) : null
+    );
+
+  return res.status(201).json({ id: Number(result.lastInsertRowid) });
+});
+
+app.get('/api/proposals', authenticate, requireRole('admin', 'specialist'), (_req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT id, name, space_type, district, address, lat, lng, email, photo_url, comment, checklist_json, created_at, reviewed
+       FROM point_proposals
+       ORDER BY created_at DESC`
+    )
+    .all();
+  return res.json(
+    rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      spaceType: row.space_type,
+      district: row.district,
+      address: row.address,
+      lat: row.lat,
+      lng: row.lng,
+      email: row.email,
+      photoUrl: row.photo_url || null,
+      comment: row.comment || '',
+      checklist: row.checklist_json ? JSON.parse(row.checklist_json) : {},
+      createdAt: row.created_at,
+      reviewed: Boolean(row.reviewed),
+    }))
+  );
 });
 
 app.listen(PORT, () => {

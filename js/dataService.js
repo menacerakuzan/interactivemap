@@ -6,6 +6,7 @@ const EXPLICIT_MODE = (import.meta.env.VITE_DATA_MODE || '').trim().toLowerCase(
 
 const DATA_MODE = EXPLICIT_MODE || (SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'local');
 const supabase = DATA_MODE === 'supabase' ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const LOCAL_PROPOSALS_KEY = 'odesaPointProposals';
 
 function isMissingPointSectionsError(error) {
   const message = String(error?.message || error || '').toLowerCase();
@@ -15,6 +16,11 @@ function isMissingPointSectionsError(error) {
 function isMissingNewsImageError(error) {
   const message = String(error?.message || error || '').toLowerCase();
   return message.includes('image_url') && message.includes('news');
+}
+
+function isMissingRouteColorError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('route_color') && message.includes('routes');
 }
 
 function parsePath(path) {
@@ -116,6 +122,7 @@ function mapRoute(row, authorName = null) {
     status: row.status,
     createdBy: row.created_by,
     authorName,
+    routeColor: row.route_color || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     points: (row.route_points || [])
@@ -129,6 +136,45 @@ function mapRoute(row, authorName = null) {
         note: rp.note,
       })),
   };
+}
+
+function appendLocalProposal(payload) {
+  const now = new Date().toISOString();
+  const proposals = JSON.parse(localStorage.getItem(LOCAL_PROPOSALS_KEY) || '[]');
+  const record = {
+    id: Date.now(),
+    ...payload,
+    createdAt: now,
+    source: 'public-form',
+  };
+  proposals.unshift(record);
+  localStorage.setItem(LOCAL_PROPOSALS_KEY, JSON.stringify(proposals));
+  return { id: record.id, createdAt: record.createdAt };
+}
+
+async function supabaseCreateProposal(payload) {
+  try {
+    const { data, error } = await supabase
+      .from('point_proposals')
+      .insert({
+        name: payload.name,
+        space_type: payload.spaceType,
+        district: payload.district,
+        address: payload.address,
+        lat: payload.lat,
+        lng: payload.lng,
+        email: payload.email,
+        photo_url: payload.photoUrl || null,
+        comment: payload.comment || null,
+        checklist_json: payload.checklist || {},
+      })
+      .select('id,created_at')
+      .single();
+    if (error) throw error;
+    return { id: data.id, createdAt: data.created_at };
+  } catch (_e) {
+    return appendLocalProposal(payload);
+  }
 }
 
 async function supabaseGetPointTypeIdByCode(code) {
@@ -182,13 +228,24 @@ async function supabaseGetPoints(query = {}) {
 }
 
 async function supabaseGetRoutes() {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('routes')
     .select(
-      'id,name,description,status,created_by,created_at,updated_at,route_points(position,note,point:points(id,title,lat,lng))'
+      'id,name,description,status,route_color,created_by,created_at,updated_at,route_points(position,note,point:points(id,title,lat,lng))'
     )
     .order('updated_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
+  if (error && isMissingRouteColorError(error)) {
+    const fallback = await supabase
+      .from('routes')
+      .select(
+        'id,name,description,status,created_by,created_at,updated_at,route_points(position,note,point:points(id,title,lat,lng))'
+      )
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw error;
 
@@ -342,16 +399,31 @@ async function supabaseDeletePoint(pointId) {
 async function supabaseCreateRoute(payload) {
   const user = await supabaseGetCurrentUser();
 
-  const { data: route, error: routeError } = await supabase
+  let { data: route, error: routeError } = await supabase
     .from('routes')
     .insert({
       name: payload.name,
       description: payload.description || null,
+      route_color: payload.routeColor || null,
       status: payload.status || 'draft',
       created_by: user.id,
     })
     .select('id')
     .single();
+  if (routeError && isMissingRouteColorError(routeError)) {
+    const fallback = await supabase
+      .from('routes')
+      .insert({
+        name: payload.name,
+        description: payload.description || null,
+        status: payload.status || 'draft',
+        created_by: user.id,
+      })
+      .select('id')
+      .single();
+    route = fallback.data;
+    routeError = fallback.error;
+  }
 
   if (routeError) throw routeError;
 
@@ -380,8 +452,15 @@ async function supabaseUpdateRoute(routeId, payload) {
   if (payload.name !== undefined) updateData.name = payload.name;
   if (payload.description !== undefined) updateData.description = payload.description || null;
   if (payload.status !== undefined) updateData.status = payload.status;
+  if (payload.routeColor !== undefined) updateData.route_color = payload.routeColor || null;
 
-  const { error: routeError } = await supabase.from('routes').update(updateData).eq('id', routeId);
+  let { error: routeError } = await supabase.from('routes').update(updateData).eq('id', routeId);
+  if (routeError && isMissingRouteColorError(routeError)) {
+    const fallbackData = { ...updateData };
+    delete fallbackData.route_color;
+    const fallback = await supabase.from('routes').update(fallbackData).eq('id', routeId);
+    routeError = fallback.error;
+  }
   if (routeError) throw routeError;
 
   if (Array.isArray(payload.points)) {
@@ -682,6 +761,10 @@ export const dataService = {
     if (pathname.startsWith('/api/news/') && method === 'DELETE') {
       const id = Number(pathname.split('/').pop());
       return supabaseDeleteNews(id);
+    }
+
+    if (pathname === '/api/proposals' && method === 'POST') {
+      return supabaseCreateProposal(body);
     }
 
     throw new Error(`Unsupported endpoint in supabase mode: ${method} ${pathname}`);

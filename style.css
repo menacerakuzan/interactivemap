@@ -707,6 +707,10 @@ body.context-open .filter-menu {
   border-bottom: 1px solid var(--c-divider) !important;
 }
 
+.custom-map-marker {
+  transition: transform var(--t-fast) var(--ease-smooth);
+}
+
 .leaflet-container.point-pick {
   cursor: crosshair;
 }
@@ -1106,6 +1110,78 @@ body.context-open .filter-menu {
   gap: 8px;
 }
 
+#route-color {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--c-divider);
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px;
+  cursor: pointer;
+}
+
+.proposal-card {
+  max-width: 980px;
+  margin: 0 auto;
+  border: 1px solid var(--c-divider);
+  border-radius: 16px;
+  padding: 24px;
+  background: linear-gradient(180deg, #fff, #f9fbff);
+  box-shadow: var(--shadow-float);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.proposal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.proposal-card input,
+.proposal-card select,
+.proposal-card textarea {
+  width: 100%;
+  border: 1px solid var(--c-divider);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  transition: border-color var(--t-fast) var(--ease-smooth), box-shadow var(--t-fast) var(--ease-smooth);
+  background: #fff;
+}
+
+.proposal-card textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.proposal-card input:focus,
+.proposal-card select:focus,
+.proposal-card textarea:focus {
+  outline: none;
+  border-color: var(--c-admiralty);
+  box-shadow: 0 0 0 3px rgba(11, 37, 69, 0.08);
+}
+
+.proposal-checklist {
+  border: 1px solid var(--c-divider);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proposal-checklist label {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  align-items: center;
+  gap: 10px;
+}
+
 .point-section-preview {
   width: 100%;
   height: 110px;
@@ -1369,6 +1445,14 @@ body.context-open .filter-menu {
     left: 8px;
     width: calc(100vw - 16px);
     padding: 12px;
+  }
+
+  .proposal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .proposal-checklist label {
+    grid-template-columns: 1fr;
   }
 
   .specialist-grid,

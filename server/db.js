@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS routes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   description TEXT,
+  route_color TEXT,
   status TEXT NOT NULL CHECK(status IN ('draft', 'review', 'published')) DEFAULT 'draft',
   created_by INTEGER NOT NULL,
   updated_by INTEGER,
@@ -86,6 +87,22 @@ CREATE TABLE IF NOT EXISTS news (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS point_proposals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  space_type TEXT NOT NULL,
+  district TEXT NOT NULL,
+  address TEXT NOT NULL,
+  lat REAL NOT NULL,
+  lng REAL NOT NULL,
+  email TEXT NOT NULL,
+  photo_url TEXT,
+  comment TEXT,
+  checklist_json TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  reviewed INTEGER NOT NULL DEFAULT 0
+);
 `);
 
 const pointColumns = db.prepare("PRAGMA table_info(points)").all();
@@ -96,6 +113,11 @@ if (!pointColumns.some((c) => c.name === 'photo_url')) {
 const newsColumns = db.prepare("PRAGMA table_info(news)").all();
 if (!newsColumns.some((c) => c.name === 'image_url')) {
   db.exec('ALTER TABLE news ADD COLUMN image_url TEXT');
+}
+
+const routeColumns = db.prepare("PRAGMA table_info(routes)").all();
+if (!routeColumns.some((c) => c.name === 'route_color')) {
+  db.exec('ALTER TABLE routes ADD COLUMN route_color TEXT');
 }
 
 const seedPointTypes = [

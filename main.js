@@ -86,6 +86,8 @@ let selectedDistrict = '';
 let selectedCommunity = '';
 let currentSpecialistAction = 'menu';
 const MAX_POINT_SECTION_COUNT = 12;
+const ROUTE_COLOR_KEY = 'odesaRouteColors';
+const DEFAULT_ROUTE_COLOR = '#E7C769';
 const dashboardBlockIds = [
   'dashboard-kpi-block',
   'dashboard-routes-block',
@@ -99,6 +101,37 @@ const editorActionToBlockId = {
   'edit-point': 'editor-edit-point-block',
   'news-editor': 'editor-news-block',
 };
+
+function loadRouteColors() {
+  try {
+    return JSON.parse(localStorage.getItem(ROUTE_COLOR_KEY) || '{}') || {};
+  } catch (_e) {
+    return {};
+  }
+}
+
+function saveRouteColors(map) {
+  localStorage.setItem(ROUTE_COLOR_KEY, JSON.stringify(map || {}));
+}
+
+function getRouteColor(routeId) {
+  const colors = loadRouteColors();
+  return colors[String(routeId)] || DEFAULT_ROUTE_COLOR;
+}
+
+function setRouteColor(routeId, color) {
+  if (!routeId || !color) return;
+  const colors = loadRouteColors();
+  colors[String(routeId)] = color;
+  saveRouteColors(colors);
+}
+
+function deleteRouteColor(routeId) {
+  if (!routeId) return;
+  const colors = loadRouteColors();
+  delete colors[String(routeId)];
+  saveRouteColors(colors);
+}
 
 function updateLanguage(lang) {
   currentLang = lang;
@@ -692,7 +725,10 @@ function renderDashboard(points, routes) {
               (r) => `
           <article class="route-item">
             <div class="route-meta">
-              <strong class="t-body">${r.name}</strong>
+              <strong class="t-body" style="display:flex;align-items:center;gap:8px;">
+                <span style="width:12px;height:12px;border-radius:50%;background:${r.routeColor || getRouteColor(r.id)};border:1px solid rgba(0,0,0,0.15);"></span>
+                ${r.name}
+              </strong>
               <span class="route-status ${r.status}">${r.status}</span>
             </div>
             <div class="t-data text-muted">${r.points.length} точок • ${formatIsoDate(r.updatedAt || r.createdAt)}</div>
@@ -807,7 +843,10 @@ async function refreshDashboardData() {
   dashboardNews = news || [];
   pointTypes = typeRows || [];
   dashboardPoints = pointRows || [];
-  dashboardRoutes = routeRows || [];
+  dashboardRoutes = (routeRows || []).map((r) => ({
+    ...r,
+    routeColor: r.routeColor || getRouteColor(r.id),
+  }));
   renderDashboard(dashboardPoints, dashboardRoutes);
   renderNews();
   populatePointTypeOptions();
@@ -833,6 +872,78 @@ async function refreshPublicData() {
   } catch (_e) {
     // Keep UI functional even if public data fails
   }
+}
+
+function bindPublicProposalForm() {
+  const btnSubmit = document.getElementById('btn-submit-proposal');
+  const feedback = document.getElementById('proposal-feedback');
+  if (!btnSubmit) return;
+
+  const setFeedback = (message, isError = false) => {
+    if (!feedback) return;
+    feedback.textContent = message || '';
+    feedback.style.color = isError ? 'var(--c-vermillion)' : 'var(--c-text-secondary)';
+  };
+
+  btnSubmit.addEventListener('click', async () => {
+    const payload = {
+      name: document.getElementById('proposal-name')?.value.trim(),
+      spaceType: document.getElementById('proposal-space-type')?.value || 'buildings',
+      district: document.getElementById('proposal-district')?.value.trim(),
+      address: document.getElementById('proposal-address')?.value.trim(),
+      lat: Number(document.getElementById('proposal-lat')?.value),
+      lng: Number(document.getElementById('proposal-lng')?.value),
+      email: document.getElementById('proposal-contact-email')?.value.trim(),
+      photoUrl: document.getElementById('proposal-photo-url')?.value.trim() || null,
+      comment: document.getElementById('proposal-comment')?.value.trim() || null,
+      checklist: Array.from(document.querySelectorAll('#proposal-section select[data-check]')).reduce((acc, el) => {
+        acc[el.getAttribute('data-check')] = el.value;
+        return acc;
+      }, {}),
+    };
+
+    if (!payload.name || !payload.district || !payload.address || !payload.email) {
+      setFeedback('Заповніть назву, район/громаду, адресу та email.', true);
+      return;
+    }
+    if (!Number.isFinite(payload.lat) || !Number.isFinite(payload.lng)) {
+      setFeedback('Вкажіть коректні координати.', true);
+      return;
+    }
+    if (payload.lat < -90 || payload.lat > 90 || payload.lng < -180 || payload.lng > 180) {
+      setFeedback('Координати поза допустимим діапазоном.', true);
+      return;
+    }
+    if (!payload.email.includes('@')) {
+      setFeedback('Email введено некоректно.', true);
+      return;
+    }
+    if (!isValidHttpUrl(payload.photoUrl)) {
+      setFeedback('URL фото має починатися з http:// або https://', true);
+      return;
+    }
+
+    try {
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = 'Надсилання...';
+      const created = await apiRequest('/api/proposals', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setFeedback(`Заявку №${created?.id || 'new'} надіслано. Дякуємо!`);
+      ['proposal-name', 'proposal-district', 'proposal-address', 'proposal-lat', 'proposal-lng', 'proposal-contact-email', 'proposal-photo-url', 'proposal-comment'].forEach(
+        (id) => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        }
+      );
+    } catch (error) {
+      setFeedback(error.message || 'Не вдалося надіслати заявку', true);
+    } finally {
+      btnSubmit.disabled = false;
+      btnSubmit.textContent = 'Надіслати заявку';
+    }
+  });
 }
 
 function setAuthState(token, user) {
@@ -926,6 +1037,8 @@ function resetRouteEditor() {
   document.getElementById('route-name').value = '';
   document.getElementById('route-description').value = '';
   document.getElementById('route-status').value = 'draft';
+  const routeColorInput = document.getElementById('route-color');
+  if (routeColorInput) routeColorInput.value = DEFAULT_ROUTE_COLOR;
   renderRoutePointOrder();
   mapController?.clearRouteHighlight?.();
   syncEditorActionButtons();
@@ -940,6 +1053,8 @@ function openRouteInEditor(routeId, options = {}) {
   document.getElementById('route-name').value = route.name;
   document.getElementById('route-description').value = route.description || '';
   document.getElementById('route-status').value = route.status;
+  const routeColorInput = document.getElementById('route-color');
+  if (routeColorInput) routeColorInput.value = route.routeColor || getRouteColor(route.id);
   routeEditorPoints = route.points.map((p) => ({ pointId: p.id, title: p.title }));
   routeOrderHistory = [];
   renderRoutePointOrder();
@@ -1338,6 +1453,7 @@ function bindFloatingUiControls() {
   const legendWrap = document.getElementById('map-legend-wrap');
   const btnToggleLegend = document.getElementById('btn-toggle-legend');
   const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
+  const routeColorInput = document.getElementById('route-color');
   const mapContainer = document.querySelector('.map-container');
 
   if (btnHideSpecialist && specialistPanel) {
@@ -1535,6 +1651,7 @@ function bindSpecialistTools() {
         name: document.getElementById('route-name').value.trim(),
         description: document.getElementById('route-description').value.trim(),
         status: document.getElementById('route-status').value,
+        routeColor: document.getElementById('route-color')?.value || DEFAULT_ROUTE_COLOR,
         points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
       };
       if (!payload.name) {
@@ -1548,6 +1665,7 @@ function bindSpecialistTools() {
             method: 'POST',
             body: JSON.stringify(payload),
           });
+          setRouteColor(created.id, payload.routeColor);
           await refreshDashboardData();
           openRouteInEditor(created.id);
           setSpecialistSuccess('Маршрут створено');
@@ -1569,6 +1687,7 @@ function bindSpecialistTools() {
         name: document.getElementById('route-name').value.trim(),
         description: document.getElementById('route-description').value.trim(),
         status: document.getElementById('route-status').value,
+        routeColor: document.getElementById('route-color')?.value || getRouteColor(editingRouteId),
         points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
       };
       if (!payload.name) {
@@ -1582,6 +1701,7 @@ function bindSpecialistTools() {
             method: 'PUT',
             body: JSON.stringify(payload),
           });
+          setRouteColor(editingRouteId, payload.routeColor);
           await refreshDashboardData();
           setSpecialistSuccess('Маршрут оновлено');
           saveUiState();
@@ -1776,6 +1896,16 @@ function bindSpecialistTools() {
     updateFullscreenLabel();
   }
 
+  if (routeColorInput) {
+    routeColorInput.addEventListener('input', () => {
+      if (!editingRouteId) return;
+      const route = dashboardRoutes.find((r) => r.id === editingRouteId);
+      if (!route) return;
+      route.routeColor = routeColorInput.value || DEFAULT_ROUTE_COLOR;
+      mapController?.highlightRoute?.(route);
+    });
+  }
+
   if (btnCreateNews) {
     btnCreateNews.addEventListener('click', async () => {
       const payload = {
@@ -1901,6 +2031,7 @@ function bindSpecialistTools() {
       await runWithButtonState(btnDeleteRoute, 'Видалення...', async () => {
         try {
           await apiRequest(`/api/routes/${editingRouteId}`, { method: 'DELETE' });
+          deleteRouteColor(editingRouteId);
           resetRouteEditor();
           await refreshDashboardData();
           setSpecialistSuccess('Маршрут видалено');
@@ -2163,6 +2294,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const btnLangToggle = document.getElementById('btn-lang-toggle');
   const btnNewsScroll = document.getElementById('btn-news-scroll');
+  const btnProposalScroll = document.getElementById('btn-proposal-scroll');
   if (btnLangToggle) {
     btnLangToggle.addEventListener('click', (e) => {
       e.preventDefault();
@@ -2181,7 +2313,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+  if (btnProposalScroll) {
+    btnProposalScroll.addEventListener('click', (e) => {
+      e.preventDefault();
+      const proposalSection = document.getElementById('proposal-section');
+      if (proposalSection) {
+        proposalSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
 
   updateLanguage(currentLang);
   bindAuthFlow();
+  bindPublicProposalForm();
 });
