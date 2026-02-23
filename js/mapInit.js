@@ -363,12 +363,14 @@ export async function initMap(options = {}) {
     zoomControl: false,
     attributionControl: false,
     zoomAnimation: true,
-    markerZoomAnimation: true,
+    markerZoomAnimation: false,
     fadeAnimation: true,
-    zoomSnap: 1,
-    zoomDelta: 1,
-    wheelDebounceTime: 24,
-    wheelPxPerZoomLevel: 140,
+    zoomSnap: 0.25,
+    zoomDelta: 0.25,
+    scrollWheelZoom: false,
+    touchZoom: 'center',
+    wheelDebounceTime: 20,
+    wheelPxPerZoomLevel: 90,
     inertia: true,
     inertiaDeceleration: 1800,
     easeLinearity: 0.2,
@@ -389,6 +391,53 @@ export async function initMap(options = {}) {
   markerLayer = L.layerGroup().addTo(map);
   routeLayer = L.layerGroup().addTo(map);
   publishedRouteLayer = L.layerGroup().addTo(map);
+
+  // Custom trackpad-friendly wheel zoom: stable step zoom without map jumps.
+  const mapContainer = map.getContainer();
+  let wheelAccumulator = 0;
+  let wheelLocked = false;
+  const wheelThreshold = 16;
+  const wheelStep = 0.25;
+  const lockMs = 50;
+
+  const normalizeWheelDelta = (event) => {
+    if (event.deltaMode === 1) return event.deltaY * 16;
+    if (event.deltaMode === 2) return event.deltaY * window.innerHeight;
+    return event.deltaY;
+  };
+
+  mapContainer.addEventListener(
+    'wheel',
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      wheelAccumulator += normalizeWheelDelta(event);
+
+      if (wheelLocked || Math.abs(wheelAccumulator) < wheelThreshold) {
+        return;
+      }
+
+      const direction = wheelAccumulator > 0 ? -1 : 1;
+      const currentZoom = map.getZoom();
+      const nextZoom = Math.max(
+        map.getMinZoom(),
+        Math.min(map.getMaxZoom(), currentZoom + direction * wheelStep)
+      );
+
+      wheelAccumulator -= Math.sign(wheelAccumulator) * wheelThreshold;
+      if (nextZoom === currentZoom) {
+        wheelAccumulator = 0;
+        return;
+      }
+
+      wheelLocked = true;
+      map.setZoom(nextZoom, { animate: true });
+      setTimeout(() => {
+        wheelLocked = false;
+      }, lockMs);
+    },
+    { passive: false }
+  );
 
   map.on('click', (e) => {
     if (!pickMode || typeof pickCallback !== 'function') {
