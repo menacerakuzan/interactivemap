@@ -583,12 +583,10 @@ body.context-open .filter-menu {
 }
 
 .hero-anchor {
-  width: 140px;
-  height: 140px;
-  margin-bottom: 40px;
+  width: 196px;
+  height: 196px;
+  margin-bottom: 30px;
   color: var(--c-admiralty);
-  filter: contrast(1.5) brightness(1.2);
-  mix-blend-mode: darken;
   filter: drop-shadow(0 10px 24px rgba(11, 37, 69, 0.16));
 }
 
@@ -1063,11 +1061,16 @@ body.context-open .filter-menu {
 }
 
 .auth-logo-img {
-  width: 54px;
-  height: 54px;
+  width: 88px;
+  height: 88px;
   object-fit: contain;
   margin-bottom: 16px;
   filter: contrast(1.1) brightness(1.06);
+}
+
+.header .logo-lockup img {
+  width: 48px;
+  height: 48px;
 }
 
 .point-sections-editor {
@@ -1297,8 +1300,8 @@ body.context-open .filter-menu {
   }
 
   .header .logo-lockup img {
-    width: 24px;
-    height: 24px;
+    width: 34px;
+    height: 34px;
   }
 
   .header .t-nav {
@@ -1318,8 +1321,8 @@ body.context-open .filter-menu {
   }
 
   .hero-anchor {
-    width: 94px;
-    height: 94px;
+    width: 132px;
+    height: 132px;
     margin-bottom: 20px;
   }
 

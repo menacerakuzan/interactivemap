@@ -1974,6 +1974,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initInteractions();
 
   const btnEnter = document.getElementById('btn-enter');
+  const heroEnterTrigger = document.getElementById('hero-enter-trigger');
   const heroSection = document.querySelector('.hero');
   const appInterface = document.querySelector('.app-interface');
   let isTransitioning = false;
@@ -2077,10 +2078,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   if (btnEnter) {
-    btnEnter.addEventListener('click', (event) => {
+    const handleHeroEnter = (event) => {
       event.preventDefault();
       transitionToMap();
-    });
+    };
+    btnEnter.addEventListener('click', handleHeroEnter);
+    if (heroEnterTrigger) {
+      heroEnterTrigger.addEventListener('click', handleHeroEnter);
+      heroEnterTrigger.setAttribute('role', 'button');
+      heroEnterTrigger.setAttribute('tabindex', '0');
+      heroEnterTrigger.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          transitionToMap();
+        }
+      });
+    }
 
     window.addEventListener(
       'wheel',

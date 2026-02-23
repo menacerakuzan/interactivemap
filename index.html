@@ -28,7 +28,6 @@
         <div class="hero-parallax-layer hero-glow parallax-front"></div>
         <div class="hero-gradient"></div>
         <img src="./assets/brand/odesa-logo-main.svg" alt="Одещина" class="hero-anchor anchor-logo"
-            style="filter: contrast(1.2) brightness(1.1); mix-blend-mode: darken;"
             onerror="this.style.display='none'" />
         <h1 class="t-display masked-reveal" id="hero-title" style="color: var(--c-admiralty);">ОДЕСЬКА ОБЛАСТЬ</h1>
         <h2 class="t-h2 reveal" data-i18n="hero_subtitle"
@@ -44,7 +43,7 @@
             <span>Маршрути від спеціалістів</span>
             <span>Новини та оперативні оновлення</span>
         </div>
-        <div class="reveal"
+        <div id="hero-enter-trigger" class="reveal"
             style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; cursor: pointer; color: var(--c-admiralty);">
             <div class="t-nav" data-i18n="swipe_hint" style="margin-bottom: 8px;">СВАЙП АБО КЛІК ДЛЯ ПЕРЕХОДУ</div>
             <button class="btn-primary" id="btn-enter" data-magnetic>&darr;</button>
@@ -65,7 +64,7 @@
         <!-- Header -->
         <header class="header">
             <div class="logo-lockup" style="display: flex; align-items: center; gap: 12px;">
-                <img src="./assets/brand/odesa-logo-main.svg" alt="Одещина" width="32" height="32"
+                <img src="./assets/brand/odesa-logo-main.svg" alt="Одещина" width="48" height="48"
                     style="object-fit: contain; mix-blend-mode: darken; filter: contrast(1.1) brightness(1.1);">
                 <div style="display: flex; flex-direction: column;">
                     <span class="t-nav" data-i18n="app_title" style="color: var(--c-text-primary);">ОДЕСЬКА

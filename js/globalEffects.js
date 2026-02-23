@@ -69,14 +69,10 @@ export function initInteractions() {
             gsap.from('.reveal', {
                 y: 40,
                 opacity: 0,
-                filter: 'blur(4px)',
                 duration: 0.9,
                 ease: 'power3.out',
                 stagger: 0.12,
-                delay: 0.3,
-                onComplete: () => {
-                    gsap.set('.reveal', { clearProps: 'filter' });
-                }
+                delay: 0.3
             });
         }
 
