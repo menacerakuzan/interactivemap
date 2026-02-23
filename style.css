@@ -38,6 +38,7 @@
   --t-fast: 0.18s;
   --t-smooth: 0.28s;
   --ease-smooth: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --header-h: 72px;
 }
 
 * {
@@ -202,7 +203,7 @@ body::before {
 
 /* Layout Elements */
 .header {
-  height: 72px;
+  height: var(--header-h);
   background: #FFFFFF;
   /* Solid white */
   border-bottom: 1px solid var(--c-divider);
@@ -214,7 +215,7 @@ body::before {
   position: fixed;
   top: 0;
   width: 100%;
-  z-index: 1000;
+  z-index: 4000;
   backdrop-filter: blur(10px);
 }
 
@@ -232,15 +233,16 @@ body::before {
 /* Filter Menu (Floating) */
 .filter-menu {
   position: fixed;
-  top: 128px;
+  top: auto;
+  bottom: 58px;
   right: 20px;
-  z-index: 2000;
+  z-index: 950;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   align-items: flex-end;
   gap: 12px;
   transition: opacity var(--t-smooth) var(--ease-smooth), transform var(--t-smooth) var(--ease-smooth);
-  transform-origin: top right;
+  transform-origin: bottom right;
 }
 
 .filter-toggle {
@@ -287,7 +289,7 @@ body::before {
   border: 1px solid var(--c-divider);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(-10px);
+  transform: translateY(10px);
   max-height: 65vh;
   overflow-y: auto;
   transition: all var(--t-smooth) var(--ease-smooth);
@@ -360,10 +362,10 @@ body::before {
 
 .map-legend {
   position: absolute;
-  top: 82px;
+  top: 88px;
   right: 16px;
   left: auto;
-  z-index: 1200;
+  z-index: 950;
   border-radius: 12px;
   border: 1px solid var(--c-divider);
   background: rgba(255, 255, 255, 0.92);
@@ -390,7 +392,7 @@ body::before {
   position: absolute;
   top: 16px;
   right: 16px;
-  z-index: 1200;
+  z-index: 950;
   border-radius: 100px;
   border: 1px solid var(--c-divider);
   background: rgba(255, 255, 255, 0.92);
@@ -732,7 +734,7 @@ body.context-open .filter-menu {
   width: 390px;
   max-height: calc(100vh - 120px);
   overflow: auto;
-  z-index: 2000;
+  z-index: 950;
   padding: 16px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.92);
@@ -1101,9 +1103,103 @@ body.context-open .filter-menu {
 }
 
 @media (max-width: 960px) {
+  :root {
+    --header-h: 64px;
+  }
+
+  .header {
+    padding: 0 14px;
+  }
+
+  .header nav {
+    gap: 12px !important;
+  }
+
+  .auth-state-badge {
+    display: none;
+  }
+
+  .map-container {
+    margin-top: var(--header-h);
+    height: calc(100dvh - var(--header-h));
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .map-view {
+    border-radius: 14px;
+  }
+
+  .map-view.panel-open {
+    width: 100%;
+  }
+
+  .context-panel {
+    position: absolute;
+    inset: 12px;
+    width: auto;
+    height: auto;
+    z-index: 1001;
+    padding: 16px;
+    border-radius: 14px;
+    transform: translateY(12px);
+  }
+
+  .context-panel.active {
+    display: block;
+  }
+
+  .map-fullscreen-btn {
+    top: 12px;
+    right: 12px;
+    font-size: 11px;
+    padding: 7px 10px;
+  }
+
+  .map-legend {
+    top: auto;
+    bottom: 12px;
+    right: 12px;
+    min-width: 152px;
+    max-width: min(62vw, 220px);
+    padding: 8px 10px;
+  }
+
+  .legend-item {
+    font-size: 11px;
+    gap: 6px;
+  }
+
+  .legend-dot {
+    width: 9px;
+    height: 9px;
+  }
+
+  .filter-menu {
+    right: 12px;
+    bottom: max(54px, env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+
+  .filter-toggle {
+    padding: 10px 14px;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    gap: 8px;
+  }
+
+  .filter-options {
+    width: min(88vw, 340px);
+    max-height: 58dvh;
+    padding: 12px;
+  }
+
   .specialist-panel {
-    width: calc(100vw - 48px);
-    left: 24px;
+    width: calc(100vw - 24px);
+    left: 12px;
+    top: calc(var(--header-h) + 10px);
+    max-height: calc(100dvh - var(--header-h) - 22px);
+    border-radius: 14px;
   }
 
   .hero-highlights {
@@ -1118,5 +1214,150 @@ body.context-open .filter-menu {
 
   .point-section-grid {
     grid-template-columns: 1fr;
+  }
+
+  .news-section {
+    padding: 84px 16px !important;
+  }
+
+  #news-list {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    max-width: 100% !important;
+  }
+
+  .news-card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .news-cover {
+    height: 130px;
+  }
+
+  #partner-panel {
+    left: 10px !important;
+    right: 10px !important;
+    bottom: 10px !important;
+    max-width: none !important;
+    width: auto !important;
+    gap: 12px !important;
+    padding: 8px 10px !important;
+  }
+
+  #partner-logos-inner {
+    gap: 12px !important;
+    width: 100%;
+    overflow-x: auto !important;
+    padding-right: 24px;
+  }
+
+  #btn-show-partners {
+    left: 10px !important;
+    bottom: 10px !important;
+    font-size: 11px;
+    padding: 8px 12px !important;
+  }
+
+  #auth-view .auth-card {
+    width: min(92vw, 420px) !important;
+    padding: 28px 18px !important;
+  }
+
+  #auth-view h2.t-h2 {
+    font-size: 24px !important;
+    margin-bottom: 20px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --header-h: 60px;
+  }
+
+  .header {
+    padding: 0 10px;
+  }
+
+  .header .logo-lockup img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .header .t-nav {
+    font-size: 10px;
+    letter-spacing: 0.09em;
+  }
+
+  .header .t-data {
+    font-size: 9px;
+  }
+
+  #btn-auth {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+  }
+
+  .hero-anchor {
+    width: 94px;
+    height: 94px;
+    margin-bottom: 20px;
+  }
+
+  .hero-highlights span {
+    font-size: 10px;
+    padding: 6px 10px 6px 20px;
+    letter-spacing: 0.06em;
+  }
+
+  .hero-highlights span::before {
+    left: 8px;
+    width: 7px;
+    height: 7px;
+  }
+
+  .map-container {
+    padding: 8px;
+  }
+
+  .context-panel {
+    inset: 8px;
+    padding: 14px;
+  }
+
+  .map-fullscreen-btn {
+    top: 10px;
+    right: 10px;
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+
+  .map-legend {
+    right: 10px;
+    bottom: 10px;
+    max-width: min(68vw, 200px);
+    min-width: 136px;
+  }
+
+  .specialist-panel {
+    left: 8px;
+    width: calc(100vw - 16px);
+    padding: 12px;
+  }
+
+  .specialist-grid,
+  .ops-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-menu {
+    right: 10px;
+    bottom: max(50px, env(safe-area-inset-bottom));
+  }
+
+  .filter-options {
+    width: min(92vw, 320px);
   }
 }

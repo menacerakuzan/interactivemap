@@ -1333,6 +1333,7 @@ function bindFloatingUiControls() {
   const btnHideSpecialist = document.getElementById('btn-hide-specialist');
   const legendWrap = document.getElementById('map-legend-wrap');
   const btnToggleLegend = document.getElementById('btn-toggle-legend');
+  const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
   const mapContainer = document.querySelector('.map-container');
 
   if (btnHideSpecialist && specialistPanel) {
@@ -1352,10 +1353,11 @@ function bindFloatingUiControls() {
   const syncFloatingByScroll = () => {
     if (!mapContainer) return;
     const rect = mapContainer.getBoundingClientRect();
-    const mapVisible = rect.bottom > 120 && rect.top < window.innerHeight - 120;
+    const mapVisible = rect.bottom > 120 && rect.top < window.innerHeight - 80;
     if (!mapVisible) {
       if (filterMenu) filterMenu.style.display = 'none';
       if (legendWrap) legendWrap.style.display = 'none';
+      if (btnMapFullscreen) btnMapFullscreen.style.display = 'none';
       if (specialistPanel?.classList.contains('active')) {
         specialistPanel.style.display = 'none';
       }
@@ -1363,6 +1365,7 @@ function bindFloatingUiControls() {
     }
     if (filterMenu) filterMenu.style.display = '';
     if (legendWrap) legendWrap.style.display = '';
+    if (btnMapFullscreen) btnMapFullscreen.style.display = '';
     if (specialistPanel?.classList.contains('active')) {
       specialistPanel.style.display = 'flex';
     }
@@ -2013,33 +2016,60 @@ document.addEventListener('DOMContentLoaded', async () => {
   const transitionToMap = () => {
     if (isTransitioning || !heroSection || heroSection.style.display === 'none') return;
     isTransitioning = true;
+    const finishTransition = async () => {
+      heroSection.style.display = 'none';
+      appInterface.style.display = 'flex';
+      appInterface.style.opacity = '1';
 
-    gsap.to('.hero', {
-      opacity: 0,
-      y: -30,
-      duration: 0.24,
-      ease: 'power2.out',
-      onComplete: async () => {
-        heroSection.style.display = 'none';
-        appInterface.style.display = 'flex';
-
-        gsap.to(appInterface, { opacity: 1, duration: 0.26, ease: 'power2.out' });
+      if (window.gsap) {
+        gsap.to(appInterface, { opacity: 1, duration: 0.22, ease: 'power2.out' });
         gsap.from('.header, .filter-menu', {
           y: -10,
           opacity: 0,
-          duration: 0.28,
+          duration: 0.24,
           stagger: 0.04,
           ease: 'power2.out',
         });
+      }
 
+      try {
         await initMapAndTools();
         window.dispatchEvent(new Event('resize'));
-      },
-    });
+        // Extra refresh passes prevent occasional marker drop after first transition.
+        await mapController?.refresh?.();
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'));
+          mapController?.refresh?.().catch(() => null);
+        }, 260);
+      } finally {
+        isTransitioning = false;
+      }
+    };
+
+    if (window.gsap) {
+      gsap.to('.hero', {
+        opacity: 0,
+        y: -30,
+        duration: 0.24,
+        ease: 'power2.out',
+        onComplete: finishTransition,
+      });
+    } else {
+      heroSection.style.opacity = '0';
+      heroSection.style.transform = 'translateY(-20px)';
+      setTimeout(() => {
+        finishTransition().catch(() => {
+          isTransitioning = false;
+        });
+      }, 180);
+    }
   };
 
   if (btnEnter) {
-    btnEnter.addEventListener('click', transitionToMap);
+    btnEnter.addEventListener('click', (event) => {
+      event.preventDefault();
+      transitionToMap();
+    });
 
     window.addEventListener(
       'wheel',
