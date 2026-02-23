@@ -1,6 +1,7 @@
 let map;
 let markerLayer;
 let routeLayer;
+let publishedRouteLayer;
 let currentFilter = { type: 'all', certified: false, district: '', community: '' };
 let pickMode = false;
 let pickCallback = null;
@@ -241,6 +242,35 @@ function clearRouteHighlight() {
   routeLayer.clearLayers();
 }
 
+function setPublishedRoutes(routes = []) {
+  if (!publishedRouteLayer) return;
+  publishedRouteLayer.clearLayers();
+  if (!Array.isArray(routes) || !routes.length) return;
+
+  routes.forEach((route) => {
+    if (!route || route.status !== 'published' || !Array.isArray(route.points) || route.points.length < 2) return;
+    const latLngs = route.points
+      .map((p) => [Number(p.lat), Number(p.lng)])
+      .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+    if (latLngs.length < 2) return;
+
+    const color = route.routeColor || '#E7C769';
+    const polyline = L.polyline(latLngs, {
+      color,
+      weight: 4,
+      opacity: 0.75,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(publishedRouteLayer);
+
+    polyline.bindTooltip(route.name || 'Маршрут', {
+      sticky: true,
+      direction: 'top',
+      className: 'route-order-label',
+    });
+  });
+}
+
 function highlightRoute(route) {
   if (!map || !routeLayer) return;
   clearRouteHighlight();
@@ -305,6 +335,7 @@ export async function initMap(options = {}) {
       disablePointPicking,
       highlightRoute,
       clearRouteHighlight,
+      setPublishedRoutes,
       focusLocation,
     };
   }
@@ -338,6 +369,7 @@ export async function initMap(options = {}) {
 
   markerLayer = L.layerGroup().addTo(map);
   routeLayer = L.layerGroup().addTo(map);
+  publishedRouteLayer = L.layerGroup().addTo(map);
 
   map.on('click', (e) => {
     if (!pickMode || typeof pickCallback !== 'function') {
@@ -360,6 +392,7 @@ export async function initMap(options = {}) {
     disablePointPicking,
     highlightRoute,
     clearRouteHighlight,
+    setPublishedRoutes,
     focusLocation,
   };
 }

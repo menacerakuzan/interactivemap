@@ -228,6 +228,9 @@ async function supabaseGetPoints(query = {}) {
 }
 
 async function supabaseGetRoutes() {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const isPublic = !sessionData?.session?.access_token;
+
   let { data, error } = await supabase
     .from('routes')
     .select(
@@ -235,6 +238,16 @@ async function supabaseGetRoutes() {
     )
     .order('updated_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
+  if (isPublic) {
+    ({ data, error } = await supabase
+      .from('routes')
+      .select(
+        'id,name,description,status,route_color,created_by,created_at,updated_at,route_points(position,note,point:points(id,title,lat,lng))'
+      )
+      .eq('status', 'published')
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false }));
+  }
   if (error && isMissingRouteColorError(error)) {
     const fallback = await supabase
       .from('routes')

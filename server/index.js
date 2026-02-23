@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const db = require('./db');
 const { PORT, JWT_SECRET } = require('./config');
-const { authenticate, requireRole } = require('./auth');
+const { authenticate, optionalAuthenticate, requireRole } = require('./auth');
 
 const app = express();
 
@@ -379,8 +379,8 @@ app.delete('/api/points/:id', authenticate, requireRole('admin', 'specialist'), 
   return res.status(204).send();
 });
 
-app.get('/api/routes', authenticate, (req, res) => {
-  const isPrivileged = ['admin', 'specialist'].includes(req.user.role);
+app.get('/api/routes', optionalAuthenticate, (req, res) => {
+  const isPrivileged = req.user && ['admin', 'specialist'].includes(req.user.role);
   const rows = isPrivileged
     ? db
         .prepare(

@@ -847,6 +847,7 @@ async function refreshDashboardData() {
     ...r,
     routeColor: r.routeColor || getRouteColor(r.id),
   }));
+  mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
   renderDashboard(dashboardPoints, dashboardRoutes);
   renderNews();
   populatePointTypeOptions();
@@ -860,12 +861,18 @@ async function refreshDashboardData() {
 
 async function refreshPublicData() {
   try {
-    const [news, typeRows] = await Promise.all([
+    const [news, typeRows, routeRows] = await Promise.all([
       apiRequest('/api/news'),
       apiRequest('/api/point-types'),
+      apiRequest('/api/routes'),
     ]);
     dashboardNews = news || [];
     pointTypes = typeRows || [];
+    dashboardRoutes = (routeRows || []).map((r) => ({
+      ...r,
+      routeColor: r.routeColor || getRouteColor(r.id),
+    }));
+    mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
     renderNews();
     renderLegend();
     populatePointTypeOptions();
