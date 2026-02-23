@@ -362,9 +362,9 @@ export async function initMap(options = {}) {
   map = L.map('map', {
     zoomControl: false,
     attributionControl: false,
-    zoomAnimation: false,
-    markerZoomAnimation: false,
-    fadeAnimation: false,
+    zoomAnimation: true,
+    markerZoomAnimation: true,
+    fadeAnimation: true,
     zoomSnap: 1,
     zoomDelta: 1,
     wheelDebounceTime: 24,
