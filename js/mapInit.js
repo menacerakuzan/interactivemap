@@ -222,6 +222,30 @@ function setFilter(filter) {
   return loadAndRenderPoints();
 }
 
+function focusPoints(points = [], options = {}) {
+  if (!map || !Array.isArray(points) || !points.length) return false;
+  const latLngs = points
+    .map((p) => [Number(p?.lat), Number(p?.lng)])
+    .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+  if (!latLngs.length) return false;
+
+  if (latLngs.length === 1) {
+    const [lat, lng] = latLngs[0];
+    focusLocation(lat, lng, options.singleZoom || 14);
+    return true;
+  }
+
+  const bounds = L.latLngBounds(latLngs);
+  map.stop();
+  map.fitBounds(bounds, {
+    padding: options.padding || [56, 56],
+    maxZoom: options.maxZoom || 14,
+    animate: true,
+    duration: 0.55,
+  });
+  return true;
+}
+
 function enablePointPicking(callback) {
   pickMode = true;
   pickCallback = callback;
@@ -371,6 +395,7 @@ export async function initMap(options = {}) {
       clearRouteHighlight,
       setPublishedRoutes,
       focusLocation,
+      focusPoints,
     };
   }
 
@@ -508,5 +533,6 @@ export async function initMap(options = {}) {
     clearRouteHighlight,
     setPublishedRoutes,
     focusLocation,
+    focusPoints,
   };
 }

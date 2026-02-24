@@ -1425,10 +1425,13 @@ function bindFilterMenu() {
       if (value.startsWith('district::')) {
         const district = value.split('::')[1];
         selectedDistrict = district;
-        await mapController?.setFilter({ district, community: '' });
-        const center = DISTRICT_CENTERS[district];
-        if (center) {
-          mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
+        const points = await mapController?.setFilter({ district, community: '' });
+        const focusedByPoints = mapController?.focusPoints?.(points, { maxZoom: 12, singleZoom: 12 });
+        if (!focusedByPoints) {
+          const center = DISTRICT_CENTERS[district];
+          if (center) {
+            mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
+          }
         }
         setSpecialistMessage(`Фокус на: ${district}`);
       }
@@ -1437,14 +1440,17 @@ function bindFilterMenu() {
         const [, district, community] = value.split('::');
         selectedDistrict = district;
         selectedCommunity = community;
-        await mapController?.setFilter({ district, community });
+        const points = await mapController?.setFilter({ district, community });
+        const focusedByPoints = mapController?.focusPoints?.(points, { maxZoom: 14, singleZoom: 14 });
 
-        const geo = await geocodeCommunity(district, community);
-        if (geo) {
-          mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 12);
-        } else if (DISTRICT_CENTERS[district]) {
-          const center = DISTRICT_CENTERS[district];
-          mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
+        if (!focusedByPoints) {
+          const geo = await geocodeCommunity(district, community);
+          if (geo) {
+            mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 12);
+          } else if (DISTRICT_CENTERS[district]) {
+            const center = DISTRICT_CENTERS[district];
+            mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
+          }
         }
         setSpecialistMessage(`Фокус на громаді: ${community}`);
       }
