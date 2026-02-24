@@ -398,9 +398,18 @@ export async function initMap(options = {}) {
   const mapContainer = map.getContainer();
   let targetZoom = map.getZoom();
   let zoomAnimationFrame = null;
+  let isWheelAnimating = false;
   const minStep = 0.03;
   const maxStep = 0.6;
   const zoomSensitivity = 0.0022;
+  const stopWheelZoomAnimation = () => {
+    if (zoomAnimationFrame) {
+      cancelAnimationFrame(zoomAnimationFrame);
+      zoomAnimationFrame = null;
+    }
+    isWheelAnimating = false;
+    targetZoom = map.getZoom();
+  };
 
   const normalizeWheelDelta = (event) => {
     if (event.deltaMode === 1) return event.deltaY * 16;
@@ -423,10 +432,12 @@ export async function initMap(options = {}) {
 
       if (zoomAnimationFrame) return;
       const animateWheelZoom = () => {
+        isWheelAnimating = true;
         const currentZoom = map.getZoom();
         const diff = targetZoom - currentZoom;
         if (Math.abs(diff) < 0.005) {
           map.setZoomAround(map.getCenter(), targetZoom, { animate: false });
+          isWheelAnimating = false;
           zoomAnimationFrame = null;
           return;
         }
@@ -438,6 +449,26 @@ export async function initMap(options = {}) {
     },
     { passive: false }
   );
+
+  map.on('zoomend', () => {
+    if (!isWheelAnimating) {
+      targetZoom = map.getZoom();
+    }
+  });
+
+  const zoomInBtn = mapContainer.querySelector('.leaflet-control-zoom-in');
+  const zoomOutBtn = mapContainer.querySelector('.leaflet-control-zoom-out');
+  [zoomInBtn, zoomOutBtn].forEach((btn) => {
+    if (!btn) return;
+    const syncManualZoom = () => {
+      stopWheelZoomAnimation();
+      requestAnimationFrame(() => {
+        targetZoom = map.getZoom();
+      });
+    };
+    btn.addEventListener('pointerdown', syncManualZoom);
+    btn.addEventListener('click', syncManualZoom);
+  });
 
   map.on('click', (e) => {
     if (!pickMode || typeof pickCallback !== 'function') {
