@@ -240,6 +240,14 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function normalizeGeoText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[’'`]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function makePointSectionMarkup(section = {}, idx = 0) {
   const title = escapeHtml(section.title || '');
   const description = escapeHtml(section.description || '');
@@ -447,12 +455,17 @@ async function geocodeCommunity(district, community) {
 
   try {
     const query = encodeURIComponent(`${community}, ${district}, Odesa Oblast, Ukraine`);
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${query}`;
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&limit=1&q=${query}`;
     const response = await fetch(url);
     if (!response.ok) return null;
     const data = await response.json();
     if (!Array.isArray(data) || !data.length) return null;
-    const result = { lat: Number(data[0].lat), lng: Number(data[0].lon), zoom: 12 };
+    const result = {
+      lat: Number(data[0].lat),
+      lng: Number(data[0].lon),
+      zoom: 12,
+      geojson: data[0].geojson || null,
+    };
     localStorage.setItem(cacheKey, JSON.stringify(result));
     return result;
   } catch (_e) {
@@ -1393,19 +1406,9 @@ function bindFilterMenu() {
         filterMenu.querySelectorAll('.btn-flat').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         filterMenu.classList.remove('active');
-
-        const key = btn.getAttribute('data-filter');
-        if (!mapController || !key) return;
-
-        if (key === 'all') {
-          await mapController.setFilter({ type: 'all', certified: false });
-          return;
-        }
-        if (key === 'certified') {
-          await mapController.setFilter({ type: 'all', certified: true });
-          return;
-        }
-        await mapController.setFilter({ type: key, certified: false });
+        if (!mapController) return;
+        await mapController.setFilter({ type: 'all', certified: false, district: '', community: '' });
+        setSpecialistMessage('Точки не приховуються: фільтр використовується для навігації.');
       });
     });
   }
@@ -1417,7 +1420,7 @@ function bindFilterMenu() {
       selectedCommunity = '';
 
       if (!value) {
-        await mapController?.setFilter({ district: '', community: '' });
+        mapController?.clearFocusBoundary?.();
         saveUiState();
         return;
       }
@@ -1425,7 +1428,11 @@ function bindFilterMenu() {
       if (value.startsWith('district::')) {
         const district = value.split('::')[1];
         selectedDistrict = district;
-        const points = await mapController?.setFilter({ district, community: '' });
+        mapController?.clearFocusBoundary?.();
+        const districtNeedle = normalizeGeoText(district);
+        const points = dashboardPoints.filter((p) =>
+          normalizeGeoText(p.district).includes(districtNeedle)
+        );
         const focusedByPoints = mapController?.focusPoints?.(points, { maxZoom: 12, singleZoom: 12 });
         if (!focusedByPoints) {
           const center = DISTRICT_CENTERS[district];
@@ -1440,17 +1447,32 @@ function bindFilterMenu() {
         const [, district, community] = value.split('::');
         selectedDistrict = district;
         selectedCommunity = community;
-        const points = await mapController?.setFilter({ district, community });
+        const districtNeedle = normalizeGeoText(district);
+        const communityNeedle = normalizeGeoText(community);
+        const points = dashboardPoints.filter((p) => {
+          const districtValue = normalizeGeoText(p.district);
+          const communityValue = normalizeGeoText(p.community);
+          return (
+            districtValue.includes(districtNeedle) &&
+            (communityValue ? communityValue.includes(communityNeedle) : true)
+          );
+        });
         const focusedByPoints = mapController?.focusPoints?.(points, { maxZoom: 14, singleZoom: 14 });
 
-        if (!focusedByPoints) {
-          const geo = await geocodeCommunity(district, community);
-          if (geo) {
-            mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 12);
-          } else if (DISTRICT_CENTERS[district]) {
-            const center = DISTRICT_CENTERS[district];
-            mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
-          }
+        const geo = await geocodeCommunity(district, community);
+        if (geo?.geojson) {
+          mapController?.setFocusBoundary?.(geo.geojson);
+        } else {
+          mapController?.clearFocusBoundary?.();
+        }
+
+        if (geo) {
+          mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 12);
+        } else if (focusedByPoints) {
+          // already focused by local points for selected district/community
+        } else if (DISTRICT_CENTERS[district]) {
+          const center = DISTRICT_CENTERS[district];
+          mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
         }
         setSpecialistMessage(`Фокус на громаді: ${community}`);
       }
@@ -2179,15 +2201,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (selectedDistrict || selectedCommunity) {
-      const filteredPoints = await mapController?.setFilter({
-        district: selectedDistrict,
-        community: selectedCommunity,
-      });
-      // Guard against stale persisted filters that hide all points on load.
-      if (!Array.isArray(filteredPoints) || filteredPoints.length === 0) {
-        selectedDistrict = '';
-        selectedCommunity = '';
-        await mapController?.setFilter({ district: '', community: '' });
+      if (selectedCommunity) {
+        const geo = await geocodeCommunity(selectedDistrict, selectedCommunity);
+        if (geo?.geojson) {
+          mapController?.setFocusBoundary?.(geo.geojson);
+        }
+        if (geo) {
+          mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 12);
+        }
+      } else if (selectedDistrict && DISTRICT_CENTERS[selectedDistrict]) {
+        const center = DISTRICT_CENTERS[selectedDistrict];
+        mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
       }
       populateCommunitiesSelect();
     }

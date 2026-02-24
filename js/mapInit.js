@@ -2,6 +2,7 @@ let map;
 let markerLayer;
 let routeLayer;
 let publishedRouteLayer;
+let focusBoundaryLayer;
 let currentFilter = { type: 'all', certified: false, district: '', community: '' };
 let pickMode = false;
 let pickCallback = null;
@@ -56,14 +57,8 @@ function createIcon(fillColor, borderColor = 'none') {
 }
 
 function getQueryFromFilter(filter) {
-  const query = new URLSearchParams();
-  if (filter.type && filter.type !== 'all') {
-    query.set('type', filter.type);
-  }
-  if (filter.certified) {
-    query.set('certified', 'true');
-  }
-  return query.toString();
+  // Filters are used as navigation controls only; keep all points visible.
+  return '';
 }
 
 function showInfoCard(data) {
@@ -164,25 +159,6 @@ async function loadAndRenderPoints() {
       points = [];
     }
 
-    if (currentFilter.district) {
-      const districtNeedle = normalizeGeoText(currentFilter.district);
-      points = points.filter((p) => {
-        const districtValue = normalizeGeoText(p.district);
-        return districtValue === districtNeedle || districtValue.includes(districtNeedle);
-      });
-    }
-    if (currentFilter.community) {
-      const communityNeedle = normalizeGeoText(currentFilter.community);
-      points = points.filter((p) => {
-        const communityValue = normalizeGeoText(p.community);
-        const districtValue = normalizeGeoText(p.district);
-        return (
-          (communityValue && (communityValue === communityNeedle || communityValue.includes(communityNeedle))) ||
-          districtValue.includes(communityNeedle)
-        );
-      });
-    }
-
     markerLayer.clearLayers();
     points.forEach((point) => {
       const lat = Number(point?.lat);
@@ -277,6 +253,31 @@ function disablePointPicking() {
 function clearRouteHighlight() {
   if (!routeLayer) return;
   routeLayer.clearLayers();
+}
+
+function clearFocusBoundary() {
+  if (!focusBoundaryLayer) return;
+  focusBoundaryLayer.clearLayers();
+}
+
+function setFocusBoundary(geojson) {
+  if (!focusBoundaryLayer) return false;
+  clearFocusBoundary();
+  if (!geojson || typeof geojson !== 'object') return false;
+  const type = String(geojson.type || '');
+  if (!['Polygon', 'MultiPolygon', 'Feature', 'FeatureCollection'].includes(type)) {
+    return false;
+  }
+  L.geoJSON(geojson, {
+    style: {
+      color: '#1E3A5F',
+      weight: 1.6,
+      opacity: 0.9,
+      fillOpacity: 0.02,
+      dashArray: '4 4',
+    },
+  }).addTo(focusBoundaryLayer);
+  return true;
 }
 
 function setPublishedRoutes(routes = []) {
@@ -406,6 +407,8 @@ export async function initMap(options = {}) {
       setPublishedRoutes,
       focusLocation,
       focusPoints,
+      setFocusBoundary,
+      clearFocusBoundary,
     };
   }
 
@@ -443,6 +446,7 @@ export async function initMap(options = {}) {
   markerLayer = L.layerGroup().addTo(map);
   routeLayer = L.layerGroup().addTo(map);
   publishedRouteLayer = L.layerGroup().addTo(map);
+  focusBoundaryLayer = L.layerGroup().addTo(map);
 
   // Custom trackpad-friendly wheel zoom: continuous and stable like modern map UIs.
   const mapContainer = map.getContainer();
@@ -544,5 +548,7 @@ export async function initMap(options = {}) {
     setPublishedRoutes,
     focusLocation,
     focusPoints,
+    setFocusBoundary,
+    clearFocusBoundary,
   };
 }
