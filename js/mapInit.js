@@ -25,6 +25,14 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function normalizeGeoText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[’'`]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 const ODESA_BOUNDS = {
   center: [46.7, 30.2],
   defaultZoom: 8,
@@ -157,19 +165,21 @@ async function loadAndRenderPoints() {
     }
 
     if (currentFilter.district) {
-      points = points.filter((p) =>
-        String(p.district || '')
-          .toLowerCase()
-          .includes(currentFilter.district.toLowerCase())
-      );
+      const districtNeedle = normalizeGeoText(currentFilter.district);
+      points = points.filter((p) => {
+        const districtValue = normalizeGeoText(p.district);
+        return districtValue === districtNeedle || districtValue.includes(districtNeedle);
+      });
     }
     if (currentFilter.community) {
+      const communityNeedle = normalizeGeoText(currentFilter.community);
       points = points.filter((p) => {
-        const district = String(p.district || '').toLowerCase();
-        const title = String(p.title || '').toLowerCase();
-        const desc = String(p.description || '').toLowerCase();
-        const q = currentFilter.community.toLowerCase();
-        return district.includes(q) || title.includes(q) || desc.includes(q);
+        const communityValue = normalizeGeoText(p.community);
+        const districtValue = normalizeGeoText(p.district);
+        return (
+          (communityValue && (communityValue === communityNeedle || communityValue.includes(communityNeedle))) ||
+          districtValue.includes(communityNeedle)
+        );
       });
     }
 
