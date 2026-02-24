@@ -264,17 +264,23 @@ function setFocusBoundary(geojson) {
   if (!focusBoundaryLayer) return false;
   clearFocusBoundary();
   if (!geojson || typeof geojson !== 'object') return false;
-  const type = String(geojson.type || '');
-  if (!['Polygon', 'MultiPolygon', 'Feature', 'FeatureCollection'].includes(type)) {
+  const hasPolygonGeometry = (obj) => {
+    if (!obj || typeof obj !== 'object') return false;
+    const t = String(obj.type || '');
+    if (t === 'Polygon' || t === 'MultiPolygon') return true;
+    if (t === 'Feature') return hasPolygonGeometry(obj.geometry);
+    if (t === 'FeatureCollection') return Array.isArray(obj.features) && obj.features.some((f) => hasPolygonGeometry(f));
     return false;
-  }
+  };
+  if (!hasPolygonGeometry(geojson)) return false;
+
   L.geoJSON(geojson, {
     style: {
-      color: '#1E3A5F',
-      weight: 1.6,
-      opacity: 0.9,
-      fillOpacity: 0.02,
-      dashArray: '4 4',
+      color: '#0B2545',
+      weight: 2.2,
+      opacity: 0.95,
+      fillOpacity: 0.05,
+      dashArray: '6 4',
     },
   }).addTo(focusBoundaryLayer);
   return true;

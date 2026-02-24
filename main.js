@@ -443,7 +443,7 @@ function populateCommunitiesSelect() {
 }
 
 async function geocodeCommunity(district, community) {
-  const cacheKey = `geo::${district}::${community}`;
+  const cacheKey = `geo::v2::${district}::${community}`;
   const cached = localStorage.getItem(cacheKey);
   if (cached) {
     try {
@@ -1460,11 +1460,8 @@ function bindFilterMenu() {
         const focusedByPoints = mapController?.focusPoints?.(points, { maxZoom: 14, singleZoom: 14 });
 
         const geo = await geocodeCommunity(district, community);
-        if (geo?.geojson) {
-          mapController?.setFocusBoundary?.(geo.geojson);
-        } else {
-          mapController?.clearFocusBoundary?.();
-        }
+        const hasBoundary = geo?.geojson ? mapController?.setFocusBoundary?.(geo.geojson) : false;
+        if (!hasBoundary) mapController?.clearFocusBoundary?.();
 
         if (geo) {
           mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 12);
@@ -1474,7 +1471,11 @@ function bindFilterMenu() {
           const center = DISTRICT_CENTERS[district];
           mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
         }
-        setSpecialistMessage(`Фокус на громаді: ${community}`);
+        setSpecialistMessage(
+          hasBoundary
+            ? `Фокус на громаді: ${community} (межі показано)`
+            : `Фокус на громаді: ${community} (межі недоступні у джерелі даних)`
+        );
       }
       saveUiState();
     });
