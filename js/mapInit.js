@@ -313,7 +313,7 @@ function setPublishedRoutes(routes = []) {
       className: 'route-order-label',
     });
 
-    // Show the same point order markers for public users as in specialist mode.
+    // Render route point markers without numeric labels.
     route.points.forEach((p, idx) => {
       const lat = Number(p?.lat);
       const lng = Number(p?.lng);
@@ -325,11 +325,6 @@ function setPublishedRoutes(routes = []) {
         fillOpacity: 1,
         weight: 2,
       }).addTo(publishedRouteLayer);
-      marker.bindTooltip(String(idx + 1), {
-        permanent: true,
-        direction: 'center',
-        className: 'route-order-label',
-      });
     });
   });
 }
@@ -361,7 +356,7 @@ function highlightRoute(route) {
     lineJoin: 'round',
   }).addTo(routeLayer);
 
-  route.points.forEach((p, idx) => {
+  route.points.forEach((p) => {
     const marker = L.circleMarker([p.lat, p.lng], {
       radius: 9,
       color: '#1E3A5F',
@@ -369,7 +364,6 @@ function highlightRoute(route) {
       fillOpacity: 1,
       weight: 2,
     }).addTo(routeLayer);
-    marker.bindTooltip(String(idx + 1), { permanent: true, direction: 'center', className: 'route-order-label' });
   });
 
   map.fitBounds(baseLine.getBounds(), { padding: [60, 60], maxZoom: ODESA_BOUNDS.cityZoom });

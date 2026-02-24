@@ -153,7 +153,7 @@ body::before {
 }
 
 .card:hover {
-  transform: translateY(-8px) translateZ(0);
+  transform: translateY(-2px) translateZ(0);
   box-shadow: var(--shadow-hover);
 }
 
@@ -1044,15 +1044,15 @@ body.context-open .filter-menu {
 .news-card::after {
   content: '';
   position: absolute;
-  inset: -120% -40%;
-  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.34) 45%, transparent 60%);
-  transform: translateX(-55%);
-  transition: transform 0.9s var(--ease-smooth);
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
+  opacity: 0;
+  transition: opacity 0.22s ease;
   pointer-events: none;
 }
 
 .news-card:hover::after {
-  transform: translateX(55%);
+  opacity: 1;
 }
 
 .news-cover {
@@ -1073,8 +1073,8 @@ body.context-open .filter-menu {
 }
 
 .news-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 20px 44px rgba(11, 37, 69, 0.16);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(11, 37, 69, 0.12);
 }
 
 .auth-logo-img {

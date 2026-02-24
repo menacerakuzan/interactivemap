@@ -101,26 +101,7 @@ export function initInteractions() {
         }
     }
 
-    // 3D Card Tilt
-    document.querySelectorAll('.card-3d').forEach(card => {
-        let rafId = null;
-        let targetTransform = 'perspective(800px) rotateX(0) rotateY(0) translateY(0)';
-        const flush = () => {
-            card.style.transform = targetTransform;
-            rafId = null;
-        };
-        card.addEventListener('mousemove', (e) => {
-            const rect = card.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / rect.width - 0.5;
-            const y = (e.clientY - rect.top) / rect.height - 0.5;
-            targetTransform = `perspective(800px) rotateX(${y * -3.2}deg) rotateY(${x * 3.2}deg) translateY(-3px)`;
-            if (!rafId) rafId = requestAnimationFrame(flush);
-        });
-        card.addEventListener('mouseleave', () => {
-            targetTransform = 'perspective(800px) rotateX(0) rotateY(0) translateY(0)';
-            if (!rafId) rafId = requestAnimationFrame(flush);
-        });
-    });
+    // Keep card interactions stable; avoid hover jitter from JS tilt.
 
     // Gradient Lighting Shift
     document.addEventListener('mousemove', (e) => {
