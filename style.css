@@ -239,12 +239,12 @@ body::before {
   right: auto;
   z-index: 980;
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
   transition: opacity var(--t-smooth) var(--ease-smooth), transform var(--t-smooth) var(--ease-smooth);
   transform: translateX(-50%);
   transform-origin: bottom center;
+  pointer-events: none;
 }
 
 .filter-toggle {
@@ -264,6 +264,7 @@ body::before {
   gap: 12px;
   box-shadow: var(--shadow-float);
   transition: all var(--t-fast) var(--ease-smooth);
+  pointer-events: auto;
 }
 
 .filter-toggle:hover {
@@ -280,6 +281,9 @@ body::before {
 }
 
 .filter-options {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
@@ -291,16 +295,18 @@ body::before {
   border: 1px solid var(--c-divider);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(10px);
+  transform: translate(-50%, 10px);
   max-height: 65vh;
   overflow-y: auto;
+  pointer-events: none;
   transition: all var(--t-smooth) var(--ease-smooth);
 }
 
 .filter-menu.active .filter-options {
   opacity: 1;
   visibility: visible;
-  transform: translateY(0);
+  transform: translate(-50%, 0);
+  pointer-events: auto;
 }
 
 .filter-options .btn-flat {
@@ -688,12 +694,11 @@ body.context-open .filter-menu {
   background: var(--c-bg) !important;
   font-family: var(--font-ui) !important;
   overscroll-behavior: contain;
-  touch-action: pan-x pan-y;
 }
 
 .leaflet-tile-pane {
-  /* No heavy sepia, just a clean luxury look */
-  filter: contrast(0.95) saturate(1.1);
+  /* Keep tile pane unfiltered to avoid mobile pinch-zoom flicker/disappear. */
+  filter: none;
 }
 
 .leaflet-control-zoom {

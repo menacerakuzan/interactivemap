@@ -365,8 +365,8 @@ export async function initMap(options = {}) {
     zoomAnimation: true,
     markerZoomAnimation: false,
     fadeAnimation: true,
-    zoomSnap: 0.01,
-    zoomDelta: 0.25,
+    zoomSnap: 0.1,
+    zoomDelta: 1,
     scrollWheelZoom: false,
     touchZoom: 'center',
     wheelDebounceTime: 20,
@@ -384,6 +384,8 @@ export async function initMap(options = {}) {
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 20,
+    updateWhenZooming: false,
+    keepBuffer: 6,
   }).addTo(map);
 
   L.control.zoom({ position: 'bottomright' }).addTo(map);
