@@ -35,8 +35,8 @@
 
   --light-x: 50%;
   --light-y: 30%;
-  --t-fast: 0.18s;
-  --t-smooth: 0.28s;
+  --t-fast: 0.14s;
+  --t-smooth: 0.22s;
   --ease-smooth: cubic-bezier(0.22, 0.61, 0.36, 1);
   --header-h: 72px;
 }
@@ -170,7 +170,7 @@ body::before {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  transition: all var(--t-smooth) var(--ease-smooth);
+  transition: background-color var(--t-smooth) var(--ease-smooth), transform var(--t-smooth) var(--ease-smooth), box-shadow var(--t-smooth) var(--ease-smooth);
   box-shadow: 0 4px 12px rgba(11, 37, 69, 0.15);
 }
 
@@ -189,7 +189,7 @@ body::before {
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 500;
-  transition: all var(--t-fast) var(--ease-smooth);
+  transition: background-color var(--t-fast) var(--ease-smooth), color var(--t-fast) var(--ease-smooth), border-color var(--t-fast) var(--ease-smooth), transform var(--t-fast) var(--ease-smooth), box-shadow var(--t-fast) var(--ease-smooth);
 }
 
 .btn-flat.active,
@@ -263,7 +263,7 @@ body::before {
   align-items: center;
   gap: 12px;
   box-shadow: var(--shadow-float);
-  transition: all var(--t-fast) var(--ease-smooth);
+  transition: background-color var(--t-fast) var(--ease-smooth), transform var(--t-fast) var(--ease-smooth), box-shadow var(--t-fast) var(--ease-smooth);
   pointer-events: auto;
 }
 
@@ -365,7 +365,7 @@ body::before {
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-float);
-  transition: width var(--t-smooth) var(--ease-smooth);
+  transition: width var(--t-smooth) var(--ease-smooth), transform var(--t-fast) var(--ease-smooth);
 }
 
 .map-legend {

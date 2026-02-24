@@ -2,11 +2,11 @@ import Lenis from 'lenis';
 
 export function initLenis() {
     const lenis = new Lenis({
-        duration: 1.4,
+        duration: 0.9,
         easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Expo ease-out
         smooth: true,
-        mouseMultiplier: 0.8,
-        touchMultiplier: 1.5,
+        mouseMultiplier: 1,
+        touchMultiplier: 1.1,
         prevent: (node) => {
             if (!node || typeof node.closest !== 'function') return false;
             return Boolean(
@@ -67,12 +67,12 @@ export function initInteractions() {
         const reveals = document.querySelectorAll('.reveal');
         if (reveals.length > 0) {
             gsap.from('.reveal', {
-                y: 40,
+                y: 26,
                 opacity: 0,
-                duration: 0.9,
+                duration: 0.55,
                 ease: 'power3.out',
-                stagger: 0.12,
-                delay: 0.3
+                stagger: 0.07,
+                delay: 0.12
             });
         }
 
@@ -90,12 +90,12 @@ export function initInteractions() {
             });
 
             gsap.from('#hero-title span', {
-                y: 50,
+                y: 32,
                 opacity: 0,
-                duration: 1.2,
-                stagger: 0.1,
+                duration: 0.75,
+                stagger: 0.07,
                 ease: 'power4.out',
-                delay: 0.2,
+                delay: 0.1,
                 clipPath: 'inset(100% 0 0 0)'
             });
         }
@@ -103,15 +103,22 @@ export function initInteractions() {
 
     // 3D Card Tilt
     document.querySelectorAll('.card-3d').forEach(card => {
+        let rafId = null;
+        let targetTransform = 'perspective(800px) rotateX(0) rotateY(0) translateY(0)';
+        const flush = () => {
+            card.style.transform = targetTransform;
+            rafId = null;
+        };
         card.addEventListener('mousemove', (e) => {
             const rect = card.getBoundingClientRect();
             const x = (e.clientX - rect.left) / rect.width - 0.5;
             const y = (e.clientY - rect.top) / rect.height - 0.5;
-            card.style.transform = `perspective(800px) rotateX(${y * -4}deg) rotateY(${x * 4}deg) translateY(-4px)`;
+            targetTransform = `perspective(800px) rotateX(${y * -3.2}deg) rotateY(${x * 3.2}deg) translateY(-3px)`;
+            if (!rafId) rafId = requestAnimationFrame(flush);
         });
         card.addEventListener('mouseleave', () => {
-            card.style.transform = 'perspective(800px) rotateX(0) rotateY(0) translateY(0)';
-            card.style.transition = 'transform 400ms cubic-bezier(0.23, 1, 0.32, 1)';
+            targetTransform = 'perspective(800px) rotateX(0) rotateY(0) translateY(0)';
+            if (!rafId) rafId = requestAnimationFrame(flush);
         });
     });
 

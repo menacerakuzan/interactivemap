@@ -1476,29 +1476,54 @@ function bindFloatingUiControls() {
     });
   }
 
+  let lastMapVisible = null;
+  let scrollTicking = false;
+
+  const setNodeDisplay = (node, value) => {
+    if (!node) return;
+    const next = value ? '' : 'none';
+    if (node.style.display !== next) {
+      node.style.display = next;
+    }
+  };
+
   const syncFloatingByScroll = () => {
     if (!mapContainer) return;
     const rect = mapContainer.getBoundingClientRect();
     const mapVisible = rect.bottom > 120 && rect.top < window.innerHeight - 80;
+    if (mapVisible === lastMapVisible) return;
+    lastMapVisible = mapVisible;
+
     if (!mapVisible) {
-      if (filterMenu) filterMenu.style.display = 'none';
-      if (legendWrap) legendWrap.style.display = 'none';
-      if (btnMapFullscreen) btnMapFullscreen.style.display = 'none';
+      setNodeDisplay(filterMenu, false);
+      setNodeDisplay(legendWrap, false);
+      setNodeDisplay(btnMapFullscreen, false);
       if (specialistPanel?.classList.contains('active')) {
-        specialistPanel.style.display = 'none';
+        setNodeDisplay(specialistPanel, false);
       }
       return;
     }
-    if (filterMenu) filterMenu.style.display = '';
-    if (legendWrap) legendWrap.style.display = '';
-    if (btnMapFullscreen) btnMapFullscreen.style.display = '';
+    setNodeDisplay(filterMenu, true);
+    setNodeDisplay(legendWrap, true);
+    setNodeDisplay(btnMapFullscreen, true);
     if (specialistPanel?.classList.contains('active')) {
-      specialistPanel.style.display = 'flex';
+      if (specialistPanel.style.display !== 'flex') {
+        specialistPanel.style.display = 'flex';
+      }
     }
   };
 
-  window.addEventListener('scroll', syncFloatingByScroll, { passive: true });
-  window.addEventListener('resize', syncFloatingByScroll);
+  const scheduleSync = () => {
+    if (scrollTicking) return;
+    scrollTicking = true;
+    requestAnimationFrame(() => {
+      scrollTicking = false;
+      syncFloatingByScroll();
+    });
+  };
+
+  window.addEventListener('scroll', scheduleSync, { passive: true });
+  window.addEventListener('resize', scheduleSync);
   syncFloatingByScroll();
 }
 
