@@ -2173,10 +2173,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (selectedDistrict || selectedCommunity) {
-      await mapController?.setFilter({
+      const filteredPoints = await mapController?.setFilter({
         district: selectedDistrict,
         community: selectedCommunity,
       });
+      // Guard against stale persisted filters that hide all points on load.
+      if (!Array.isArray(filteredPoints) || filteredPoints.length === 0) {
+        selectedDistrict = '';
+        selectedCommunity = '';
+        await mapController?.setFilter({ district: '', community: '' });
+      }
       populateCommunitiesSelect();
     }
   };

@@ -148,7 +148,7 @@ function closeInfoCard() {
 
 async function loadAndRenderPoints() {
   if (!map || !markerLayer) {
-    return;
+    return [];
   }
   try {
     let points = await fetchPointsFn(currentFilter);
@@ -202,6 +202,7 @@ async function loadAndRenderPoints() {
       reloadRetryTimer = null;
     }
     window.dispatchEvent(new CustomEvent('map:points-updated', { detail: points }));
+    return points;
   } catch (error) {
     console.warn('Points load failed, keeping previous markers', error);
     if (!reloadRetryTimer) {
@@ -210,7 +211,9 @@ async function loadAndRenderPoints() {
         loadAndRenderPoints().catch(() => null);
       }, 1500);
     }
-    window.dispatchEvent(new CustomEvent('map:points-updated', { detail: lastStablePoints || [] }));
+    const fallback = lastStablePoints || [];
+    window.dispatchEvent(new CustomEvent('map:points-updated', { detail: fallback }));
+    return fallback;
   }
 }
 
@@ -333,10 +336,22 @@ function highlightRoute(route) {
 
 function focusLocation(lat, lng, zoom = ODESA_BOUNDS.cityZoom) {
   if (!map) return;
-  map.flyTo([lat, lng], zoom, {
-    duration: 1,
+  const safeLat = Number(lat);
+  const safeLng = Number(lng);
+  const safeZoom = Number.isFinite(Number(zoom)) ? Number(zoom) : ODESA_BOUNDS.cityZoom;
+  if (!Number.isFinite(safeLat) || !Number.isFinite(safeLng)) return;
+
+  map.stop();
+  map.setView([safeLat, safeLng], safeZoom, {
+    animate: true,
+    duration: 0.55,
     easeLinearity: 0.25,
   });
+
+  // Ensure layout settles after panel/filter transitions.
+  setTimeout(() => {
+    map.invalidateSize({ pan: false });
+  }, 120);
 }
 
 export async function initMap(options = {}) {
