@@ -39,9 +39,12 @@
             Одеська область
         </p>
         <div class="hero-highlights reveal">
-            <span>Офіційний реєстр точок безбарʼєрності</span>
-            <span>Маршрути моніторингу спеціалістів</span>
-            <span>Новини та службові оновлення</span>
+            <button type="button" class="hero-highlight-btn" data-hero-target="map">Офіційний реєстр точок
+                безбарʼєрності</button>
+            <button type="button" class="hero-highlight-btn" data-hero-target="map">Маршрути моніторингу
+                спеціалістів</button>
+            <button type="button" class="hero-highlight-btn" data-hero-target="news-section">Новини та службові
+                оновлення</button>
         </div>
         <div id="hero-enter-trigger" class="reveal"
             style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; cursor: pointer; color: var(--c-admiralty);">
@@ -63,7 +66,8 @@
 
         <!-- Header -->
         <header class="header">
-            <div class="logo-lockup" style="display: flex; align-items: center; gap: 12px;">
+            <div class="logo-lockup" id="btn-logo-home" role="button" tabindex="0"
+                style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
                 <img src="./assets/brand/odesa-logo-main.svg" alt="Одещина" width="48" height="48"
                     style="object-fit: contain; mix-blend-mode: darken; filter: contrast(1.1) brightness(1.1);">
                 <div style="display: flex; flex-direction: column;">
@@ -181,6 +185,15 @@
                 <div class="specialist-block" id="dashboard-activity-block">
                     <div class="t-label">Останні дії</div>
                     <div id="activity-list" class="activity-list"></div>
+                </div>
+                <div class="specialist-block" id="dashboard-proposals-block">
+                    <div class="t-label">Заявки користувачів</div>
+                    <div id="proposal-list" class="route-list"></div>
+                    <div class="list-pager">
+                        <button id="proposal-prev" class="btn-flat">Prev</button>
+                        <span id="proposal-page-label" class="t-data text-muted">1 / 1</span>
+                        <button id="proposal-next" class="btn-flat">Next</button>
+                    </div>
                 </div>
             </div>
             <div class="specialist-tab-content" id="specialist-editor">
@@ -306,6 +319,11 @@
             style="padding: 120px 32px; background: var(--c-surface); display: flex; flex-direction: column; align-items: center;">
             <h2 class="t-h2 reveal" data-i18n="news_title" style="margin-bottom: 48px;">ОСТАННІ НОВИНИ</h2>
             <div id="news-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 1000px; width: 100%;"></div>
+            <div id="news-pager" class="list-pager" style="margin-top: 22px; max-width: 1000px; width: 100%;">
+                <button id="news-prev" class="btn-flat">Prev</button>
+                <span id="news-page-label" class="t-data text-muted">1 / 1</span>
+                <button id="news-next" class="btn-flat">Next</button>
+            </div>
         </section>
 
         <section id="proposal-section" style="padding: 96px 20px; background: #fff;">

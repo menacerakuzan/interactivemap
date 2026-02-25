@@ -70,6 +70,7 @@ let mapController = null;
 let dashboardPoints = [];
 let dashboardRoutes = [];
 let dashboardNews = [];
+let dashboardProposals = [];
 let pointTypes = [];
 let editingRouteId = null;
 let editingPointId = null;
@@ -80,7 +81,11 @@ let routeSearchTerm = '';
 let pointSearchTerm = '';
 let routePage = 1;
 let pointPage = 1;
+let newsPage = 1;
+let proposalPage = 1;
 const PAGE_SIZE = 5;
+const NEWS_PAGE_SIZE = 4;
+const PROPOSAL_PAGE_SIZE = 5;
 const UI_STATE_KEY = 'odesaSpecialistUiState';
 let selectedDistrict = '';
 let selectedCommunity = '';
@@ -94,6 +99,7 @@ const dashboardBlockIds = [
   'dashboard-review-block',
   'dashboard-points-block',
   'dashboard-activity-block',
+  'dashboard-proposals-block',
 ];
 const editorActionToBlockId = {
   'add-point': 'editor-add-point-block',
@@ -370,6 +376,8 @@ function saveUiState() {
         pointSearchTerm,
         routePage,
         pointPage,
+        newsPage,
+        proposalPage,
         editingRouteId,
         editingNewsId,
         selectedDistrict,
@@ -396,6 +404,8 @@ function applySavedUiState() {
   pointSearchTerm = saved.pointSearchTerm || '';
   routePage = Number(saved.routePage) > 0 ? Number(saved.routePage) : 1;
   pointPage = Number(saved.pointPage) > 0 ? Number(saved.pointPage) : 1;
+  newsPage = Number(saved.newsPage) > 0 ? Number(saved.newsPage) : 1;
+  proposalPage = Number(saved.proposalPage) > 0 ? Number(saved.proposalPage) : 1;
   editingRouteId = Number(saved.editingRouteId) > 0 ? Number(saved.editingRouteId) : null;
   editingNewsId = Number(saved.editingNewsId) > 0 ? Number(saved.editingNewsId) : null;
   selectedDistrict = saved.selectedDistrict || '';
@@ -672,14 +682,25 @@ function renderLegend() {
 
 function renderNews() {
   const newsList = document.getElementById('news-list');
+  const newsPager = document.getElementById('news-pager');
+  const newsPageLabel = document.getElementById('news-page-label');
   if (!newsList) return;
 
   if (!dashboardNews.length) {
     newsList.innerHTML = '<div class="card news-card"><p class="t-body text-muted">Новин поки немає.</p></div>';
+    if (newsPager) newsPager.style.display = 'none';
     return;
   }
 
-  newsList.innerHTML = dashboardNews
+  const pageCount = Math.max(1, Math.ceil(dashboardNews.length / NEWS_PAGE_SIZE));
+  newsPage = Math.min(newsPage, pageCount);
+  const start = (newsPage - 1) * NEWS_PAGE_SIZE;
+  const visibleNews = dashboardNews.slice(start, start + NEWS_PAGE_SIZE);
+
+  if (newsPager) newsPager.style.display = '';
+  if (newsPageLabel) newsPageLabel.textContent = `${newsPage} / ${pageCount}`;
+
+  newsList.innerHTML = visibleNews
     .map(
       (item) => `
       <div class="card reveal news-card">
@@ -714,6 +735,7 @@ function renderDashboard(points, routes) {
   const reviewList = document.getElementById('review-list');
   const pointList = document.getElementById('point-list');
   const activityList = document.getElementById('activity-list');
+  const proposalList = document.getElementById('proposal-list');
 
   if (kpiPoints) kpiPoints.textContent = String(points.length);
   if (kpiCertified) kpiCertified.textContent = String(certifiedPoints);
@@ -839,6 +861,38 @@ function renderDashboard(points, routes) {
             .join('')
         : '<div class="activity-item t-body text-muted">Поки немає активності</div>';
   }
+
+  if (proposalList) {
+    const pageCount = Math.max(1, Math.ceil(dashboardProposals.length / PROPOSAL_PAGE_SIZE));
+    proposalPage = Math.min(proposalPage, pageCount);
+    const start = (proposalPage - 1) * PROPOSAL_PAGE_SIZE;
+    const pageSlice = dashboardProposals.slice(start, start + PROPOSAL_PAGE_SIZE);
+    const pageLabel = document.getElementById('proposal-page-label');
+    if (pageLabel) pageLabel.textContent = `${proposalPage} / ${pageCount}`;
+
+    proposalList.innerHTML =
+      pageSlice.length > 0
+        ? pageSlice
+            .map(
+              (p) => `
+          <article class="route-item">
+            <div class="route-meta">
+              <strong class="t-body">${p.name || 'Без назви'}</strong>
+              <span class="route-status review">${formatIsoDate(p.createdAt)}</span>
+            </div>
+            <div class="t-data text-muted">${p.spaceType || 'тип не вказано'} • ${p.district || '-'}</div>
+            <div class="t-data text-muted">${p.address || '-'}</div>
+            <div class="route-actions">
+              <button class="btn-flat" data-action="proposal-focus" data-proposal-id="${p.id}">На карту</button>
+              <button class="btn-flat" data-action="proposal-use-for-point" data-proposal-id="${p.id}">У точку</button>
+              ${p.photoUrl ? `<button class="btn-flat" data-action="proposal-open-photo" data-proposal-id="${p.id}">Фото</button>` : ''}
+            </div>
+          </article>
+        `
+            )
+            .join('')
+        : '<div class="activity-item t-body text-muted">Поки немає заявок</div>';
+  }
   saveUiState();
 }
 
@@ -847,11 +901,12 @@ async function refreshDashboardData() {
     return;
   }
 
-  const [news, typeRows, pointRows, routeRows] = await Promise.all([
+  const [news, typeRows, pointRows, routeRows, proposals] = await Promise.all([
     apiRequest('/api/news'),
     apiRequest('/api/point-types'),
     apiRequest('/api/points'),
     apiRequest('/api/routes'),
+    apiRequest('/api/proposals').catch(() => []),
   ]);
   dashboardNews = news || [];
   pointTypes = typeRows || [];
@@ -860,6 +915,7 @@ async function refreshDashboardData() {
     ...r,
     routeColor: r.routeColor || getRouteColor(r.id),
   }));
+  dashboardProposals = proposals || [];
   mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
   renderDashboard(dashboardPoints, dashboardRoutes);
   renderNews();
@@ -1212,6 +1268,35 @@ function bindDashboardActions() {
         openPointInEditor(pointId);
       }
 
+      if (action === 'proposal-focus') {
+        const proposalId = Number(button.dataset.proposalId);
+        const proposal = dashboardProposals.find((p) => p.id === proposalId);
+        if (!proposal) return;
+        mapController?.focusLocation?.(Number(proposal.lat), Number(proposal.lng), 16);
+        setSpecialistSuccess(`Фокус на заявці "${proposal.name}"`);
+      }
+
+      if (action === 'proposal-open-photo') {
+        const proposalId = Number(button.dataset.proposalId);
+        const proposal = dashboardProposals.find((p) => p.id === proposalId);
+        if (!proposal?.photoUrl) return;
+        window.open(proposal.photoUrl, '_blank', 'noopener,noreferrer');
+      }
+
+      if (action === 'proposal-use-for-point') {
+        const proposalId = Number(button.dataset.proposalId);
+        const proposal = dashboardProposals.find((p) => p.id === proposalId);
+        if (!proposal) return;
+        setActiveSpecialistTab('add-point');
+        document.getElementById('point-title').value = proposal.name || '';
+        document.getElementById('point-district').value = proposal.district || '';
+        document.getElementById('point-lat').value = Number(proposal.lat || 0) || '';
+        document.getElementById('point-lng').value = Number(proposal.lng || 0) || '';
+        document.getElementById('point-photo-url').value = proposal.photoUrl || '';
+        document.getElementById('point-description').value = [proposal.address, proposal.comment].filter(Boolean).join('\n');
+        setSpecialistMessage(`Дані із заявки "${proposal.name}" підставлено у форму точки`);
+      }
+
       if (action === 'remove-route-point') {
         routeEditorPoints = routeEditorPoints.filter((p) => p.pointId !== Number(pointId));
         renderRoutePointOrder();
@@ -1257,6 +1342,7 @@ function bindAuthFlow() {
         dashboardPoints = [];
         dashboardRoutes = [];
         dashboardNews = [];
+        dashboardProposals = [];
         renderDashboard([], []);
         renderNews();
         resetRouteEditor();
@@ -1375,6 +1461,7 @@ function bindAuthFlow() {
       dashboardPoints = [];
       dashboardRoutes = [];
       dashboardNews = [];
+      dashboardProposals = [];
       renderDashboard([], []);
       renderNews();
       resetRouteEditor();
@@ -2111,6 +2198,10 @@ function bindSearchAndPager() {
   const routeNext = document.getElementById('route-next');
   const pointPrev = document.getElementById('point-prev');
   const pointNext = document.getElementById('point-next');
+  const newsPrev = document.getElementById('news-prev');
+  const newsNext = document.getElementById('news-next');
+  const proposalPrev = document.getElementById('proposal-prev');
+  const proposalNext = document.getElementById('proposal-next');
 
   if (routeSearch) {
     routeSearch.addEventListener('input', () => {
@@ -2157,6 +2248,34 @@ function bindSearchAndPager() {
       saveUiState();
     });
   }
+  if (newsPrev) {
+    newsPrev.addEventListener('click', () => {
+      newsPage = Math.max(1, newsPage - 1);
+      renderNews();
+      saveUiState();
+    });
+  }
+  if (newsNext) {
+    newsNext.addEventListener('click', () => {
+      newsPage += 1;
+      renderNews();
+      saveUiState();
+    });
+  }
+  if (proposalPrev) {
+    proposalPrev.addEventListener('click', () => {
+      proposalPage = Math.max(1, proposalPage - 1);
+      renderDashboard(dashboardPoints, dashboardRoutes);
+      saveUiState();
+    });
+  }
+  if (proposalNext) {
+    proposalNext.addEventListener('click', () => {
+      proposalPage += 1;
+      renderDashboard(dashboardPoints, dashboardRoutes);
+      saveUiState();
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -2167,36 +2286,56 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const btnEnter = document.getElementById('btn-enter');
   const heroEnterTrigger = document.getElementById('hero-enter-trigger');
+  const heroHighlightButtons = document.querySelectorAll('[data-hero-target]');
+  const btnLogoHome = document.getElementById('btn-logo-home');
   const heroSection = document.querySelector('.hero');
   const appInterface = document.querySelector('.app-interface');
   let isTransitioning = false;
+  let mapToolsInitialized = false;
+
+  const scrollToInterfaceSection = (targetId) => {
+    const target = targetId ? document.getElementById(targetId) : null;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const mapSection = document.querySelector('.map-container');
+    if (mapSection) {
+      mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const initMapAndTools = async () => {
-    mapController = await initMap({
-      fetchPoints: async (filter) => {
-        const query = new URLSearchParams();
-        if (filter.type && filter.type !== 'all') {
-          query.set('type', filter.type);
-        }
-        if (filter.certified) {
-          query.set('certified', 'true');
-        }
-        return apiRequest(`/api/points${query.toString() ? `?${query.toString()}` : ''}`);
-      },
-    });
-    bindFilterMenu();
-    bindSpecialistTools();
-    bindSpecialistTabs();
-    bindDashboardActions();
-    bindSearchAndPager();
-    bindFloatingUiControls();
-    applySavedUiState();
+    if (!mapToolsInitialized) {
+      mapController = await initMap({
+        fetchPoints: async (filter) => {
+          const query = new URLSearchParams();
+          if (filter.type && filter.type !== 'all') {
+            query.set('type', filter.type);
+          }
+          if (filter.certified) {
+            query.set('certified', 'true');
+          }
+          return apiRequest(`/api/points${query.toString() ? `?${query.toString()}` : ''}`);
+        },
+      });
+      bindFilterMenu();
+      bindSpecialistTools();
+      bindSpecialistTabs();
+      bindDashboardActions();
+      bindSearchAndPager();
+      bindFloatingUiControls();
+      applySavedUiState();
+      mapToolsInitialized = true;
+    }
+
     await refreshPublicData();
 
     if (authUser && ['admin', 'specialist'].includes(authUser.role)) {
       setAuthState(authToken, authUser);
       await refreshDashboardData();
     } else {
+      dashboardProposals = [];
       renderDashboard([], []);
       resetRouteEditor();
     }
@@ -2218,7 +2357,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
-  const transitionToMap = () => {
+  const transitionToMap = (targetId = 'map') => {
     if (isTransitioning || !heroSection || heroSection.style.display === 'none') return;
     isTransitioning = true;
     // Prevent residual page scroll from moving map viewport on touch devices.
@@ -2253,6 +2392,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           window.dispatchEvent(new Event('resize'));
           mapController?.refresh?.().catch(() => null);
         }, 260);
+        setTimeout(() => scrollToInterfaceSection(targetId), 60);
       } finally {
         isTransitioning = false;
       }
@@ -2277,20 +2417,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  const handleHeroEnter = (event, targetId = 'map') => {
+    event?.preventDefault?.();
+    transitionToMap(targetId);
+  };
+
   if (btnEnter) {
-    const handleHeroEnter = (event) => {
-      event.preventDefault();
-      transitionToMap();
-    };
-    btnEnter.addEventListener('click', handleHeroEnter);
+    btnEnter.addEventListener('click', (event) => handleHeroEnter(event, 'map'));
+    btnEnter.addEventListener('pointerup', (event) => handleHeroEnter(event, 'map'));
     if (heroEnterTrigger) {
-      heroEnterTrigger.addEventListener('click', handleHeroEnter);
+      heroEnterTrigger.addEventListener('click', (event) => handleHeroEnter(event, 'map'));
       heroEnterTrigger.setAttribute('role', 'button');
       heroEnterTrigger.setAttribute('tabindex', '0');
       heroEnterTrigger.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          transitionToMap();
+          transitionToMap('map');
         }
       });
     }
@@ -2298,7 +2440,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener(
       'wheel',
       (e) => {
-        if (e.deltaY > 50 && heroSection.style.display !== 'none') transitionToMap();
+        if (e.deltaY > 50 && heroSection.style.display !== 'none') transitionToMap('map');
       },
       { passive: true }
     );
@@ -2317,13 +2459,39 @@ document.addEventListener('DOMContentLoaded', async () => {
       (e) => {
         if (touchStartY - e.changedTouches[0].clientY > 50 && heroSection.style.display !== 'none') {
           e.preventDefault?.();
-          transitionToMap();
+          transitionToMap('map');
         }
       },
       { passive: false }
     );
   } else if (isMapApp) {
     await initMapAndTools();
+  }
+
+  heroHighlightButtons.forEach((button) => {
+    button.addEventListener('click', (event) => {
+      const targetId = button.getAttribute('data-hero-target') || 'map';
+      handleHeroEnter(event, targetId);
+    });
+  });
+
+  if (btnLogoHome && heroSection && appInterface) {
+    const openHero = (event) => {
+      event?.preventDefault?.();
+      heroSection.style.display = '';
+      heroSection.style.opacity = '1';
+      heroSection.style.transform = '';
+      appInterface.style.display = 'none';
+      appInterface.style.opacity = '0';
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    };
+    btnLogoHome.addEventListener('click', openHero);
+    btnLogoHome.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openHero(e);
+      }
+    });
   }
 
   const btnHidePartners = document.getElementById('btn-hide-partners');

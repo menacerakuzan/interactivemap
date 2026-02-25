@@ -660,6 +660,46 @@ async function supabaseDeletePointPhoto(photoUrl) {
   return { ok: true };
 }
 
+async function supabaseGetProposals() {
+  try {
+    const { data, error } = await supabase
+      .from('point_proposals')
+      .select('id,name,space_type,district,address,lat,lng,email,photo_url,comment,checklist_json,created_at')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      spaceType: row.space_type,
+      district: row.district,
+      address: row.address,
+      lat: row.lat,
+      lng: row.lng,
+      email: row.email,
+      photoUrl: row.photo_url || null,
+      comment: row.comment || null,
+      checklist: row.checklist_json || {},
+      createdAt: row.created_at,
+    }));
+  } catch (_e) {
+    const fallback = JSON.parse(localStorage.getItem(LOCAL_PROPOSALS_KEY) || '[]');
+    return fallback.map((row) => ({
+      id: row.id,
+      name: row.name,
+      spaceType: row.spaceType,
+      district: row.district,
+      address: row.address,
+      lat: row.lat,
+      lng: row.lng,
+      email: row.email,
+      photoUrl: row.photoUrl || null,
+      comment: row.comment || null,
+      checklist: row.checklist || {},
+      createdAt: row.createdAt,
+    }));
+  }
+}
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -778,6 +818,10 @@ export const dataService = {
 
     if (pathname === '/api/proposals' && method === 'POST') {
       return supabaseCreateProposal(body);
+    }
+
+    if (pathname === '/api/proposals' && method === 'GET') {
+      return supabaseGetProposals();
     }
 
     throw new Error(`Unsupported endpoint in supabase mode: ${method} ${pathname}`);
