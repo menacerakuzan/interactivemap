@@ -11,6 +11,7 @@ let lastStablePoints = [];
 let reloadRetryTimer = null;
 let lineToolVisible = false;
 let lineToolMode = 'draw';
+let lineSnapEnabled = true;
 let lineToolStyle = 'dashed';
 let lineToolColor = '#E7C769';
 let lineDraftVertices = [];
@@ -496,8 +497,9 @@ function updateLineToolCursor() {
   container.classList.toggle('line-tool-erase', lineToolVisible && lineToolMode === 'erase');
 }
 
-function addLineDraftVertex(latlng) {
-  const snap = resolveNearestSnap(latlng);
+function addLineDraftVertex(latlng, originalEvent = null) {
+  const altOverride = Boolean(originalEvent && (originalEvent.altKey || originalEvent.metaKey));
+  const snap = lineSnapEnabled && !altOverride ? resolveNearestSnap(latlng) : null;
   const nextVertex = snap
     ? {
         lat: snap.lat,
@@ -598,6 +600,10 @@ function setLineToolVisible(visible) {
 function setLineToolMode(mode = 'draw') {
   lineToolMode = mode === 'erase' ? 'erase' : 'draw';
   updateLineToolCursor();
+}
+
+function setLineToolSnapEnabled(enabled = true) {
+  lineSnapEnabled = Boolean(enabled);
 }
 
 function setLineToolStyle(style = 'dashed') {
@@ -792,6 +798,7 @@ export async function initMap(options = {}) {
       clearFocusBoundary,
       setLineToolVisible,
       setLineToolMode,
+      setLineToolSnapEnabled,
       setLineToolStyle,
       setLineToolColor,
       undoLineDraft,
@@ -923,6 +930,8 @@ export async function initMap(options = {}) {
     if (lineToolVisible) {
       if (lineToolMode === 'erase') {
         eraseLineDraftVertex(e.latlng);
+      } else {
+        addLineDraftVertex(e.latlng, e.originalEvent);
       }
       return;
     }
@@ -954,6 +963,7 @@ export async function initMap(options = {}) {
     clearFocusBoundary,
     setLineToolVisible,
     setLineToolMode,
+    setLineToolSnapEnabled,
     setLineToolStyle,
     setLineToolColor,
     undoLineDraft,

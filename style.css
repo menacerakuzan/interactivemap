@@ -232,9 +232,9 @@ body::before {
 
 /* Filter Menu (Floating) */
 .filter-menu {
-  position: fixed;
+  position: absolute;
   top: auto;
-  bottom: 76px;
+  bottom: 16px;
   left: 50%;
   right: auto;
   z-index: 980;
@@ -245,6 +245,10 @@ body::before {
   transform: translateX(-50%);
   transform-origin: bottom center;
   pointer-events: none;
+}
+
+.map-view.route-toolbar-visible .filter-menu {
+  bottom: 86px;
 }
 
 .filter-toggle {
@@ -421,18 +425,32 @@ body::before {
 .route-line-toolbar {
   position: absolute;
   left: 50%;
-  bottom: 18px;
+  top: 12px;
+  bottom: auto;
   transform: translateX(-50%);
   z-index: 942;
   display: flex;
   align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(8, 12, 18, 0.86);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 18px 42px rgba(11, 37, 69, 0.45);
+}
+
+.route-line-toolbar .tool-group {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  background: rgba(11, 15, 22, 0.8);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 18px 32px rgba(11, 37, 69, 0.34);
+  padding-right: 10px;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.route-line-toolbar .tool-group:last-child {
+  border-right: none;
+  padding-right: 0;
 }
 
 .route-line-toolbar .btn-flat,
@@ -463,8 +481,8 @@ body::before {
 }
 
 .route-line-toolbar .btn-flat.active {
-  background: rgba(147, 51, 234, 0.46);
-  border-color: rgba(196, 181, 253, 0.8);
+  background: rgba(56, 189, 248, 0.34);
+  border-color: rgba(125, 211, 252, 0.8);
 }
 
 .route-line-toolbar select,
@@ -1449,6 +1467,24 @@ body.context-open .filter-menu {
   height: 24px;
 }
 
+.point-photo-preview {
+  min-height: 110px;
+  border: 1px dashed var(--c-divider);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 6px;
+}
+
+.point-photo-preview img {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
 @media (max-width: 960px) {
   :root {
     --header-h: 64px;
@@ -1506,7 +1542,8 @@ body.context-open .filter-menu {
   .route-line-toolbar {
     left: 12px;
     right: 12px;
-    bottom: 12px;
+    top: 12px;
+    bottom: auto;
     transform: none;
     overflow-x: auto;
     justify-content: flex-start;
@@ -1535,7 +1572,7 @@ body.context-open .filter-menu {
   .filter-menu {
     left: 50%;
     right: auto;
-    bottom: max(76px, env(safe-area-inset-bottom));
+    bottom: max(14px, env(safe-area-inset-bottom));
     gap: 8px;
     transform: translateX(-50%);
   }
@@ -1726,7 +1763,7 @@ body.context-open .filter-menu {
   .filter-menu {
     left: 50%;
     right: auto;
-    bottom: max(72px, env(safe-area-inset-bottom));
+    bottom: max(12px, env(safe-area-inset-bottom));
     transform: translateX(-50%);
   }
 

@@ -338,6 +338,36 @@ function renderTypePreview(selectId, previewId) {
   `;
 }
 
+const photoPreviewObjectUrls = new Map();
+
+function clearPhotoPreviewObjectUrl(previewId) {
+  const prev = photoPreviewObjectUrls.get(previewId);
+  if (prev) {
+    URL.revokeObjectURL(prev);
+    photoPreviewObjectUrls.delete(previewId);
+  }
+}
+
+function renderPointPhotoPreview(previewId, { url = '', file = null } = {}) {
+  const previewEl = document.getElementById(previewId);
+  if (!previewEl) return;
+
+  clearPhotoPreviewObjectUrl(previewId);
+
+  let src = String(url || '').trim();
+  if (file instanceof File) {
+    src = URL.createObjectURL(file);
+    photoPreviewObjectUrls.set(previewId, src);
+  }
+
+  if (!src) {
+    previewEl.innerHTML = '<span class="t-data text-muted">Превʼю фото відсутнє</span>';
+    return;
+  }
+
+  previewEl.innerHTML = `<img src="${src}" alt="Превʼю фото точки" loading="lazy" decoding="async" />`;
+}
+
 function updateLanguage(lang) {
   currentLang = lang;
   document.querySelectorAll('[data-i18n]').forEach((el) => {
@@ -752,8 +782,12 @@ function setActiveSpecialistTab(tabName) {
   const canUseLineTools = Boolean(authUser && ['admin', 'specialist'].includes(authUser.role));
   const showRouteLineToolbar = action === 'route-editor' && canUseLineTools;
   const routeLineToolbar = document.getElementById('route-line-toolbar');
+  const mapView = document.querySelector('.map-view');
   if (routeLineToolbar) {
     routeLineToolbar.style.display = showRouteLineToolbar ? 'flex' : 'none';
+  }
+  if (mapView) {
+    mapView.classList.toggle('route-toolbar-visible', showRouteLineToolbar);
   }
   mapController?.setLineToolVisible?.(showRouteLineToolbar);
 
@@ -1440,6 +1474,9 @@ function openPointInEditor(pointId) {
   document.getElementById('edit-point-district').value = point.district || '';
   document.getElementById('edit-point-description').value = point.description || '';
   document.getElementById('edit-point-photo-url').value = point.photoUrl || '';
+  const editPhotoFileInput = document.getElementById('edit-point-photo-file');
+  if (editPhotoFileInput) editPhotoFileInput.value = '';
+  renderPointPhotoPreview('edit-point-photo-preview', { url: point.photoUrl || '' });
   renderPointSectionsEditor(document.getElementById('edit-point-sections-list'), point.sections || []);
   const editPointSelect = document.getElementById('edit-point-select');
   if (editPointSelect) {
@@ -1580,6 +1617,9 @@ function bindDashboardActions() {
         document.getElementById('point-lat').value = Number(proposal.lat || 0) || '';
         document.getElementById('point-lng').value = Number(proposal.lng || 0) || '';
         document.getElementById('point-photo-url').value = proposal.photoUrl || '';
+        const addPointPhotoFile = document.getElementById('point-photo-file');
+        if (addPointPhotoFile) addPointPhotoFile.value = '';
+        renderPointPhotoPreview('point-photo-preview', { url: proposal.photoUrl || '' });
         document.getElementById('point-description').value = [proposal.address, proposal.comment].filter(Boolean).join('\n');
         setSpecialistMessage(`Дані із заявки "${proposal.name}" підставлено у форму точки`);
       }
@@ -1935,6 +1975,8 @@ function bindSpecialistTools() {
   const pointTypeSelect = document.getElementById('point-type');
   const editPointTypeSelect = document.getElementById('edit-point-type');
   const btnCreatePoint = document.getElementById('btn-create-point');
+  const pointPhotoFileInput = document.getElementById('point-photo-file');
+  const pointPhotoUrlInput = document.getElementById('point-photo-url');
   const btnCreateRoute = document.getElementById('btn-create-route');
   const btnSaveRoute = document.getElementById('btn-save-route');
   const btnDeleteRoute = document.getElementById('btn-delete-route');
@@ -1942,6 +1984,8 @@ function bindSpecialistTools() {
   const routeEditSelect = document.getElementById('route-edit-select');
   const btnAddRoutePoint = document.getElementById('btn-add-route-point');
   const btnSavePoint = document.getElementById('btn-save-point');
+  const editPointPhotoFileInput = document.getElementById('edit-point-photo-file');
+  const editPointPhotoUrlInput = document.getElementById('edit-point-photo-url');
   const btnDeletePoint = document.getElementById('btn-delete-point');
   const btnUndoRouteOrder = document.getElementById('btn-undo-route-order');
   const btnCreateNews = document.getElementById('btn-create-news');
@@ -1957,7 +2001,9 @@ function bindSpecialistTools() {
   const btnAddPointSection = document.getElementById('btn-add-point-section');
   const btnAddEditPointSection = document.getElementById('btn-add-edit-point-section');
   const btnLineDraw = document.getElementById('btn-line-draw');
+  const btnLineCursor = document.getElementById('btn-line-cursor');
   const btnLineErase = document.getElementById('btn-line-erase');
+  const btnLineSnap = document.getElementById('btn-line-snap');
   const btnLineUndo = document.getElementById('btn-line-undo');
   const btnLineClear = document.getElementById('btn-line-clear');
   const btnLineApplyRoute = document.getElementById('btn-line-apply-route');
@@ -1971,6 +2017,8 @@ function bindSpecialistTools() {
   bindPointSectionsEditor(editPointSectionsList, btnAddEditPointSection);
   renderTypePreview('point-type', 'point-type-preview');
   renderTypePreview('edit-point-type', 'edit-point-type-preview');
+  renderPointPhotoPreview('point-photo-preview');
+  renderPointPhotoPreview('edit-point-photo-preview');
 
   if (pointTypeSelect) {
     pointTypeSelect.addEventListener('change', () => {
@@ -1982,13 +2030,42 @@ function bindSpecialistTools() {
       renderTypePreview('edit-point-type', 'edit-point-type-preview');
     });
   }
+  if (pointPhotoUrlInput) {
+    pointPhotoUrlInput.addEventListener('input', () => {
+      renderPointPhotoPreview('point-photo-preview', { url: pointPhotoUrlInput.value });
+    });
+  }
+  if (pointPhotoFileInput) {
+    pointPhotoFileInput.addEventListener('change', () => {
+      const file = pointPhotoFileInput.files?.[0] || null;
+      renderPointPhotoPreview('point-photo-preview', { url: pointPhotoUrlInput?.value || '', file });
+    });
+  }
+  if (editPointPhotoUrlInput) {
+    editPointPhotoUrlInput.addEventListener('input', () => {
+      renderPointPhotoPreview('edit-point-photo-preview', { url: editPointPhotoUrlInput.value });
+    });
+  }
+  if (editPointPhotoFileInput) {
+    editPointPhotoFileInput.addEventListener('change', () => {
+      const file = editPointPhotoFileInput.files?.[0] || null;
+      renderPointPhotoPreview('edit-point-photo-preview', { url: editPointPhotoUrlInput?.value || '', file });
+    });
+  }
+
+  let lineSnapEnabled = true;
 
   const setLineToolButtonState = (mode) => {
+    if (btnLineCursor) btnLineCursor.classList.toggle('active', mode === 'cursor');
     if (btnLineDraw) btnLineDraw.classList.toggle('active', mode === 'draw');
     if (btnLineErase) btnLineErase.classList.toggle('active', mode === 'erase');
   };
 
   setLineToolButtonState('draw');
+  mapController?.setLineToolVisible?.(true);
+  mapController?.setLineToolMode?.('draw');
+  mapController?.setLineToolSnapEnabled?.(lineSnapEnabled);
+  if (btnLineSnap) btnLineSnap.classList.toggle('active', lineSnapEnabled);
 
   if (routeLineToolbar) {
     ['pointerdown', 'mousedown', 'click', 'dblclick', 'touchstart', 'wheel'].forEach((eventName) => {
@@ -2017,19 +2094,39 @@ function bindSpecialistTools() {
     });
   }
 
+  if (btnLineCursor) {
+    btnLineCursor.addEventListener('click', () => {
+      setLineToolButtonState('cursor');
+      mapController?.setLineToolVisible?.(false);
+      setSpecialistMessage('Режим курсора: перегляд точок без редагування лінії');
+    });
+  }
+
   if (btnLineDraw) {
     btnLineDraw.addEventListener('click', () => {
       setLineToolButtonState('draw');
+      mapController?.setLineToolVisible?.(true);
       mapController?.setLineToolMode?.('draw');
-      setSpecialistMessage('Режим пера: клік по карті додає вузол маршруту');
+      setSpecialistMessage('Перо: клік по карті додає вершину. Alt = тимчасово без snap.');
     });
   }
 
   if (btnLineErase) {
     btnLineErase.addEventListener('click', () => {
       setLineToolButtonState('erase');
+      mapController?.setLineToolVisible?.(true);
       mapController?.setLineToolMode?.('erase');
       setSpecialistMessage('Режим стирача: клікніть біля вузла, щоб видалити його');
+    });
+  }
+
+  if (btnLineSnap) {
+    btnLineSnap.addEventListener('click', () => {
+      lineSnapEnabled = !lineSnapEnabled;
+      mapController?.setLineToolSnapEnabled?.(lineSnapEnabled);
+      btnLineSnap.classList.toggle('active', lineSnapEnabled);
+      btnLineSnap.textContent = lineSnapEnabled ? 'Snap ON' : 'Snap OFF';
+      setSpecialistMessage(lineSnapEnabled ? 'Snap увімкнено' : 'Snap вимкнено');
     });
   }
 
@@ -2194,6 +2291,7 @@ function bindSpecialistTools() {
           document.getElementById('point-description').value = '';
           document.getElementById('point-photo-url').value = '';
           document.getElementById('point-photo-file').value = '';
+          renderPointPhotoPreview('point-photo-preview');
           renderPointSectionsEditor(pointSectionsList, []);
           setSpecialistSuccess('Точку додано');
         } catch (error) {
@@ -2383,6 +2481,8 @@ function bindSpecialistTools() {
         document.getElementById('edit-point-district').value = '';
         document.getElementById('edit-point-description').value = '';
         document.getElementById('edit-point-photo-url').value = '';
+        document.getElementById('edit-point-photo-file').value = '';
+        renderPointPhotoPreview('edit-point-photo-preview');
         renderPointSectionsEditor(editPointSectionsList, []);
         renderTypePreview('edit-point-type', 'edit-point-type-preview');
         return;
@@ -2421,6 +2521,7 @@ function bindSpecialistTools() {
           document.getElementById('edit-point-description').value = '';
           document.getElementById('edit-point-photo-url').value = '';
           document.getElementById('edit-point-photo-file').value = '';
+          renderPointPhotoPreview('edit-point-photo-preview');
           renderPointSectionsEditor(editPointSectionsList, []);
           renderTypePreview('edit-point-type', 'edit-point-type-preview');
           await mapController.refresh();
@@ -2737,6 +2838,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           return (points || []).map((point) => normalizePointRecord(point));
         },
       });
+      const filterMenuNode = document.getElementById('filter-menu');
+      const mapViewNode = document.querySelector('.map-view');
+      if (filterMenuNode && mapViewNode && filterMenuNode.parentElement !== mapViewNode) {
+        mapViewNode.appendChild(filterMenuNode);
+      }
       bindFilterMenu();
       bindLegendPointsSync();
       bindSpecialistTools();

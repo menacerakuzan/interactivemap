@@ -201,6 +201,9 @@
                     <textarea id="point-description" placeholder="Коментар"></textarea>
                     <input id="point-photo-file" type="file" accept="image/*" />
                     <input id="point-photo-url" type="text" placeholder="URL фото (опційно)" />
+                    <div id="point-photo-preview" class="point-photo-preview">
+                        <span class="t-data text-muted">Превʼю фото відсутнє</span>
+                    </div>
                     <div class="point-sections-editor">
                         <div class="t-label">Розділи опису з фото</div>
                         <div id="point-sections-list" class="point-sections-list"></div>
@@ -242,6 +245,9 @@
                     <textarea id="edit-point-description" placeholder="Коментар"></textarea>
                     <input id="edit-point-photo-file" type="file" accept="image/*" />
                     <input id="edit-point-photo-url" type="text" placeholder="URL фото (опційно)" />
+                    <div id="edit-point-photo-preview" class="point-photo-preview">
+                        <span class="t-data text-muted">Превʼю фото відсутнє</span>
+                    </div>
                     <div class="point-sections-editor">
                         <div class="t-label">Розділи опису з фото</div>
                         <div id="edit-point-sections-list" class="point-sections-list"></div>
@@ -294,17 +300,25 @@
                     style="display: none; position: absolute; bottom: 24px; left: 24px; z-index: 781; background: var(--c-surface); backdrop-filter: blur(8px); border-radius: var(--radius-md); padding: 10px 16px; border: 1px solid rgba(255,255,255,0.4); box-shadow: var(--shadow-float); color: var(--c-admiralty); font-size: 12px; font-weight: 600;">ПОКАЗАТИ
                     ПАРТНЕРІВ</button>
                 <div id="route-line-toolbar" class="route-line-toolbar" style="display:none;">
-                    <button id="btn-line-draw" class="btn-flat active" type="button">Перо</button>
-                    <button id="btn-line-erase" class="btn-flat" type="button">Стирач</button>
-                    <button id="btn-line-undo" class="btn-flat" type="button">Undo</button>
-                    <button id="btn-line-clear" class="btn-flat" type="button">Очистити</button>
-                    <select id="line-style-select">
-                        <option value="dashed">Пунктир</option>
-                        <option value="dashdot">Штрих-пунктир</option>
-                        <option value="solid">Суцільна</option>
-                    </select>
-                    <input id="line-color-input" type="color" value="#E7C769" title="Колір лінії" />
-                    <button id="btn-line-apply-route" class="btn-primary" type="button">В маршрут</button>
+                    <div class="tool-group">
+                        <button id="btn-line-cursor" class="btn-flat" type="button">Курсор</button>
+                        <button id="btn-line-draw" class="btn-flat active" type="button">Перо</button>
+                        <button id="btn-line-erase" class="btn-flat" type="button">Стирач</button>
+                    </div>
+                    <div class="tool-group">
+                        <button id="btn-line-snap" class="btn-flat active" type="button">Snap ON</button>
+                        <select id="line-style-select">
+                            <option value="dashed">Пунктир</option>
+                            <option value="dashdot">Штрих-пунктир</option>
+                            <option value="solid">Суцільна</option>
+                        </select>
+                        <input id="line-color-input" type="color" value="#E7C769" title="Колір лінії" />
+                    </div>
+                    <div class="tool-group">
+                        <button id="btn-line-undo" class="btn-flat" type="button">Undo</button>
+                        <button id="btn-line-clear" class="btn-flat" type="button">Очистити</button>
+                        <button id="btn-line-apply-route" class="btn-primary" type="button">В маршрут</button>
+                    </div>
                 </div>
             </div>
             <div class="context-panel hidden" id="context-panel">
