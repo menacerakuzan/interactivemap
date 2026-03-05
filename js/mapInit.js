@@ -307,7 +307,11 @@ async function loadAndRenderPoints() {
             eraseLineDraftVertex({ lat, lng });
             return;
           }
-          addLineDraftFromPoint(point);
+          if (lineToolMode === 'draw' || lineToolMode === 'curve') {
+            addLineDraftFromPoint(point);
+            return;
+          }
+          // edit mode: do not add points on marker click
           return;
         }
         map.panTo([lat, lng], {
@@ -437,6 +441,9 @@ function resolveNearestSnap(latlng, maxPx = 22) {
 
 function normalizeLineVertex(vertex) {
   if (!vertex || typeof vertex !== 'object') return null;
+  const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(vertex?.edgeStyle) ? vertex.edgeStyle : 'dashed';
+  const edgeColor = typeof vertex?.edgeColor === 'string' && vertex.edgeColor.startsWith('#') ? vertex.edgeColor : '#E7C769';
+  const edgeCurve = Boolean(vertex?.edgeCurve);
   const pointId = Number(vertex.pointId);
   if (Number.isFinite(pointId)) {
     const source = findPointById(pointId) || vertex;
@@ -449,6 +456,9 @@ function normalizeLineVertex(vertex) {
       pointId,
       title: source.title || vertex.title || '',
       snapped: true,
+      edgeStyle,
+      edgeColor,
+      edgeCurve,
     };
   }
 
@@ -461,7 +471,37 @@ function normalizeLineVertex(vertex) {
     pointId: null,
     title: '',
     snapped: false,
+    edgeStyle,
+    edgeColor,
+    edgeCurve,
   };
+}
+
+function buildCurvedSegmentPoints(vertices, segmentIndex, steps = 18) {
+  const p0 = vertices[Math.max(0, segmentIndex - 1)];
+  const p1 = vertices[segmentIndex];
+  const p2 = vertices[segmentIndex + 1];
+  const p3 = vertices[Math.min(vertices.length - 1, segmentIndex + 2)];
+  const points = [];
+  for (let step = 0; step <= steps; step += 1) {
+    const t = step / steps;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const lat =
+      0.5 *
+      ((2 * p1.lat) +
+        (-p0.lat + p2.lat) * t +
+        (2 * p0.lat - 5 * p1.lat + 4 * p2.lat - p3.lat) * t2 +
+        (-p0.lat + 3 * p1.lat - 3 * p2.lat + p3.lat) * t3);
+    const lng =
+      0.5 *
+      ((2 * p1.lng) +
+        (-p0.lng + p2.lng) * t +
+        (2 * p0.lng - 5 * p1.lng + 4 * p2.lng - p3.lng) * t2 +
+        (-p0.lng + 3 * p1.lng - 3 * p2.lng + p3.lng) * t3);
+    points.push([lat, lng]);
+  }
+  return points;
 }
 
 function renderLineDraft() {
@@ -469,27 +509,82 @@ function renderLineDraft() {
   lineDraftLayer.clearLayers();
 
   if (lineDraftVertices.length >= 2) {
-    L.polyline(
-      lineDraftVertices.map((vertex) => [vertex.lat, vertex.lng]),
-      {
-        color: lineToolColor,
+    for (let index = 1; index < lineDraftVertices.length; index += 1) {
+      const prev = lineDraftVertices[index - 1];
+      const next = lineDraftVertices[index];
+      const segmentStyle = ['solid', 'dashed', 'dashdot'].includes(next.edgeStyle) ? next.edgeStyle : lineToolStyle;
+      const segmentColor = typeof next.edgeColor === 'string' && next.edgeColor.startsWith('#') ? next.edgeColor : lineToolColor;
+      const segmentCurve = Boolean(next.edgeCurve);
+      const segmentPoints =
+        segmentCurve && lineDraftVertices.length > 2
+          ? buildCurvedSegmentPoints(lineDraftVertices, index - 1)
+          : [
+              [prev.lat, prev.lng],
+              [next.lat, next.lng],
+            ];
+
+      const segmentLine = L.polyline(segmentPoints, {
+        color: segmentColor,
         weight: 5,
         opacity: 0.96,
         lineCap: 'round',
         lineJoin: 'round',
-        dashArray: getDashPattern(lineToolStyle),
+        dashArray: getDashPattern(segmentStyle),
+      }).addTo(lineDraftLayer);
+
+      if (lineToolMode === 'edit') {
+        segmentLine.on('click', (event) => {
+          const insertLat = Number(event?.latlng?.lat);
+          const insertLng = Number(event?.latlng?.lng);
+          if (!Number.isFinite(insertLat) || !Number.isFinite(insertLng)) return;
+          lineDraftVertices.splice(index, 0, {
+            lat: insertLat,
+            lng: insertLng,
+            pointId: null,
+            title: '',
+            snapped: false,
+            edgeStyle: segmentStyle,
+            edgeColor: segmentColor,
+            edgeCurve: segmentCurve,
+          });
+          renderLineDraft();
+        });
       }
-    ).addTo(lineDraftLayer);
+    }
   }
 
   lineDraftVertices.forEach((vertex, index) => {
-    const marker = L.circleMarker([vertex.lat, vertex.lng], {
-      radius: 6,
-      color: vertex.snapped ? '#0B2545' : '#7C3AED',
-      weight: 2,
-      fillOpacity: 1,
-      fillColor: vertex.snapped ? '#FFFFFF' : '#EDE9FE',
+    const marker = L.marker([vertex.lat, vertex.lng], {
+      draggable: lineToolMode === 'edit',
+      icon: L.divIcon({
+        className: 'line-draft-vertex-icon',
+        html: `<span class="line-draft-vertex ${vertex.snapped ? 'is-snapped' : 'is-free'}">${index + 1}</span>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      }),
     }).addTo(lineDraftLayer);
+
+    if (lineToolMode === 'edit') {
+      marker.on('drag', (event) => {
+        const latlng = event?.target?.getLatLng?.();
+        if (!latlng) return;
+        lineDraftVertices[index] = {
+          ...lineDraftVertices[index],
+          lat: Number(latlng.lat),
+          lng: Number(latlng.lng),
+          pointId: null,
+          title: '',
+          snapped: false,
+        };
+        renderLineDraft();
+      });
+      marker.on('click', (event) => {
+        const altPressed = Boolean(event?.originalEvent?.altKey || event?.originalEvent?.metaKey);
+        if (!altPressed) return;
+        lineDraftVertices.splice(index, 1);
+        renderLineDraft();
+      });
+    }
 
     marker.bindTooltip(String(index + 1), {
       permanent: true,
@@ -505,6 +600,7 @@ function updateLineToolCursor() {
   if (!container) return;
   container.classList.toggle('line-tool-active', lineToolVisible);
   container.classList.toggle('line-tool-erase', lineToolVisible && lineToolMode === 'erase');
+  container.classList.toggle('line-tool-edit', lineToolVisible && lineToolMode === 'edit');
 }
 
 function addLineDraftVertex(latlng, originalEvent = null) {
@@ -516,14 +612,20 @@ function addLineDraftVertex(latlng, originalEvent = null) {
         lng: snap.lng,
         pointId: Number(snap.point.id),
         title: snap.point.title || '',
-        snapped: true,
-      }
+      snapped: true,
+      edgeStyle: lineToolStyle,
+      edgeColor: lineToolColor,
+      edgeCurve: lineToolMode === 'curve',
+    }
     : {
         lat: Number(latlng.lat),
         lng: Number(latlng.lng),
         pointId: null,
         title: '',
         snapped: false,
+        edgeStyle: lineToolStyle,
+        edgeColor: lineToolColor,
+        edgeCurve: lineToolMode === 'curve',
       };
 
   const prev = lineDraftVertices[lineDraftVertices.length - 1];
@@ -553,6 +655,9 @@ function addLineDraftFromPoint(point) {
     pointId,
     title: point?.title || '',
     snapped: true,
+    edgeStyle: lineToolStyle,
+    edgeColor: lineToolColor,
+    edgeCurve: lineToolMode === 'curve',
   });
   renderLineDraft();
   return true;
@@ -608,7 +713,12 @@ function setLineToolVisible(visible) {
 }
 
 function setLineToolMode(mode = 'draw') {
-  lineToolMode = mode === 'erase' ? 'erase' : 'draw';
+  if (mode === 'erase' || mode === 'curve' || mode === 'edit') {
+    lineToolMode = mode;
+  } else {
+    lineToolMode = 'draw';
+  }
+  renderLineDraft();
   updateLineToolCursor();
 }
 
@@ -626,6 +736,10 @@ function setLineToolColor(color = '#E7C769') {
     lineToolColor = color;
     renderLineDraft();
   }
+}
+
+function getLineDraftSnapshot() {
+  return lineDraftVertices.map((vertex) => ({ ...vertex }));
 }
 
 function applyLineDraftToRoute() {
@@ -830,6 +944,7 @@ export async function initMap(options = {}) {
       undoLineDraft,
       clearLineDraft,
       setLineDraftFromPoints,
+      getLineDraftSnapshot,
       applyLineDraftToRoute,
     };
   }
@@ -956,8 +1071,10 @@ export async function initMap(options = {}) {
     if (lineToolVisible) {
       if (lineToolMode === 'erase') {
         eraseLineDraftVertex(e.latlng);
-      } else {
+      } else if (lineToolMode === 'draw' || lineToolMode === 'curve') {
         addLineDraftVertex(e.latlng, e.originalEvent);
+      } else {
+        // edit mode: vertex/segment interactions are handled by draft layer itself
       }
       return;
     }
@@ -997,6 +1114,7 @@ export async function initMap(options = {}) {
     undoLineDraft,
     clearLineDraft,
     setLineDraftFromPoints,
+    getLineDraftSnapshot,
     applyLineDraftToRoute,
   };
 }

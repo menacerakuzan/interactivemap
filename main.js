@@ -2172,6 +2172,8 @@ function bindSpecialistTools() {
   const btnAddPointSection = document.getElementById('btn-add-point-section');
   const btnAddEditPointSection = document.getElementById('btn-add-edit-point-section');
   const btnLineDraw = document.getElementById('btn-line-draw');
+  const btnLineCurve = document.getElementById('btn-line-curve');
+  const btnLineEdit = document.getElementById('btn-line-edit');
   const btnLineCursor = document.getElementById('btn-line-cursor');
   const btnLineErase = document.getElementById('btn-line-erase');
   const btnLineSnap = document.getElementById('btn-line-snap');
@@ -2230,6 +2232,8 @@ function bindSpecialistTools() {
   const setLineToolButtonState = (mode) => {
     if (btnLineCursor) btnLineCursor.classList.toggle('active', mode === 'cursor');
     if (btnLineDraw) btnLineDraw.classList.toggle('active', mode === 'draw');
+    if (btnLineCurve) btnLineCurve.classList.toggle('active', mode === 'curve');
+    if (btnLineEdit) btnLineEdit.classList.toggle('active', mode === 'edit');
     if (btnLineErase) btnLineErase.classList.toggle('active', mode === 'erase');
   };
 
@@ -2292,6 +2296,24 @@ function bindSpecialistTools() {
     });
   }
 
+  if (btnLineCurve) {
+    btnLineCurve.addEventListener('click', () => {
+      setLineToolButtonState('curve');
+      mapController?.setLineToolVisible?.(true);
+      mapController?.setLineToolMode?.('curve');
+      setSpecialistMessage('Крива: ставте опорні точки, лінія згладжується автоматично.');
+    });
+  }
+
+  if (btnLineEdit) {
+    btnLineEdit.addEventListener('click', () => {
+      setLineToolButtonState('edit');
+      mapController?.setLineToolVisible?.(true);
+      mapController?.setLineToolMode?.('edit');
+      setSpecialistMessage('Редагування: тягніть вузли мишкою, клік по сегменту додає вузол, Alt+клік по вузлу видаляє.');
+    });
+  }
+
   if (btnLineErase) {
     btnLineErase.addEventListener('click', () => {
       setLineToolButtonState('erase');
@@ -2346,6 +2368,7 @@ function bindSpecialistTools() {
 
   if (btnLineApplyRoute) {
     btnLineApplyRoute.addEventListener('click', () => {
+      const lineDraftSnapshot = mapController?.getLineDraftSnapshot?.() || [];
       const result = mapController?.applyLineDraftToRoute?.();
       if (!result?.ok) {
         setSpecialistMessage(result?.message || 'Не вдалося застосувати лінію', true);
@@ -2368,6 +2391,9 @@ function bindSpecialistTools() {
       routeOrderHistory.push(routeEditorPoints.map((point) => ({ ...point })));
       routeEditorPoints = mappedPoints;
       renderRoutePointOrder();
+      if (lineDraftSnapshot.length) {
+        mapController?.setLineDraftFromPoints?.(lineDraftSnapshot);
+      }
 
       if (result.color) {
         const routeColorInputEl = document.getElementById('route-color');

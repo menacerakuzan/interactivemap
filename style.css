@@ -1015,6 +1015,35 @@ body.context-open .filter-menu {
   cursor: not-allowed;
 }
 
+.leaflet-container.line-tool-active.line-tool-edit {
+  cursor: grab;
+}
+
+.line-draft-vertex-icon {
+  background: transparent;
+  border: none;
+}
+
+.line-draft-vertex {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-data);
+  font-size: 10px;
+  font-weight: 700;
+  background: #ffffff;
+  color: #0b2545;
+  border: 2px solid #0b2545;
+  box-shadow: 0 4px 10px rgba(11, 37, 69, 0.2);
+}
+
+.line-draft-vertex.is-free {
+  border-color: #7c3aed;
+  color: #5b21b6;
+}
+
 .route-order-label {
   background: transparent;
   border: none;
