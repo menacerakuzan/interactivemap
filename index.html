@@ -292,19 +292,30 @@
                     <div id="partner-logos-inner"
                         style="display: flex; align-items: center; gap: 20px; overflow: hidden;">
                         <img src="./assets/barrier-free.svg" alt="Фізична безбар'єрність"
-                            style="height: 28px; object-fit: contain;" onerror="this.style.display='none'" />
+                            style="height: 34px; object-fit: contain;" onerror="this.style.display='none'" />
                         <img src="./assets/logo-dark-miu-ukr.svg" alt="Міністерство розвитку громад"
-                            style="height: 30px; object-fit: contain;" onerror="this.style.display='none'" />
+                            style="height: 38px; object-fit: contain;" onerror="this.style.display='none'" />
                         <img src="./assets/Одещина.svg" alt="Одещина"
-                            style="height: 60px; object-fit: contain; transform: scale(1.1); filter: drop-shadow(0 0 5px rgba(0,0,0,0.05));"
-                            onerror="this.style.display='none'" />
-                        <img src="./assets/omr.svg" alt="Одеська міська рада" style="height: 40px; object-fit: contain;"
+                            style="height: 72px; object-fit: contain; transform: scale(1.1); filter: drop-shadow(0 0 5px rgba(0,0,0,0.05));"
                             onerror="this.style.display='none'" />
                     </div>
                 </div>
                 <button id="btn-show-partners"
                     style="display: none; position: absolute; bottom: 24px; left: 24px; z-index: 781; background: var(--c-surface); backdrop-filter: blur(8px); border-radius: var(--radius-md); padding: 10px 16px; border: 1px solid rgba(255,255,255,0.4); box-shadow: var(--shadow-float); color: var(--c-admiralty); font-size: 12px; font-weight: 600;">ПОКАЗАТИ
                     ПАРТНЕРІВ</button>
+                <div id="route-line-toolbar" class="route-line-toolbar" style="display:none;">
+                    <button id="btn-line-draw" class="btn-flat active" type="button">Перо</button>
+                    <button id="btn-line-erase" class="btn-flat" type="button">Стирач</button>
+                    <button id="btn-line-undo" class="btn-flat" type="button">Undo</button>
+                    <button id="btn-line-clear" class="btn-flat" type="button">Очистити</button>
+                    <select id="line-style-select">
+                        <option value="dashed">Пунктир</option>
+                        <option value="dashdot">Штрих-пунктир</option>
+                        <option value="solid">Суцільна</option>
+                    </select>
+                    <input id="line-color-input" type="color" value="#E7C769" title="Колір лінії" />
+                    <button id="btn-line-apply-route" class="btn-primary" type="button">В маршрут</button>
+                </div>
             </div>
             <div class="context-panel hidden" id="context-panel">
                 <!-- Information Card will be injected via JS -->

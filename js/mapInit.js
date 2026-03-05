@@ -3,11 +3,75 @@ let markerLayer;
 let routeLayer;
 let publishedRouteLayer;
 let focusBoundaryLayer;
+let lineDraftLayer;
 let currentFilter = { type: 'all', certified: false, district: '', community: '' };
 let pickMode = false;
 let pickCallback = null;
 let lastStablePoints = [];
 let reloadRetryTimer = null;
+let lineToolVisible = false;
+let lineToolMode = 'draw';
+let lineToolStyle = 'dashed';
+let lineToolColor = '#E7C769';
+let lineDraftVertices = [];
+
+const POINT_TYPE_MARKER_FILE = {
+  transport_stop: 'зупинка Т.svg',
+  parking: 'азс.svg',
+  toilet: 'мед заклад.svg',
+  entrance: 'адміністрація.svg',
+  crossing: 'парк.svg',
+  ramp: 'соціальні послуги.svg',
+  elevator: 'соціальні послуги.svg',
+};
+
+const MARKER_FILES = [
+  'адміністрація.svg',
+  'азс.svg',
+  'аптека.svg',
+  'банк.svg',
+  'вокзал.svg',
+  'житло.svg',
+  'зупинка А.svg',
+  'зупинка П.svg',
+  'зупинка Т.svg',
+  'кафе.svg',
+  'культура.svg',
+  'майданчик.svg',
+  'мед заклад.svg',
+  'навчал заклад.svg',
+  'парк.svg',
+  'перукарня.svg',
+  'пошта.svg',
+  'ресторан.svg',
+  'соціальні послуги.svg',
+  'спорт.svg',
+  'укриття.svg',
+];
+
+const MARKER_URL_BY_FILE = {
+  'адміністрація.svg': new URL('../assets/markers/адміністрація.svg', import.meta.url).href,
+  'азс.svg': new URL('../assets/markers/азс.svg', import.meta.url).href,
+  'аптека.svg': new URL('../assets/markers/аптека.svg', import.meta.url).href,
+  'банк.svg': new URL('../assets/markers/банк.svg', import.meta.url).href,
+  'вокзал.svg': new URL('../assets/markers/вокзал.svg', import.meta.url).href,
+  'житло.svg': new URL('../assets/markers/житло.svg', import.meta.url).href,
+  'зупинка А.svg': new URL('../assets/markers/зупинка А.svg', import.meta.url).href,
+  'зупинка П.svg': new URL('../assets/markers/зупинка П.svg', import.meta.url).href,
+  'зупинка Т.svg': new URL('../assets/markers/зупинка Т.svg', import.meta.url).href,
+  'кафе.svg': new URL('../assets/markers/кафе.svg', import.meta.url).href,
+  'культура.svg': new URL('../assets/markers/культура.svg', import.meta.url).href,
+  'майданчик.svg': new URL('../assets/markers/майданчик.svg', import.meta.url).href,
+  'мед заклад.svg': new URL('../assets/markers/мед заклад.svg', import.meta.url).href,
+  'навчал заклад.svg': new URL('../assets/markers/навчал заклад.svg', import.meta.url).href,
+  'парк.svg': new URL('../assets/markers/парк.svg', import.meta.url).href,
+  'перукарня.svg': new URL('../assets/markers/перукарня.svg', import.meta.url).href,
+  'пошта.svg': new URL('../assets/markers/пошта.svg', import.meta.url).href,
+  'ресторан.svg': new URL('../assets/markers/ресторан.svg', import.meta.url).href,
+  'соціальні послуги.svg': new URL('../assets/markers/соціальні послуги.svg', import.meta.url).href,
+  'спорт.svg': new URL('../assets/markers/спорт.svg', import.meta.url).href,
+  'укриття.svg': new URL('../assets/markers/укриття.svg', import.meta.url).href,
+};
 let fetchPointsFn = async (filter) => {
   const query = getQueryFromFilter(filter);
   const response = await fetch(`/api/points${query ? `?${query}` : ''}`);
@@ -40,19 +104,59 @@ const ODESA_BOUNDS = {
   cityZoom: 13,
 };
 
-function createIcon(fillColor, borderColor = 'none') {
-  const svgMarker = `
-    <svg width="28" height="38" viewBox="0 0 28 38" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M14 1.5C7.1 1.5 1.5 7.1 1.5 14c0 9.8 11 20.6 11.5 21.1a1.5 1.5 0 0 0 2 0C15.5 34.6 26.5 23.8 26.5 14 26.5 7.1 20.9 1.5 14 1.5Z"
-            fill="${fillColor}" stroke="${borderColor}" stroke-width="2"/>
-      <circle cx="14" cy="14" r="5.2" fill="#F4F1EC" opacity="0.95"/>
-    </svg>`;
+function normalizeMarkerKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’'`]/g, '')
+    .replace(/[^a-zа-яіїєґ0-9]+/g, ' ')
+    .trim();
+}
+
+function markerFileToLabel(fileName) {
+  const base = String(fileName || '').replace(/\.svg$/i, '').trim();
+  if (!base) return 'Точка';
+  return base.charAt(0).toUpperCase() + base.slice(1);
+}
+
+function markerFileToUrl(fileName) {
+  return MARKER_URL_BY_FILE[fileName] || MARKER_URL_BY_FILE['соціальні послуги.svg'];
+}
+
+function resolveMarkerFile(point) {
+  const typeCode = String(point?.pointType?.code || '').trim();
+  if (typeCode && POINT_TYPE_MARKER_FILE[typeCode]) {
+    return POINT_TYPE_MARKER_FILE[typeCode];
+  }
+
+  const label = normalizeMarkerKey(point?.pointType?.labelUk || '');
+  if (label) {
+    const matched = MARKER_FILES.find((fileName) => normalizeMarkerKey(fileName).includes(label));
+    if (matched) return matched;
+  }
+  return 'соціальні послуги.svg';
+}
+
+function createIcon(point) {
+  const markerFile = resolveMarkerFile(point);
+  const markerUrl = markerFileToUrl(markerFile);
+  const markerLabel = markerFileToLabel(markerFile);
+  const markerTitle = escapeHtml(markerLabel);
+
+  const html = `
+    <div class="map-marker-wrap ${point?.isCertified ? 'is-certified' : ''}">
+      <div class="map-marker-pin" style="--marker-color: ${escapeHtml(point?.pointType?.color || '#3D5263')}">
+        <img src="${markerUrl}" alt="${markerTitle}" loading="lazy" decoding="async" />
+      </div>
+      <div class="map-marker-caption">${markerTitle}</div>
+    </div>`;
 
   return L.divIcon({
     className: 'custom-map-marker',
-    html: svgMarker,
-    iconSize: [28, 38],
-    iconAnchor: [14, 37],
+    html,
+    iconSize: [140, 68],
+    iconAnchor: [22, 56],
   });
 }
 
@@ -166,11 +270,7 @@ async function loadAndRenderPoints() {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         return;
       }
-      const icon = createIcon(
-        point?.pointType?.color || '#3D5263',
-        point?.isCertified ? '#B8965A' : 'none'
-      );
-
+      const icon = createIcon(point);
       const marker = L.marker([lat, lng], { icon }).addTo(markerLayer);
       marker.on('click', () => {
         map.panTo([lat, lng], {
@@ -258,6 +358,234 @@ function clearRouteHighlight() {
 function clearFocusBoundary() {
   if (!focusBoundaryLayer) return;
   focusBoundaryLayer.clearLayers();
+}
+
+function getDashPattern(style) {
+  if (style === 'dashed') return '12 10';
+  if (style === 'dashdot') return '12 8 2 8';
+  return null;
+}
+
+function findPointById(pointId) {
+  const id = Number(pointId);
+  if (!Number.isFinite(id)) return null;
+  return lastStablePoints.find((point) => Number(point?.id) === id) || null;
+}
+
+function resolveNearestSnap(latlng, maxPx = 22) {
+  if (!map || !Array.isArray(lastStablePoints) || !lastStablePoints.length) return null;
+  const target = map.latLngToContainerPoint(latlng);
+  let best = null;
+
+  for (const point of lastStablePoints) {
+    const lat = Number(point?.lat);
+    const lng = Number(point?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+    const candidate = map.latLngToContainerPoint([lat, lng]);
+    const distance = target.distanceTo(candidate);
+    if (!best || distance < best.distance) {
+      best = { point, lat, lng, distance };
+    }
+  }
+
+  if (!best || best.distance > maxPx) return null;
+  return best;
+}
+
+function normalizeLineVertex(vertex) {
+  if (!vertex || typeof vertex !== 'object') return null;
+  const pointId = Number(vertex.pointId);
+  if (Number.isFinite(pointId)) {
+    const source = findPointById(pointId) || vertex;
+    const lat = Number(source.lat);
+    const lng = Number(source.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return {
+      lat,
+      lng,
+      pointId,
+      title: source.title || vertex.title || '',
+      snapped: true,
+    };
+  }
+
+  const lat = Number(vertex.lat);
+  const lng = Number(vertex.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return {
+    lat,
+    lng,
+    pointId: null,
+    title: '',
+    snapped: false,
+  };
+}
+
+function renderLineDraft() {
+  if (!lineDraftLayer) return;
+  lineDraftLayer.clearLayers();
+
+  if (lineDraftVertices.length >= 2) {
+    L.polyline(
+      lineDraftVertices.map((vertex) => [vertex.lat, vertex.lng]),
+      {
+        color: lineToolColor,
+        weight: 5,
+        opacity: 0.96,
+        lineCap: 'round',
+        lineJoin: 'round',
+        dashArray: getDashPattern(lineToolStyle),
+      }
+    ).addTo(lineDraftLayer);
+  }
+
+  lineDraftVertices.forEach((vertex, index) => {
+    const marker = L.circleMarker([vertex.lat, vertex.lng], {
+      radius: 6,
+      color: vertex.snapped ? '#0B2545' : '#7C3AED',
+      weight: 2,
+      fillOpacity: 1,
+      fillColor: vertex.snapped ? '#FFFFFF' : '#EDE9FE',
+    }).addTo(lineDraftLayer);
+
+    marker.bindTooltip(String(index + 1), {
+      permanent: true,
+      direction: 'center',
+      opacity: 1,
+      className: 'route-order-label',
+    });
+  });
+}
+
+function updateLineToolCursor() {
+  const container = map?.getContainer();
+  if (!container) return;
+  container.classList.toggle('line-tool-active', lineToolVisible);
+  container.classList.toggle('line-tool-erase', lineToolVisible && lineToolMode === 'erase');
+}
+
+function addLineDraftVertex(latlng) {
+  const snap = resolveNearestSnap(latlng);
+  const nextVertex = snap
+    ? {
+        lat: snap.lat,
+        lng: snap.lng,
+        pointId: Number(snap.point.id),
+        title: snap.point.title || '',
+        snapped: true,
+      }
+    : {
+        lat: Number(latlng.lat),
+        lng: Number(latlng.lng),
+        pointId: null,
+        title: '',
+        snapped: false,
+      };
+
+  const prev = lineDraftVertices[lineDraftVertices.length - 1];
+  if (prev && Math.abs(prev.lat - nextVertex.lat) < 1e-7 && Math.abs(prev.lng - nextVertex.lng) < 1e-7) {
+    return false;
+  }
+
+  lineDraftVertices.push(nextVertex);
+  renderLineDraft();
+  return true;
+}
+
+function eraseLineDraftVertex(latlng) {
+  if (!lineDraftVertices.length || !map) return false;
+  const target = map.latLngToContainerPoint(latlng);
+  let minIdx = -1;
+  let minDistance = Number.POSITIVE_INFINITY;
+
+  lineDraftVertices.forEach((vertex, index) => {
+    const candidate = map.latLngToContainerPoint([vertex.lat, vertex.lng]);
+    const distance = target.distanceTo(candidate);
+    if (distance < minDistance) {
+      minDistance = distance;
+      minIdx = index;
+    }
+  });
+
+  if (minIdx < 0 || minDistance > 26) return false;
+  lineDraftVertices.splice(minIdx, 1);
+  renderLineDraft();
+  return true;
+}
+
+function undoLineDraft() {
+  if (!lineDraftVertices.length) return false;
+  lineDraftVertices.pop();
+  renderLineDraft();
+  return true;
+}
+
+function clearLineDraft() {
+  lineDraftVertices = [];
+  renderLineDraft();
+}
+
+function setLineDraftFromPoints(points = []) {
+  if (!Array.isArray(points)) return;
+  lineDraftVertices = points.map(normalizeLineVertex).filter(Boolean);
+  renderLineDraft();
+}
+
+function setLineToolVisible(visible) {
+  lineToolVisible = Boolean(visible);
+  if (!lineToolVisible) {
+    lineDraftLayer?.clearLayers();
+  } else {
+    renderLineDraft();
+  }
+  updateLineToolCursor();
+}
+
+function setLineToolMode(mode = 'draw') {
+  lineToolMode = mode === 'erase' ? 'erase' : 'draw';
+  updateLineToolCursor();
+}
+
+function setLineToolStyle(style = 'dashed') {
+  lineToolStyle = ['solid', 'dashed', 'dashdot'].includes(style) ? style : 'dashed';
+  renderLineDraft();
+}
+
+function setLineToolColor(color = '#E7C769') {
+  if (typeof color === 'string' && color.startsWith('#')) {
+    lineToolColor = color;
+    renderLineDraft();
+  }
+}
+
+function applyLineDraftToRoute() {
+  const snappedIds = [];
+  for (const vertex of lineDraftVertices) {
+    if (!Number.isFinite(Number(vertex.pointId))) continue;
+    const pointId = Number(vertex.pointId);
+    if (!snappedIds.length || snappedIds[snappedIds.length - 1] !== pointId) {
+      snappedIds.push(pointId);
+    }
+  }
+
+  if (snappedIds.length < 2) {
+    return {
+      ok: false,
+      message: 'Для маршруту потрібно мінімум 2 прив’язані точки.',
+      pointIds: [],
+      skippedVertices: lineDraftVertices.length,
+    };
+  }
+
+  const skippedVertices = lineDraftVertices.length - snappedIds.length;
+  return {
+    ok: true,
+    pointIds: snappedIds,
+    skippedVertices,
+    color: lineToolColor,
+    style: lineToolStyle,
+  };
 }
 
 function setFocusBoundary(geojson) {
@@ -409,6 +737,14 @@ export async function initMap(options = {}) {
       focusPoints,
       setFocusBoundary,
       clearFocusBoundary,
+      setLineToolVisible,
+      setLineToolMode,
+      setLineToolStyle,
+      setLineToolColor,
+      undoLineDraft,
+      clearLineDraft,
+      setLineDraftFromPoints,
+      applyLineDraftToRoute,
     };
   }
 
@@ -447,6 +783,7 @@ export async function initMap(options = {}) {
   routeLayer = L.layerGroup().addTo(map);
   publishedRouteLayer = L.layerGroup().addTo(map);
   focusBoundaryLayer = L.layerGroup().addTo(map);
+  lineDraftLayer = L.layerGroup().addTo(map);
 
   // Custom trackpad-friendly wheel zoom: continuous and stable like modern map UIs.
   const mapContainer = map.getContainer();
@@ -525,6 +862,15 @@ export async function initMap(options = {}) {
   });
 
   map.on('click', (e) => {
+    if (lineToolVisible) {
+      if (lineToolMode === 'erase') {
+        eraseLineDraftVertex(e.latlng);
+        return;
+      }
+      addLineDraftVertex(e.latlng);
+      return;
+    }
+
     if (!pickMode || typeof pickCallback !== 'function') {
       closeInfoCard();
       return;
@@ -550,5 +896,13 @@ export async function initMap(options = {}) {
     focusPoints,
     setFocusBoundary,
     clearFocusBoundary,
+    setLineToolVisible,
+    setLineToolMode,
+    setLineToolStyle,
+    setLineToolColor,
+    undoLineDraft,
+    clearLineDraft,
+    setLineDraftFromPoints,
+    applyLineDraftToRoute,
   };
 }

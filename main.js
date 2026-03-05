@@ -93,6 +93,16 @@ let currentSpecialistAction = 'menu';
 const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
+const POINT_TYPE_MARKER_FILE = {
+  transport_stop: 'зупинка Т.svg',
+  parking: 'азс.svg',
+  toilet: 'мед заклад.svg',
+  entrance: 'адміністрація.svg',
+  crossing: 'парк.svg',
+  ramp: 'соціальні послуги.svg',
+  elevator: 'соціальні послуги.svg',
+};
+const DEFAULT_POINT_MARKER_FILE = 'соціальні послуги.svg';
 const dashboardBlockIds = [
   'dashboard-kpi-block',
   'dashboard-routes-block',
@@ -137,6 +147,15 @@ function deleteRouteColor(routeId) {
   const colors = loadRouteColors();
   delete colors[String(routeId)];
   saveRouteColors(colors);
+}
+
+function resolvePointTypeMarkerFile(pointTypeCode) {
+  return POINT_TYPE_MARKER_FILE[String(pointTypeCode || '').trim()] || DEFAULT_POINT_MARKER_FILE;
+}
+
+function resolvePointTypeMarkerUrl(pointTypeCode) {
+  const fileName = resolvePointTypeMarkerFile(pointTypeCode);
+  return `./assets/markers/${encodeURIComponent(fileName)}`;
 }
 
 function updateLanguage(lang) {
@@ -549,6 +568,15 @@ function setActiveSpecialistTab(tabName) {
       if (focusId) document.getElementById(focusId)?.classList.add('action-focus');
     }
   }
+
+  const canUseLineTools = Boolean(authUser && ['admin', 'specialist'].includes(authUser.role));
+  const showRouteLineToolbar = action === 'route-editor' && canUseLineTools;
+  const routeLineToolbar = document.getElementById('route-line-toolbar');
+  if (routeLineToolbar) {
+    routeLineToolbar.style.display = showRouteLineToolbar ? 'flex' : 'none';
+  }
+  mapController?.setLineToolVisible?.(showRouteLineToolbar);
+
   saveUiState();
 }
 
@@ -604,6 +632,27 @@ function renderRoutePointOrder() {
       renderRoutePointOrder();
     });
   });
+
+  syncRouteLineDraftFromEditor();
+}
+
+function resolveRouteEditorPointsForMap() {
+  return routeEditorPoints
+    .map((item) => {
+      const point = dashboardPoints.find((p) => Number(p.id) === Number(item.pointId));
+      if (!point) return null;
+      return {
+        pointId: point.id,
+        title: point.title,
+        lat: Number(point.lat),
+        lng: Number(point.lng),
+      };
+    })
+    .filter((point) => point && Number.isFinite(point.lat) && Number.isFinite(point.lng));
+}
+
+function syncRouteLineDraftFromEditor() {
+  mapController?.setLineDraftFromPoints?.(resolveRouteEditorPointsForMap());
 }
 
 function refreshRouteSelectors() {
@@ -665,18 +714,63 @@ function renderLegend() {
   const legend = document.getElementById('map-legend');
   if (!legend) return;
 
-  if (!pointTypes.length) {
+  if (!dashboardPoints.length && !pointTypes.length) {
     legend.innerHTML = '<div class="t-data text-muted">Немає типів точок</div>';
     return;
   }
 
+  const typeMetaByCode = new Map(pointTypes.map((pt) => [String(pt.code), pt]));
+  const grouped = new Map();
+  dashboardPoints.forEach((point) => {
+    const code = String(point?.pointType?.code || '');
+    if (!code) return;
+    const current = grouped.get(code) || { total: 0, certified: 0 };
+    current.total += 1;
+    if (point?.isCertified) current.certified += 1;
+    grouped.set(code, current);
+  });
+
+  const legendRows = grouped.size
+    ? Array.from(grouped.entries())
+        .map(([code, stat]) => {
+          const meta = typeMetaByCode.get(code);
+          const label = meta?.labelUk || code;
+          const color = meta?.color || '#3D5263';
+          const markerUrl = resolvePointTypeMarkerUrl(code);
+          return {
+            code,
+            label,
+            color,
+            markerUrl,
+            total: stat.total,
+            certified: stat.certified,
+          };
+        })
+        .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'uk'))
+    : pointTypes.map((pt) => ({
+        code: pt.code,
+        label: pt.labelUk,
+        color: pt.color,
+        markerUrl: resolvePointTypeMarkerUrl(pt.code),
+        total: 0,
+        certified: 0,
+      }));
+
+  const certifiedTotal = dashboardPoints.filter((point) => point.isCertified).length;
   legend.innerHTML = [
     '<div class="t-data text-muted">ЛЕГЕНДА ТОЧОК</div>',
-    ...pointTypes.map(
-      (pt) =>
-        `<div class="legend-item"><span class="legend-dot" style="background:${pt.color}"></span><span>${pt.labelUk}</span></div>`
+    ...legendRows.map(
+      (row) => `
+        <div class="legend-item">
+          <span class="legend-marker" style="border-color:${row.color}">
+            <img src="${row.markerUrl}" alt="${row.label}" loading="lazy" decoding="async" />
+          </span>
+          <span class="legend-label">${row.label}</span>
+          <span class="legend-count">${row.total}</span>
+        </div>
+      `
     ),
-    '<div class="legend-item"><span class="legend-dot" style="background:#C5A059"></span><span>Сертифікована точка</span></div>',
+    `<div class="legend-item legend-item-certified"><span class="legend-dot" style="background:#C5A059"></span><span class="legend-label">Сертифіковані</span><span class="legend-count">${certifiedTotal}</span></div>`,
   ].join('');
 }
 
@@ -1115,6 +1209,9 @@ function resetRouteEditor() {
   document.getElementById('route-status').value = 'draft';
   const routeColorInput = document.getElementById('route-color');
   if (routeColorInput) routeColorInput.value = DEFAULT_ROUTE_COLOR;
+  const lineColorInput = document.getElementById('line-color-input');
+  if (lineColorInput) lineColorInput.value = DEFAULT_ROUTE_COLOR;
+  mapController?.setLineToolColor?.(DEFAULT_ROUTE_COLOR);
   renderRoutePointOrder();
   mapController?.clearRouteHighlight?.();
   syncEditorActionButtons();
@@ -1131,6 +1228,9 @@ function openRouteInEditor(routeId, options = {}) {
   document.getElementById('route-status').value = route.status;
   const routeColorInput = document.getElementById('route-color');
   if (routeColorInput) routeColorInput.value = route.routeColor || getRouteColor(route.id);
+  const lineColorInput = document.getElementById('line-color-input');
+  if (lineColorInput) lineColorInput.value = route.routeColor || getRouteColor(route.id);
+  mapController?.setLineToolColor?.(route.routeColor || getRouteColor(route.id));
   routeEditorPoints = route.points.map((p) => ({ pointId: p.id, title: p.title }));
   routeOrderHistory = [];
   renderRoutePointOrder();
@@ -1667,11 +1767,25 @@ function bindSpecialistTools() {
   const editPointSectionsList = document.getElementById('edit-point-sections-list');
   const btnAddPointSection = document.getElementById('btn-add-point-section');
   const btnAddEditPointSection = document.getElementById('btn-add-edit-point-section');
+  const btnLineDraw = document.getElementById('btn-line-draw');
+  const btnLineErase = document.getElementById('btn-line-erase');
+  const btnLineUndo = document.getElementById('btn-line-undo');
+  const btnLineClear = document.getElementById('btn-line-clear');
+  const btnLineApplyRoute = document.getElementById('btn-line-apply-route');
+  const lineStyleSelect = document.getElementById('line-style-select');
+  const lineColorInput = document.getElementById('line-color-input');
 
   renderPointSectionsEditor(pointSectionsList, []);
   renderPointSectionsEditor(editPointSectionsList, []);
   bindPointSectionsEditor(pointSectionsList, btnAddPointSection);
   bindPointSectionsEditor(editPointSectionsList, btnAddEditPointSection);
+
+  const setLineToolButtonState = (mode) => {
+    if (btnLineDraw) btnLineDraw.classList.toggle('active', mode === 'draw');
+    if (btnLineErase) btnLineErase.classList.toggle('active', mode === 'erase');
+  };
+
+  setLineToolButtonState('draw');
 
   if (btnPickOnMap) {
     btnPickOnMap.addEventListener('click', () => {
@@ -1685,6 +1799,93 @@ function bindSpecialistTools() {
         document.getElementById('point-lng').value = lng.toFixed(6);
         setSpecialistSuccess('Координати вибрано');
       });
+    });
+  }
+
+  if (btnLineDraw) {
+    btnLineDraw.addEventListener('click', () => {
+      setLineToolButtonState('draw');
+      mapController?.setLineToolMode?.('draw');
+      setSpecialistMessage('Режим пера: клік по карті додає вузол маршруту');
+    });
+  }
+
+  if (btnLineErase) {
+    btnLineErase.addEventListener('click', () => {
+      setLineToolButtonState('erase');
+      mapController?.setLineToolMode?.('erase');
+      setSpecialistMessage('Режим стирача: клікніть біля вузла, щоб видалити його');
+    });
+  }
+
+  if (btnLineUndo) {
+    btnLineUndo.addEventListener('click', () => {
+      const ok = mapController?.undoLineDraft?.();
+      if (!ok) {
+        setSpecialistMessage('Немає точок для скасування', true);
+      }
+    });
+  }
+
+  if (btnLineClear) {
+    btnLineClear.addEventListener('click', () => {
+      mapController?.clearLineDraft?.();
+      setSpecialistMessage('Лінію очищено');
+    });
+  }
+
+  if (lineStyleSelect) {
+    mapController?.setLineToolStyle?.(lineStyleSelect.value || 'dashed');
+    lineStyleSelect.addEventListener('change', () => {
+      mapController?.setLineToolStyle?.(lineStyleSelect.value || 'dashed');
+    });
+  }
+
+  if (lineColorInput) {
+    mapController?.setLineToolColor?.(lineColorInput.value || DEFAULT_ROUTE_COLOR);
+    lineColorInput.addEventListener('input', () => {
+      const value = lineColorInput.value || DEFAULT_ROUTE_COLOR;
+      mapController?.setLineToolColor?.(value);
+      const routeColorInputEl = document.getElementById('route-color');
+      if (routeColorInputEl) routeColorInputEl.value = value;
+    });
+  }
+
+  if (btnLineApplyRoute) {
+    btnLineApplyRoute.addEventListener('click', () => {
+      const result = mapController?.applyLineDraftToRoute?.();
+      if (!result?.ok) {
+        setSpecialistMessage(result?.message || 'Не вдалося застосувати лінію', true);
+        return;
+      }
+
+      const mappedPoints = result.pointIds
+        .map((pointId) => {
+          const point = dashboardPoints.find((candidate) => Number(candidate.id) === Number(pointId));
+          if (!point) return null;
+          return { pointId: point.id, title: point.title };
+        })
+        .filter(Boolean);
+
+      if (mappedPoints.length < 2) {
+        setSpecialistMessage('У маршруті має бути мінімум 2 валідні точки', true);
+        return;
+      }
+
+      routeOrderHistory.push(routeEditorPoints.map((point) => ({ ...point })));
+      routeEditorPoints = mappedPoints;
+      renderRoutePointOrder();
+
+      if (result.color) {
+        const routeColorInputEl = document.getElementById('route-color');
+        if (routeColorInputEl) routeColorInputEl.value = result.color;
+      }
+
+      if (result.skippedVertices > 0) {
+        setSpecialistSuccess(`Маршрут зібрано. Пропущено ${result.skippedVertices} не привʼязаних вузлів.`);
+      } else {
+        setSpecialistSuccess('Лінію застосовано до маршруту');
+      }
     });
   }
 
@@ -2046,6 +2247,8 @@ function bindSpecialistTools() {
 
   if (routeColorInput) {
     routeColorInput.addEventListener('input', () => {
+      mapController?.setLineToolColor?.(routeColorInput.value || DEFAULT_ROUTE_COLOR);
+      if (lineColorInput) lineColorInput.value = routeColorInput.value || DEFAULT_ROUTE_COLOR;
       if (!editingRouteId) return;
       const route = dashboardRoutes.find((r) => r.id === editingRouteId);
       if (!route) return;

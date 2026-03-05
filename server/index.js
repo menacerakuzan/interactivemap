@@ -11,6 +11,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 const ROUTE_STATUSES = new Set(['draft', 'review', 'published']);
+const ODESA_REGION_BOUNDS = {
+  minLat: 45.0,
+  maxLat: 47.9,
+  minLng: 28.0,
+  maxLng: 31.9,
+};
 
 function isNonEmptyText(value, maxLen = 255) {
   return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= maxLen;
@@ -18,6 +24,13 @@ function isNonEmptyText(value, maxLen = 255) {
 
 function isValidCoordinate(value, min, max) {
   return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function isInsideOdesaRegion(lat, lng) {
+  return (
+    isValidCoordinate(lat, ODESA_REGION_BOUNDS.minLat, ODESA_REGION_BOUNDS.maxLat) &&
+    isValidCoordinate(lng, ODESA_REGION_BOUNDS.minLng, ODESA_REGION_BOUNDS.maxLng)
+  );
 }
 
 function normalizeOptionalText(value, maxLen = 2000) {
@@ -214,6 +227,9 @@ app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, 
   if (!isNonEmptyText(title, 160) || !isValidCoordinate(lat, -90, 90) || !isValidCoordinate(lng, -180, 180) || !pointTypeCode) {
     return res.status(400).json({ error: 'title, lat, lng, pointTypeCode are required' });
   }
+  if (!isInsideOdesaRegion(lat, lng)) {
+    return res.status(400).json({ error: 'Point coordinates must be inside Odesa region bounds' });
+  }
 
   const pointType = db.prepare('SELECT id FROM point_types WHERE code = ?').get(pointTypeCode);
   if (!pointType) {
@@ -272,7 +288,7 @@ app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, 
 
 app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (req, res) => {
   const pointId = Number(req.params.id);
-  const existing = db.prepare('SELECT id FROM points WHERE id = ?').get(pointId);
+  const existing = db.prepare('SELECT id, lat, lng FROM points WHERE id = ?').get(pointId);
   if (!existing) {
     return res.status(404).json({ error: 'Point not found' });
   }
@@ -295,6 +311,11 @@ app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (re
   }
   if (lng !== undefined && !isValidCoordinate(lng, -180, 180)) {
     return res.status(400).json({ error: 'Invalid longitude' });
+  }
+  const nextLat = lat !== undefined ? Number(lat) : Number(existing.lat);
+  const nextLng = lng !== undefined ? Number(lng) : Number(existing.lng);
+  if (!isInsideOdesaRegion(nextLat, nextLng)) {
+    return res.status(400).json({ error: 'Point coordinates must be inside Odesa region bounds' });
   }
 
   const fields = [];
