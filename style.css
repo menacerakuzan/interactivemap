@@ -440,6 +440,36 @@ body::before {
   box-shadow: 0 18px 42px rgba(11, 37, 69, 0.45);
 }
 
+.toolbar-collapse-btn {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(8, 12, 18, 0.88);
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.route-line-toolbar.collapsed {
+  padding: 7px 10px;
+  gap: 0;
+}
+
+.route-line-toolbar.collapsed .tool-group {
+  display: none;
+}
+
+.route-line-toolbar.collapsed .toolbar-collapse-btn {
+  position: static;
+  transform: none;
+}
+
 .route-line-toolbar .tool-group {
   display: flex;
   align-items: center;
@@ -1483,6 +1513,14 @@ body.context-open .filter-menu {
   max-height: 180px;
   object-fit: cover;
   border-radius: 8px;
+}
+
+.card,
+.news-item,
+.route-item,
+.activity-item,
+.proposal-card {
+  transition: transform 0.24s ease, box-shadow 0.24s ease, opacity 0.24s ease;
 }
 
 @media (max-width: 960px) {
