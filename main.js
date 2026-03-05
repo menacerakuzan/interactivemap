@@ -89,6 +89,7 @@ let selectedDistrict = '';
 let selectedCommunity = '';
 let currentSpecialistAction = 'menu';
 let legendPointsSyncBound = false;
+const hiddenPointTypeCodes = new Set();
 const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
@@ -807,7 +808,16 @@ function setActiveSpecialistTab(tabName) {
   const routeLineToolbar = document.getElementById('route-line-toolbar');
   const mapView = document.querySelector('.map-view');
   if (routeLineToolbar) {
-    routeLineToolbar.style.display = showRouteLineToolbar ? 'flex' : 'none';
+    if (showRouteLineToolbar) {
+      routeLineToolbar.style.display = 'flex';
+      requestAnimationFrame(() => routeLineToolbar.classList.remove('ui-hidden'));
+    } else {
+      routeLineToolbar.classList.add('ui-hidden');
+      window.setTimeout(() => {
+        if (!routeLineToolbar.classList.contains('ui-hidden')) return;
+        routeLineToolbar.style.display = 'none';
+      }, 170);
+    }
   }
   if (mapView) {
     mapView.classList.toggle('route-toolbar-visible', showRouteLineToolbar);
@@ -993,20 +1003,49 @@ function renderLegend() {
         markerUrl: resolvePointTypeMarkerUrl(pt.code),
         total: 0,
       }));
+  const visibleCount = Math.max(0, legendRows.length - hiddenPointTypeCodes.size);
   legend.innerHTML = [
-    '<div class="t-data text-muted">ЛЕГЕНДА ТОЧОК</div>',
-    ...legendRows.map(
-      (row) => `
-        <div class="legend-item">
+    `
+      <div class="legend-head">
+        <div class="t-data text-muted">ЛЕГЕНДА ТОЧОК</div>
+        <button class="btn-flat legend-reset-btn" data-legend-reset type="button">Скинути</button>
+      </div>
+      <div class="legend-subhead t-data text-muted">Показано типів: ${visibleCount}/${legendRows.length}</div>
+    `,
+    ...legendRows.map((row) => {
+      const isHidden = hiddenPointTypeCodes.has(row.code);
+      return `
+        <button class="legend-item ${isHidden ? 'is-hidden' : ''}" data-legend-toggle="${row.code}" type="button"
+          title="${isHidden ? 'Показати тип' : 'Сховати тип'}">
           <span class="legend-marker" style="border-color:${row.color}">
             <img src="${row.markerUrl}" alt="${row.label}" loading="lazy" decoding="async" />
           </span>
           <span class="legend-label">${row.label}</span>
           <span class="legend-count">${row.total}</span>
-        </div>
-      `
-    ),
+        </button>
+      `;
+    }),
   ].join('');
+
+  legend.querySelectorAll('[data-legend-toggle]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const code = String(el.getAttribute('data-legend-toggle') || '').trim();
+      if (!code) return;
+      if (hiddenPointTypeCodes.has(code)) {
+        hiddenPointTypeCodes.delete(code);
+      } else {
+        hiddenPointTypeCodes.add(code);
+      }
+      mapController?.setHiddenPointTypes?.(Array.from(hiddenPointTypeCodes));
+      renderLegend();
+    });
+  });
+
+  legend.querySelector('[data-legend-reset]')?.addEventListener('click', () => {
+    hiddenPointTypeCodes.clear();
+    mapController?.setHiddenPointTypes?.([]);
+    renderLegend();
+  });
 }
 
 function renderNews() {
@@ -1236,6 +1275,10 @@ async function refreshDashboardData() {
   ]);
   dashboardNews = news || [];
   pointTypes = normalizePointTypes(typeRows || []);
+  const knownTypeCodes = new Set(pointTypes.map((type) => String(type.code)));
+  Array.from(hiddenPointTypeCodes).forEach((code) => {
+    if (!knownTypeCodes.has(code)) hiddenPointTypeCodes.delete(code);
+  });
   dashboardPoints = (pointRows || []).map((point) => normalizePointRecord(point));
   dashboardRoutes = (routeRows || []).map((r) => ({
     ...r,
@@ -1243,6 +1286,7 @@ async function refreshDashboardData() {
   }));
   dashboardProposals = proposals || [];
   mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
+  mapController?.setHiddenPointTypes?.(Array.from(hiddenPointTypeCodes));
   renderDashboard(dashboardPoints, dashboardRoutes);
   renderNews();
   populatePointTypeOptions();
@@ -1264,12 +1308,17 @@ async function refreshPublicData() {
     ]);
     dashboardNews = news || [];
     pointTypes = normalizePointTypes(typeRows || []);
+    const knownTypeCodes = new Set(pointTypes.map((type) => String(type.code)));
+    Array.from(hiddenPointTypeCodes).forEach((code) => {
+      if (!knownTypeCodes.has(code)) hiddenPointTypeCodes.delete(code);
+    });
     dashboardPoints = (pointRows || []).map((point) => normalizePointRecord(point));
     dashboardRoutes = (routeRows || []).map((r) => ({
       ...r,
       routeColor: r.routeColor || getRouteColor(r.id),
     }));
     mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
+    mapController?.setHiddenPointTypes?.(Array.from(hiddenPointTypeCodes));
     renderNews();
     renderLegend();
     populatePointTypeOptions();
@@ -1401,6 +1450,17 @@ function setAuthState(token, user) {
     editingPointId = null;
     editingRouteId = null;
     resetNewsEditor();
+    const routeLineToolbar = document.getElementById('route-line-toolbar');
+    const mapView = document.querySelector('.map-view');
+    if (routeLineToolbar) {
+      routeLineToolbar.classList.remove('collapsed');
+      routeLineToolbar.classList.add('ui-hidden');
+      routeLineToolbar.style.display = 'none';
+    }
+    if (mapView) {
+      mapView.classList.remove('route-toolbar-visible');
+    }
+    mapController?.setLineToolVisible?.(false);
   }
 }
 
@@ -1877,9 +1937,20 @@ function bindFilterMenu() {
     communitySelect.value = resolved;
     communitySelect.dispatchEvent(new Event('change', { bubbles: true }));
     filterMenu?.classList.remove('active');
+    quickSearchInput.blur();
   };
 
   if (filterMenu && btnToggleFilters) {
+    ['pointerdown', 'mousedown', 'touchstart', 'wheel'].forEach((eventName) => {
+      filterMenu.addEventListener(
+        eventName,
+        (event) => {
+          event.stopPropagation();
+        },
+        { passive: false }
+      );
+    });
+
     btnToggleFilters.addEventListener('click', () => {
       filterMenu.classList.toggle('active');
     });
@@ -1890,9 +1961,9 @@ function bindFilterMenu() {
       }
     });
 
-    filterMenu.querySelectorAll('.btn-flat').forEach((btn) => {
+    filterMenu.querySelectorAll('.btn-flat[data-filter]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        filterMenu.querySelectorAll('.btn-flat').forEach((b) => b.classList.remove('active'));
+        filterMenu.querySelectorAll('.btn-flat[data-filter]').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         filterMenu.classList.remove('active');
         if (!mapController) return;
@@ -1903,11 +1974,24 @@ function bindFilterMenu() {
   }
 
   if (btnQuickGo) {
+    ['pointerdown', 'mousedown', 'touchstart'].forEach((eventName) => {
+      btnQuickGo.addEventListener(
+        eventName,
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        },
+        { passive: false }
+      );
+    });
     btnQuickGo.addEventListener('click', async () => {
       await applyQuickLocation();
     });
   }
   if (quickSearchInput) {
+    ['pointerdown', 'mousedown', 'touchstart'].forEach((eventName) => {
+      quickSearchInput.addEventListener(eventName, (event) => event.stopPropagation(), { passive: true });
+    });
     quickSearchInput.addEventListener('keydown', async (event) => {
       if (event.key !== 'Enter') return;
       event.preventDefault();
@@ -2014,10 +2098,7 @@ function bindFloatingUiControls() {
 
   const setNodeDisplay = (node, value) => {
     if (!node) return;
-    const next = value ? '' : 'none';
-    if (node.style.display !== next) {
-      node.style.display = next;
-    }
+    node.classList.toggle('ui-hidden', !value);
   };
 
   const syncFloatingByScroll = () => {

@@ -15,6 +15,7 @@ let lineSnapEnabled = true;
 let lineToolStyle = 'dashed';
 let lineToolColor = '#E7C769';
 let lineDraftVertices = [];
+let hiddenPointTypes = new Set();
 
 const POINT_TYPE_MARKER_FILE = {
   school: 'навчал заклад.svg',
@@ -289,6 +290,10 @@ async function loadAndRenderPoints() {
 
     markerLayer.clearLayers();
     points.forEach((point) => {
+      const pointTypeCode = String(point?.pointType?.code || '');
+      if (pointTypeCode && hiddenPointTypes.has(pointTypeCode)) {
+        return;
+      }
       const lat = Number(point?.lat);
       const lng = Number(point?.lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -333,6 +338,11 @@ async function loadAndRenderPoints() {
     window.dispatchEvent(new CustomEvent('map:points-updated', { detail: fallback }));
     return fallback;
   }
+}
+
+function setHiddenPointTypes(codes = []) {
+  hiddenPointTypes = new Set((Array.isArray(codes) ? codes : []).map((code) => String(code || '').trim()).filter(Boolean));
+  return loadAndRenderPoints();
 }
 
 function setFilter(filter) {
@@ -811,6 +821,7 @@ export async function initMap(options = {}) {
       setFocusBoundary,
       focusBoundary,
       clearFocusBoundary,
+      setHiddenPointTypes,
       setLineToolVisible,
       setLineToolMode,
       setLineToolSnapEnabled,
@@ -977,6 +988,7 @@ export async function initMap(options = {}) {
     setFocusBoundary,
     focusBoundary,
     clearFocusBoundary,
+    setHiddenPointTypes,
     setLineToolVisible,
     setLineToolMode,
     setLineToolSnapEnabled,
