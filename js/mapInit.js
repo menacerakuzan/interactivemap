@@ -673,6 +673,20 @@ function setFocusBoundary(geojson) {
   return true;
 }
 
+function focusBoundary(options = {}) {
+  if (!map || !focusBoundaryLayer) return false;
+  const bounds = focusBoundaryLayer.getBounds?.();
+  if (!bounds || !bounds.isValid?.()) return false;
+  map.stop();
+  map.fitBounds(bounds, {
+    padding: options.padding || [40, 40],
+    maxZoom: Number.isFinite(Number(options.maxZoom)) ? Number(options.maxZoom) : 13,
+    animate: true,
+    duration: 0.45,
+  });
+  return true;
+}
+
 function setPublishedRoutes(routes = []) {
   if (!publishedRouteLayer) return;
   publishedRouteLayer.clearLayers();
@@ -795,6 +809,7 @@ export async function initMap(options = {}) {
       focusLocation,
       focusPoints,
       setFocusBoundary,
+      focusBoundary,
       clearFocusBoundary,
       setLineToolVisible,
       setLineToolMode,
@@ -960,6 +975,7 @@ export async function initMap(options = {}) {
     focusLocation,
     focusPoints,
     setFocusBoundary,
+    focusBoundary,
     clearFocusBoundary,
     setLineToolVisible,
     setLineToolMode,

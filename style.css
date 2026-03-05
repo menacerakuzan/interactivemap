@@ -348,6 +348,26 @@ body::before {
   font-size: 13px;
 }
 
+.community-quick-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.community-quick-row input {
+  border: 1px solid var(--c-divider);
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.community-quick-row .btn-flat {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
 .map-container {
   margin-top: 72px;
   height: calc(100vh - 72px);

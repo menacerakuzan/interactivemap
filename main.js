@@ -1825,8 +1825,59 @@ function bindFilterMenu() {
   const filterMenu = document.getElementById('filter-menu');
   const btnToggleFilters = document.getElementById('btn-toggle-filters');
   const communitySelect = document.getElementById('community-select');
+  const quickSearchInput = document.getElementById('location-quick-search');
+  const quickSearchDatalist = document.getElementById('location-quick-options');
+  const btnQuickGo = document.getElementById('btn-location-quick-go');
 
   populateCommunitiesSelect();
+
+  const quickValueByKey = new Map();
+  const quickDisplayLabelByKey = new Map();
+  const addQuickAlias = (label, value) => {
+    const key = normalizeGeoText(label);
+    if (!key || quickValueByKey.has(key)) return;
+    quickValueByKey.set(key, value);
+    quickDisplayLabelByKey.set(key, String(label));
+  };
+
+  addQuickAlias('Одеса', 'community::Одеський район::Одеська міська');
+  addQuickAlias('місто Одеса', 'community::Одеський район::Одеська міська');
+  addQuickAlias('Одеська міська', 'community::Одеський район::Одеська міська');
+
+  Object.entries(COMMUNITIES_BY_DISTRICT).forEach(([district, communities]) => {
+    addQuickAlias(district, `district::${district}`);
+    communities.forEach((community) => {
+      addQuickAlias(community, `community::${district}::${community}`);
+    });
+  });
+
+  if (quickSearchDatalist) {
+    const labels = Array.from(quickDisplayLabelByKey.values())
+      .sort((a, b) => a.localeCompare(b, 'uk'));
+    quickSearchDatalist.innerHTML = labels
+      .map((label) => `<option value="${label}"></option>`)
+      .join('');
+  }
+
+  const applyQuickLocation = async () => {
+    if (!quickSearchInput || !communitySelect) return;
+    const needle = normalizeGeoText(quickSearchInput.value);
+    if (!needle) return;
+
+    let resolved = quickValueByKey.get(needle) || '';
+    if (!resolved) {
+      const fallback = Array.from(quickValueByKey.entries()).find(([key]) => key.includes(needle));
+      resolved = fallback?.[1] || '';
+    }
+    if (!resolved) {
+      setSpecialistMessage('Локацію не знайдено. Спробуйте назву громади/району.', true);
+      return;
+    }
+
+    communitySelect.value = resolved;
+    communitySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    filterMenu?.classList.remove('active');
+  };
 
   if (filterMenu && btnToggleFilters) {
     btnToggleFilters.addEventListener('click', () => {
@@ -1851,6 +1902,19 @@ function bindFilterMenu() {
     });
   }
 
+  if (btnQuickGo) {
+    btnQuickGo.addEventListener('click', async () => {
+      await applyQuickLocation();
+    });
+  }
+  if (quickSearchInput) {
+    quickSearchInput.addEventListener('keydown', async (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      await applyQuickLocation();
+    });
+  }
+
   if (communitySelect) {
     communitySelect.addEventListener('change', async () => {
       const value = communitySelect.value;
@@ -1871,11 +1935,11 @@ function bindFilterMenu() {
         const points = dashboardPoints.filter((p) =>
           normalizeGeoText(p.district).includes(districtNeedle)
         );
-        const focusedByPoints = mapController?.focusPoints?.(points, { maxZoom: 12, singleZoom: 12 });
+        const focusedByPoints = mapController?.focusPoints?.(points, { maxZoom: 11, singleZoom: 11 });
         if (!focusedByPoints) {
           const center = DISTRICT_CENTERS[district];
           if (center) {
-            mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
+            mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 11);
           }
         }
         setSpecialistMessage(`Фокус на: ${district}`);
@@ -1895,19 +1959,21 @@ function bindFilterMenu() {
             (communityValue ? communityValue.includes(communityNeedle) : true)
           );
         });
-        const focusedByPoints = mapController?.focusPoints?.(points, { maxZoom: 14, singleZoom: 14 });
+        const focusedByPoints = mapController?.focusPoints?.(points, { maxZoom: 13, singleZoom: 13 });
 
         const geo = await geocodeCommunity(district, community);
         const hasBoundary = geo?.geojson ? mapController?.setFocusBoundary?.(geo.geojson) : false;
         if (!hasBoundary) mapController?.clearFocusBoundary?.();
 
-        if (geo) {
-          mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 12);
+        if (geo && hasBoundary) {
+          mapController?.focusBoundary?.({ maxZoom: 13 });
+        } else if (geo) {
+          mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 13);
         } else if (focusedByPoints) {
           // already focused by local points for selected district/community
         } else if (DISTRICT_CENTERS[district]) {
           const center = DISTRICT_CENTERS[district];
-          mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
+          mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 11);
         }
         setSpecialistMessage(
           hasBoundary
@@ -2905,15 +2971,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (selectedDistrict || selectedCommunity) {
       if (selectedCommunity) {
         const geo = await geocodeCommunity(selectedDistrict, selectedCommunity);
-        if (geo?.geojson) {
-          mapController?.setFocusBoundary?.(geo.geojson);
-        }
-        if (geo) {
-          mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 12);
+        const hasBoundary = geo?.geojson ? mapController?.setFocusBoundary?.(geo.geojson) : false;
+        if (geo && hasBoundary) {
+          mapController?.focusBoundary?.({ maxZoom: 13 });
+        } else if (geo) {
+          mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 13);
         }
       } else if (selectedDistrict && DISTRICT_CENTERS[selectedDistrict]) {
         const center = DISTRICT_CENTERS[selectedDistrict];
-        mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 10);
+        mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 11);
       }
       populateCommunitiesSelect();
     }

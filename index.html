@@ -104,6 +104,13 @@
                 <button class="btn-flat active" data-filter="all" data-i18n="filter_all" data-magnetic>Всі
                     об'єкти</button>
                 <div class="community-filter">
+                    <label class="t-data text-muted" for="location-quick-search">ШВИДКИЙ ПЕРЕХІД</label>
+                    <div class="community-quick-row">
+                        <input id="location-quick-search" type="text" list="location-quick-options"
+                            placeholder="Напр.: Одеса, Одеська міська..." />
+                        <button id="btn-location-quick-go" class="btn-flat" type="button">Перейти</button>
+                    </div>
+                    <datalist id="location-quick-options"></datalist>
                     <label class="t-data text-muted" for="community-select">ГРОМАДА / РАЙОН</label>
                     <select id="community-select"></select>
                 </div>
