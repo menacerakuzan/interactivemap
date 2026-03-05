@@ -114,6 +114,14 @@ const POINT_TYPE_MARKER_FILE = {
   social_services: 'соціальні послуги.svg',
   sport: 'спорт.svg',
   shelter: 'укриття.svg',
+  // Legacy aliases (for old datasets/backups)
+  ramp: 'соціальні послуги.svg',
+  elevator: 'соціальні послуги.svg',
+  toilet: 'мед заклад.svg',
+  parking: 'азс.svg',
+  entrance: 'адміністрація.svg',
+  crossing: 'парк.svg',
+  transport_stop: 'зупинка Т.svg',
 };
 const DEFAULT_POINT_MARKER_FILE = 'соціальні послуги.svg';
 const dashboardBlockIds = [
@@ -169,6 +177,38 @@ function resolvePointTypeMarkerFile(pointTypeCode) {
 function resolvePointTypeMarkerUrl(pointTypeCode) {
   const fileName = resolvePointTypeMarkerFile(pointTypeCode);
   return `./assets/markers/${encodeURIComponent(fileName)}`;
+}
+
+function prettifyPointTypeCode(code) {
+  const raw = String(code || '').trim();
+  if (!raw) return 'Невідомий тип';
+  return raw
+    .replaceAll('_', ' ')
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function getPointTypeLabelByCode(code) {
+  const found = pointTypes.find((pt) => String(pt.code) === String(code));
+  return found?.labelUk || prettifyPointTypeCode(code);
+}
+
+function renderTypePreview(selectId, previewId) {
+  const selectEl = document.getElementById(selectId);
+  const previewEl = document.getElementById(previewId);
+  if (!selectEl || !previewEl) return;
+
+  const selectedCode = selectEl.value;
+  if (!selectedCode) {
+    previewEl.innerHTML = '<span class="t-data text-muted">Оберіть тип точки</span>';
+    return;
+  }
+
+  const markerUrl = resolvePointTypeMarkerUrl(selectedCode);
+  const label = getPointTypeLabelByCode(selectedCode);
+  previewEl.innerHTML = `
+    <span class="legend-marker"><img src="${markerUrl}" alt="${label}" loading="lazy" decoding="async" /></span>
+    <span class="t-body">${label}</span>
+  `;
 }
 
 function updateLanguage(lang) {
@@ -672,6 +712,8 @@ function refreshRouteSelectors() {
   const routeEditSelect = document.getElementById('route-edit-select');
   const routePointAdd = document.getElementById('route-point-add');
   const editPointSelect = document.getElementById('edit-point-select');
+  const pointTypeSelect = document.getElementById('point-type');
+  const editPointTypeSelect = document.getElementById('edit-point-type');
   const newsEditSelect = document.getElementById('news-edit-select');
 
   if (routeEditSelect) {
@@ -721,6 +763,8 @@ function populatePointTypeOptions() {
 
   if (createTypeSelect) createTypeSelect.innerHTML = options;
   if (editTypeSelect) editTypeSelect.innerHTML = options;
+  renderTypePreview('point-type', 'point-type-preview');
+  renderTypePreview('edit-point-type', 'edit-point-type-preview');
 }
 
 function renderLegend() {
@@ -1274,6 +1318,7 @@ function openPointInEditor(pointId) {
   if (editPointSelect) {
     editPointSelect.value = String(point.id);
   }
+  renderTypePreview('edit-point-type', 'edit-point-type-preview');
   setActiveSpecialistTab('edit-point');
   setSpecialistMessage(`Редагування точки: ${point.title}`);
   saveUiState();
@@ -1795,6 +1840,19 @@ function bindSpecialistTools() {
   renderPointSectionsEditor(editPointSectionsList, []);
   bindPointSectionsEditor(pointSectionsList, btnAddPointSection);
   bindPointSectionsEditor(editPointSectionsList, btnAddEditPointSection);
+  renderTypePreview('point-type', 'point-type-preview');
+  renderTypePreview('edit-point-type', 'edit-point-type-preview');
+
+  if (pointTypeSelect) {
+    pointTypeSelect.addEventListener('change', () => {
+      renderTypePreview('point-type', 'point-type-preview');
+    });
+  }
+  if (editPointTypeSelect) {
+    editPointTypeSelect.addEventListener('change', () => {
+      renderTypePreview('edit-point-type', 'edit-point-type-preview');
+    });
+  }
 
   const setLineToolButtonState = (mode) => {
     if (btnLineDraw) btnLineDraw.classList.toggle('active', mode === 'draw');
@@ -2197,6 +2255,7 @@ function bindSpecialistTools() {
         document.getElementById('edit-point-description').value = '';
         document.getElementById('edit-point-photo-url').value = '';
         renderPointSectionsEditor(editPointSectionsList, []);
+        renderTypePreview('edit-point-type', 'edit-point-type-preview');
         return;
       }
       openPointInEditor(pointId);
@@ -2234,6 +2293,7 @@ function bindSpecialistTools() {
           document.getElementById('edit-point-photo-url').value = '';
           document.getElementById('edit-point-photo-file').value = '';
           renderPointSectionsEditor(editPointSectionsList, []);
+          renderTypePreview('edit-point-type', 'edit-point-type-preview');
           await mapController.refresh();
           await refreshDashboardData();
           setActiveSpecialistTab(prevAction || 'edit-point');

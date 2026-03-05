@@ -1438,6 +1438,27 @@ body.context-open .filter-menu {
   gap: 8px;
 }
 
+.point-type-preview {
+  min-height: 42px;
+  border: 1px solid var(--c-divider);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+}
+
+.point-type-preview .legend-marker {
+  width: 32px;
+  height: 32px;
+}
+
+.point-type-preview .legend-marker img {
+  width: 24px;
+  height: 24px;
+}
+
 @media (max-width: 960px) {
   :root {
     --header-h: 64px;
