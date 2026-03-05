@@ -974,7 +974,7 @@ body.context-open .filter-menu {
   padding: 3px;
   background: #fff;
   border: 2px solid color-mix(in srgb, var(--marker-color, #3d5263) 70%, #ffffff 30%);
-  box-shadow: 0 10px 20px rgba(11, 37, 69, 0.22);
+  box-shadow: none;
   display: grid;
   place-items: center;
 }
