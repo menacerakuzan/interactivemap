@@ -107,8 +107,6 @@
                 <button class="btn-flat" data-filter="elevator" data-i18n="filter_elevators" data-magnetic>Ліфти</button>
                 <button class="btn-flat" data-filter="toilet" data-i18n="filter_toilets" data-magnetic>Туалети</button>
                 <button class="btn-flat" data-filter="parking" data-i18n="filter_parking" data-magnetic>Паркування</button>
-                <button class="btn-flat" data-filter="certified" data-i18n="filter_certified"
-                    style="border-color: var(--c-brass); color: var(--c-brass);" data-magnetic>Сертифіковані ✦</button>
                 <div class="community-filter">
                     <label class="t-data text-muted" for="community-select">ГРОМАДА / РАЙОН</label>
                     <select id="community-select"></select>
@@ -144,10 +142,6 @@
                     <article class="ops-kpi">
                         <div class="t-data text-muted">Точки</div>
                         <div id="kpi-points" class="ops-kpi-value">0</div>
-                    </article>
-                    <article class="ops-kpi">
-                        <div class="t-data text-muted">Сертифіковані</div>
-                        <div id="kpi-certified" class="ops-kpi-value">0</div>
                     </article>
                     <article class="ops-kpi">
                         <div class="t-data text-muted">Маршрути</div>
@@ -215,7 +209,6 @@
                         <div id="point-sections-list" class="point-sections-list"></div>
                         <button id="btn-add-point-section" class="btn-flat" type="button">+ Додати розділ</button>
                     </div>
-                    <label class="specialist-check"><input id="point-certified" type="checkbox" /> Сертифіковано</label>
                     <button id="btn-pick-on-map" class="btn-flat">Вибрати на карті</button>
                     <button id="btn-create-point" class="btn-primary">Створити точку</button>
                 </div>
@@ -256,7 +249,6 @@
                         <div id="edit-point-sections-list" class="point-sections-list"></div>
                         <button id="btn-add-edit-point-section" class="btn-flat" type="button">+ Додати розділ</button>
                     </div>
-                    <label class="specialist-check"><input id="edit-point-certified" type="checkbox" /> Сертифіковано</label>
                     <button id="btn-save-point" class="btn-primary">Зберегти точку</button>
                     <button id="btn-delete-point" class="btn-flat">Видалити точку</button>
                 </div>

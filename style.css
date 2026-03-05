@@ -523,9 +523,9 @@ body::before {
 }
 
 .legend-marker {
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
   border: 1px solid var(--c-divider);
   background: #fff;
   display: grid;
@@ -535,8 +535,8 @@ body::before {
 }
 
 .legend-marker img {
-  width: 18px;
-  height: 18px;
+  width: 23px;
+  height: 23px;
   object-fit: contain;
 }
 
@@ -553,12 +553,6 @@ body::before {
   font-size: 10px;
   font-weight: 700;
   color: var(--c-admiralty);
-}
-
-.legend-item-certified {
-  border-top: 1px dashed rgba(11, 37, 69, 0.2);
-  margin-top: 4px;
-  padding-top: 6px;
 }
 
 .map-view.panel-open {
@@ -849,19 +843,15 @@ body.context-open .filter-menu {
 }
 
 .map-marker-pin {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  padding: 7px;
+  width: 62px;
+  height: 62px;
+  border-radius: 999px;
+  padding: 4px;
   background: #fff;
   border: 2px solid color-mix(in srgb, var(--marker-color, #3d5263) 70%, #ffffff 30%);
   box-shadow: 0 10px 20px rgba(11, 37, 69, 0.22);
   display: grid;
   place-items: center;
-}
-
-.map-marker-wrap.is-certified .map-marker-pin {
-  box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.48), 0 10px 24px rgba(11, 37, 69, 0.24);
 }
 
 .map-marker-pin img {

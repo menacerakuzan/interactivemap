@@ -21,7 +21,6 @@ const translations = {
     filter_elevators: 'Ліфти',
     filter_toilets: 'Туалети',
     filter_parking: 'Паркування',
-    filter_certified: 'Сертифіковані ✦',
     show_partners: 'ПОКАЗАТИ ПАРТНЕРІВ',
     hide_btn: 'ПРИХОВАТИ',
     news_title: 'ОСТАННІ НОВИНИ',
@@ -49,7 +48,6 @@ const translations = {
     filter_elevators: 'Elevators',
     filter_toilets: 'Toilets',
     filter_parking: 'Parking',
-    filter_certified: 'Certified ✦',
     show_partners: 'SHOW PARTNERS',
     hide_btn: 'HIDE',
     news_title: 'LATEST NEWS',
@@ -90,6 +88,7 @@ const UI_STATE_KEY = 'odesaSpecialistUiState';
 let selectedDistrict = '';
 let selectedCommunity = '';
 let currentSpecialistAction = 'menu';
+let legendPointsSyncBound = false;
 const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
@@ -724,9 +723,8 @@ function renderLegend() {
   dashboardPoints.forEach((point) => {
     const code = String(point?.pointType?.code || '');
     if (!code) return;
-    const current = grouped.get(code) || { total: 0, certified: 0 };
+    const current = grouped.get(code) || { total: 0 };
     current.total += 1;
-    if (point?.isCertified) current.certified += 1;
     grouped.set(code, current);
   });
 
@@ -743,7 +741,6 @@ function renderLegend() {
             color,
             markerUrl,
             total: stat.total,
-            certified: stat.certified,
           };
         })
         .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'uk'))
@@ -753,10 +750,7 @@ function renderLegend() {
         color: pt.color,
         markerUrl: resolvePointTypeMarkerUrl(pt.code),
         total: 0,
-        certified: 0,
       }));
-
-  const certifiedTotal = dashboardPoints.filter((point) => point.isCertified).length;
   legend.innerHTML = [
     '<div class="t-data text-muted">ЛЕГЕНДА ТОЧОК</div>',
     ...legendRows.map(
@@ -770,7 +764,6 @@ function renderLegend() {
         </div>
       `
     ),
-    `<div class="legend-item legend-item-certified"><span class="legend-dot" style="background:#C5A059"></span><span class="legend-label">Сертифіковані</span><span class="legend-count">${certifiedTotal}</span></div>`,
   ].join('');
 }
 
@@ -818,11 +811,9 @@ function renderNews() {
 }
 
 function renderDashboard(points, routes) {
-  const certifiedPoints = points.filter((p) => p.isCertified).length;
   const publishedRoutes = routes.filter((r) => r.status === 'published').length;
 
   const kpiPoints = document.getElementById('kpi-points');
-  const kpiCertified = document.getElementById('kpi-certified');
   const kpiRoutes = document.getElementById('kpi-routes');
   const kpiPublished = document.getElementById('kpi-published');
   const routeList = document.getElementById('route-list');
@@ -832,7 +823,6 @@ function renderDashboard(points, routes) {
   const proposalList = document.getElementById('proposal-list');
 
   if (kpiPoints) kpiPoints.textContent = String(points.length);
-  if (kpiCertified) kpiCertified.textContent = String(certifiedPoints);
   if (kpiRoutes) kpiRoutes.textContent = String(routes.length);
   if (kpiPublished) kpiPublished.textContent = String(publishedRoutes);
 
@@ -914,7 +904,7 @@ function renderDashboard(points, routes) {
           <article class="route-item">
             <div class="route-meta">
               <strong class="t-body">${p.title}</strong>
-              <span class="route-status ${p.isCertified ? 'published' : 'draft'}">${p.pointType.labelUk}</span>
+              <span class="route-status review">${p.pointType.labelUk}</span>
             </div>
             <div class="route-actions">
               <button class="btn-flat" data-action="edit-point" data-point-id="${p.id}">Edit</button>
@@ -1024,13 +1014,15 @@ async function refreshDashboardData() {
 
 async function refreshPublicData() {
   try {
-    const [news, typeRows, routeRows] = await Promise.all([
+    const [news, typeRows, pointRows, routeRows] = await Promise.all([
       apiRequest('/api/news'),
       apiRequest('/api/point-types'),
+      apiRequest('/api/points'),
       apiRequest('/api/routes'),
     ]);
     dashboardNews = news || [];
     pointTypes = typeRows || [];
+    dashboardPoints = pointRows || [];
     dashboardRoutes = (routeRows || []).map((r) => ({
       ...r,
       routeColor: r.routeColor || getRouteColor(r.id),
@@ -1113,6 +1105,16 @@ function bindPublicProposalForm() {
       btnSubmit.disabled = false;
       btnSubmit.textContent = 'Надіслати заявку';
     }
+  });
+}
+
+function bindLegendPointsSync() {
+  if (legendPointsSyncBound) return;
+  legendPointsSyncBound = true;
+  window.addEventListener('map:points-updated', (event) => {
+    if (!Array.isArray(event?.detail)) return;
+    dashboardPoints = event.detail;
+    renderLegend();
   });
 }
 
@@ -1253,7 +1255,6 @@ function openPointInEditor(pointId) {
   document.getElementById('edit-point-district').value = point.district || '';
   document.getElementById('edit-point-description').value = point.description || '';
   document.getElementById('edit-point-photo-url').value = point.photoUrl || '';
-  document.getElementById('edit-point-certified').checked = Boolean(point.isCertified);
   renderPointSectionsEditor(document.getElementById('edit-point-sections-list'), point.sections || []);
   const editPointSelect = document.getElementById('edit-point-select');
   if (editPointSelect) {
@@ -1774,6 +1775,7 @@ function bindSpecialistTools() {
   const btnLineApplyRoute = document.getElementById('btn-line-apply-route');
   const lineStyleSelect = document.getElementById('line-style-select');
   const lineColorInput = document.getElementById('line-color-input');
+  const routeLineToolbar = document.getElementById('route-line-toolbar');
 
   renderPointSectionsEditor(pointSectionsList, []);
   renderPointSectionsEditor(editPointSectionsList, []);
@@ -1786,6 +1788,18 @@ function bindSpecialistTools() {
   };
 
   setLineToolButtonState('draw');
+
+  if (routeLineToolbar) {
+    ['pointerdown', 'mousedown', 'click', 'dblclick', 'touchstart', 'wheel'].forEach((eventName) => {
+      routeLineToolbar.addEventListener(
+        eventName,
+        (event) => {
+          event.stopPropagation();
+        },
+        { passive: false }
+      );
+    });
+  }
 
   if (btnPickOnMap) {
     btnPickOnMap.addEventListener('click', () => {
@@ -1933,7 +1947,7 @@ function bindSpecialistTools() {
         district: document.getElementById('point-district').value.trim(),
         description: document.getElementById('point-description').value.trim(),
         photoUrl: document.getElementById('point-photo-url').value.trim() || null,
-        isCertified: document.getElementById('point-certified').checked,
+        isCertified: false,
       };
 
       if (!payload.title || !payload.pointTypeCode || !Number.isFinite(payload.lat) || !Number.isFinite(payload.lng)) {
@@ -1979,7 +1993,6 @@ function bindSpecialistTools() {
           document.getElementById('point-description').value = '';
           document.getElementById('point-photo-url').value = '';
           document.getElementById('point-photo-file').value = '';
-          document.getElementById('point-certified').checked = false;
           renderPointSectionsEditor(pointSectionsList, []);
           setSpecialistSuccess('Точку додано');
         } catch (error) {
@@ -2094,7 +2107,7 @@ function bindSpecialistTools() {
         district: document.getElementById('edit-point-district').value.trim(),
         description: document.getElementById('edit-point-description').value.trim(),
         photoUrl: document.getElementById('edit-point-photo-url').value.trim() || null,
-        isCertified: document.getElementById('edit-point-certified').checked,
+        isCertified: false,
       };
       const existingPoint = dashboardPoints.find((p) => p.id === editingPointId);
       if (!payload.title || !payload.pointTypeCode) {
@@ -2169,7 +2182,6 @@ function bindSpecialistTools() {
         document.getElementById('edit-point-district').value = '';
         document.getElementById('edit-point-description').value = '';
         document.getElementById('edit-point-photo-url').value = '';
-        document.getElementById('edit-point-certified').checked = false;
         renderPointSectionsEditor(editPointSectionsList, []);
         return;
       }
@@ -2206,7 +2218,6 @@ function bindSpecialistTools() {
           document.getElementById('edit-point-district').value = '';
           document.getElementById('edit-point-description').value = '';
           document.getElementById('edit-point-photo-url').value = '';
-          document.getElementById('edit-point-certified').checked = false;
           document.getElementById('edit-point-photo-file').value = '';
           renderPointSectionsEditor(editPointSectionsList, []);
           await mapController.refresh();
@@ -2523,6 +2534,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         },
       });
       bindFilterMenu();
+      bindLegendPointsSync();
       bindSpecialistTools();
       bindSpecialistTabs();
       bindDashboardActions();

@@ -145,7 +145,7 @@ function createIcon(point) {
   const markerTitle = escapeHtml(markerLabel);
 
   const html = `
-    <div class="map-marker-wrap ${point?.isCertified ? 'is-certified' : ''}">
+    <div class="map-marker-wrap">
       <div class="map-marker-pin" style="--marker-color: ${escapeHtml(point?.pointType?.color || '#3D5263')}">
         <img src="${markerUrl}" alt="${markerTitle}" loading="lazy" decoding="async" />
       </div>
@@ -155,8 +155,8 @@ function createIcon(point) {
   return L.divIcon({
     className: 'custom-map-marker',
     html,
-    iconSize: [140, 68],
-    iconAnchor: [22, 56],
+    iconSize: [160, 86],
+    iconAnchor: [31, 72],
   });
 }
 
@@ -178,10 +178,6 @@ function showInfoCard(data) {
   if (window.gsap) {
     gsap.to(panel, { opacity: 1, x: 0, duration: 0.24, ease: 'power2.out' });
   }
-
-  const badge = data.isCertified
-    ? `<span style="margin-left: 12px; color: var(--c-brass); border: 1px solid var(--c-brass); border-radius: 100px; padding: 2px 8px; font-family: var(--font-nav); font-size: 11px;">СЕРТИФІКОВАНО ✦</span>`
-    : '';
 
   const sections = Array.isArray(data.sections) ? data.sections : [];
   const sectionsMarkup = sections.length
@@ -217,7 +213,7 @@ function showInfoCard(data) {
           : 'linear-gradient(130deg, #dbeafe 0%, #f8fafc 100%)'
       }; border-radius: var(--radius-md);"></div>
       <div>
-        <h2 class="t-h2" style="display: flex; align-items: center;">${data.title} ${badge}</h2>
+        <h2 class="t-h2" style="display: flex; align-items: center;">${data.title}</h2>
         <div class="t-label text-muted" style="margin-top: 4px;">${data.district || 'Одеська область'}</div>
       </div>
       <hr style="border: 0; border-top: 1px solid var(--c-divider);">
@@ -862,6 +858,11 @@ export async function initMap(options = {}) {
   });
 
   map.on('click', (e) => {
+    const originalTarget = e?.originalEvent?.target;
+    if (originalTarget?.closest?.('#route-line-toolbar')) {
+      return;
+    }
+
     if (lineToolVisible) {
       if (lineToolMode === 'erase') {
         eraseLineDraftVertex(e.latlng);
