@@ -878,16 +878,6 @@ body.context-open .filter-menu {
   text-overflow: ellipsis;
 }
 
-.leaflet-container.markers-compact .map-marker-pin {
-  width: 38px;
-  height: 38px;
-  border-width: 1.5px;
-}
-
-.leaflet-container.markers-compact .map-marker-caption {
-  display: none;
-}
-
 .leaflet-container.point-pick {
   cursor: crosshair;
 }

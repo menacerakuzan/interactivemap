@@ -599,12 +599,6 @@ function setLineToolColor(color = '#E7C769') {
   }
 }
 
-function updateMarkerZoomClass() {
-  const container = map?.getContainer();
-  if (!container || !map) return;
-  container.classList.toggle('markers-compact', map.getZoom() < 11.2);
-}
-
 function applyLineDraftToRoute() {
   const snappedIds = [];
   for (const vertex of lineDraftVertices) {
@@ -891,7 +885,6 @@ export async function initMap(options = {}) {
     if (!isWheelAnimating) {
       targetZoom = map.getZoom();
     }
-    updateMarkerZoomClass();
   });
 
   const zoomInBtn = mapContainer.querySelector('.leaflet-control-zoom-in');
@@ -931,7 +924,6 @@ export async function initMap(options = {}) {
 
   window.addEventListener('resize', () => map.invalidateSize());
   setTimeout(() => map.invalidateSize(), 500);
-  updateMarkerZoomClass();
 
   await loadAndRenderPoints();
 
