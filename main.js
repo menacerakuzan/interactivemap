@@ -1805,6 +1805,8 @@ function bindFloatingUiControls() {
 
 function bindSpecialistTools() {
   const btnPickOnMap = document.getElementById('btn-pick-on-map');
+  const pointTypeSelect = document.getElementById('point-type');
+  const editPointTypeSelect = document.getElementById('edit-point-type');
   const btnCreatePoint = document.getElementById('btn-create-point');
   const btnCreateRoute = document.getElementById('btn-create-route');
   const btnSaveRoute = document.getElementById('btn-save-route');
