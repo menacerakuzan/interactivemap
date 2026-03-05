@@ -92,36 +92,78 @@ let legendPointsSyncBound = false;
 const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
+const CANONICAL_POINT_TYPES = [
+  { code: 'school', labelUk: 'Школа', labelEn: 'School', color: '#1D4ED8', markerFile: 'навчал заклад.svg' },
+  { code: 'housing', labelUk: 'Житло', labelEn: 'Housing', color: '#2B6CB0', markerFile: 'житло.svg' },
+  { code: 'cafe', labelUk: 'Кафе', labelEn: 'Cafe', color: '#A16207', markerFile: 'кафе.svg' },
+  { code: 'restaurant', labelUk: 'Ресторан', labelEn: 'Restaurant', color: '#9A3412', markerFile: 'ресторан.svg' },
+  {
+    code: 'administration',
+    labelUk: 'Адміністрація',
+    labelEn: 'Administration',
+    color: '#13315C',
+    markerFile: 'адміністрація.svg',
+  },
+  {
+    code: 'social_services',
+    labelUk: 'Соціальні послуги',
+    labelEn: 'Social Services',
+    color: '#1E3A8A',
+    markerFile: 'соціальні послуги.svg',
+  },
+  { code: 'shelter', labelUk: 'Укриття', labelEn: 'Shelter', color: '#334155', markerFile: 'укриття.svg' },
+  { code: 'medical', labelUk: 'Мед заклад', labelEn: 'Medical', color: '#BE123C', markerFile: 'мед заклад.svg' },
+  { code: 'pharmacy', labelUk: 'Аптека', labelEn: 'Pharmacy', color: '#B12B2B', markerFile: 'аптека.svg' },
+  { code: 'education', labelUk: 'Освіта', labelEn: 'Education', color: '#1D4ED8', markerFile: 'навчал заклад.svg' },
+  { code: 'sport', labelUk: 'Спорт', labelEn: 'Sport', color: '#166534', markerFile: 'спорт.svg' },
+  { code: 'culture', labelUk: 'Культура', labelEn: 'Culture', color: '#6D28D9', markerFile: 'культура.svg' },
+  {
+    code: 'hairdresser',
+    labelUk: 'Перукарня',
+    labelEn: 'Hairdresser',
+    color: '#7E22CE',
+    markerFile: 'перукарня.svg',
+  },
+  { code: 'station', labelUk: 'Вокзал', labelEn: 'Station', color: '#2C7A7B', markerFile: 'вокзал.svg' },
+  {
+    code: 'transport_stop',
+    labelUk: 'Транспортна зупинка',
+    labelEn: 'Transport Stop',
+    color: '#7C2D12',
+    markerFile: 'зупинка Т.svg',
+  },
+  { code: 'bank', labelUk: 'Банк', labelEn: 'Bank', color: '#C5A059', markerFile: 'банк.svg' },
+  { code: 'post', labelUk: 'Пошта', labelEn: 'Post', color: '#0E7490', markerFile: 'пошта.svg' },
+  { code: 'fuel_station', labelUk: 'АЗС', labelEn: 'Fuel Station', color: '#0B2545', markerFile: 'азс.svg' },
+  { code: 'street', labelUk: 'Вулиці', labelEn: 'Street', color: '#3D5263', markerFile: 'парк.svg' },
+  { code: 'square', labelUk: 'Площі', labelEn: 'Square', color: '#3D5263', markerFile: 'парк.svg' },
+  { code: 'park', labelUk: 'Парк', labelEn: 'Park', color: '#15803D', markerFile: 'парк.svg' },
+  { code: 'playground', labelUk: 'Дитячий майданчик', labelEn: 'Playground', color: '#0369A1', markerFile: 'майданчик.svg' },
+  { code: 'hotel', labelUk: 'Готель', labelEn: 'Hotel', color: '#2B6CB0', markerFile: 'житло.svg' },
+  { code: 'other', labelUk: 'Інше', labelEn: 'Other', color: '#64748B', markerFile: 'соціальні послуги.svg' },
+];
+const POINT_TYPE_META_BY_CODE = new Map(CANONICAL_POINT_TYPES.map((pt) => [pt.code, pt]));
+const LEGACY_POINT_TYPE_ALIAS = {
+  ramp: 'social_services',
+  elevator: 'social_services',
+  toilet: 'medical',
+  parking: 'fuel_station',
+  entrance: 'administration',
+  crossing: 'street',
+  stop_a: 'transport_stop',
+  stop_p: 'transport_stop',
+  stop_t: 'transport_stop',
+  transport_stop: 'transport_stop',
+};
 const POINT_TYPE_MARKER_FILE = {
-  administration: 'адміністрація.svg',
-  fuel_station: 'азс.svg',
-  pharmacy: 'аптека.svg',
-  bank: 'банк.svg',
-  station: 'вокзал.svg',
-  housing: 'житло.svg',
-  stop_a: 'зупинка А.svg',
-  stop_p: 'зупинка П.svg',
-  stop_t: 'зупинка Т.svg',
-  cafe: 'кафе.svg',
-  culture: 'культура.svg',
-  playground: 'майданчик.svg',
-  medical: 'мед заклад.svg',
-  education: 'навчал заклад.svg',
-  park: 'парк.svg',
-  hairdresser: 'перукарня.svg',
-  post: 'пошта.svg',
-  restaurant: 'ресторан.svg',
-  social_services: 'соціальні послуги.svg',
-  sport: 'спорт.svg',
-  shelter: 'укриття.svg',
-  // Legacy aliases (for old datasets/backups)
-  ramp: 'соціальні послуги.svg',
-  elevator: 'соціальні послуги.svg',
-  toilet: 'мед заклад.svg',
-  parking: 'азс.svg',
-  entrance: 'адміністрація.svg',
-  crossing: 'парк.svg',
-  transport_stop: 'зупинка Т.svg',
+  ...Object.fromEntries(CANONICAL_POINT_TYPES.map((pt) => [pt.code, pt.markerFile])),
+  // Legacy aliases for datasets/backups.
+  ...Object.fromEntries(
+    Object.entries(LEGACY_POINT_TYPE_ALIAS).map(([legacyCode, canonicalCode]) => [
+      legacyCode,
+      POINT_TYPE_META_BY_CODE.get(canonicalCode)?.markerFile || 'соціальні послуги.svg',
+    ])
+  ),
 };
 const DEFAULT_POINT_MARKER_FILE = 'соціальні послуги.svg';
 const dashboardBlockIds = [
@@ -171,7 +213,9 @@ function deleteRouteColor(routeId) {
 }
 
 function resolvePointTypeMarkerFile(pointTypeCode) {
-  return POINT_TYPE_MARKER_FILE[String(pointTypeCode || '').trim()] || DEFAULT_POINT_MARKER_FILE;
+  const rawCode = String(pointTypeCode || '').trim();
+  const normalizedCode = LEGACY_POINT_TYPE_ALIAS[rawCode] || rawCode;
+  return POINT_TYPE_MARKER_FILE[normalizedCode] || DEFAULT_POINT_MARKER_FILE;
 }
 
 function resolvePointTypeMarkerUrl(pointTypeCode) {
@@ -188,8 +232,91 @@ function prettifyPointTypeCode(code) {
 }
 
 function getPointTypeLabelByCode(code) {
-  const found = pointTypes.find((pt) => String(pt.code) === String(code));
+  const normalizedCode = LEGACY_POINT_TYPE_ALIAS[String(code || '').trim()] || String(code || '').trim();
+  const found = pointTypes.find((pt) => String(pt.code) === normalizedCode);
+  const canonical = POINT_TYPE_META_BY_CODE.get(normalizedCode);
+  if (canonical?.labelUk) return canonical.labelUk;
   return found?.labelUk || prettifyPointTypeCode(code);
+}
+
+function inferPointTypeCodeFromText(textValue) {
+  const text = String(textValue || '').toLowerCase();
+  if (!text) return null;
+  if (/(школ|ліцей|гімназ|school)/i.test(text)) return 'school';
+  if (/(садок|освіт|універс|інститут|коледж)/i.test(text)) return 'education';
+  if (/(аптек)/i.test(text)) return 'pharmacy';
+  if (/(лікар|мед(заклад|центр|пункт|ична)?|поліклін|амбулатор|клінік)/i.test(text)) return 'medical';
+  if (/(кафе|coffee|кав[’'` ]?яр)/i.test(text)) return 'cafe';
+  if (/(ресторан|їдальн|food|foodcourt)/i.test(text)) return 'restaurant';
+  if (/(перукар|barber|салон)/i.test(text)) return 'hairdresser';
+  if (/(вокзал|станц|автостанц|порт|аеропорт)/i.test(text)) return 'station';
+  if (/(зупинк|трамва|тролейб|автобус|маршрутк|метро)/i.test(text)) return 'transport_stop';
+  if (/(банк|банкомат|atm)/i.test(text)) return 'bank';
+  if (/(пошт|укрпошт|nova ?poshta|нова пошта)/i.test(text)) return 'post';
+  if (/(азс|заправ|палив|fuel|gas station)/i.test(text)) return 'fuel_station';
+  if (/(вулиц|просп|дорог|провул|street|road)/i.test(text)) return 'street';
+  if (/(площ|сквер|майдан)/i.test(text)) return 'square';
+  if (/(парк|green zone|відпочин|лавк|сквер)/i.test(text)) return 'park';
+  if (/(дитяч|майданч|playground)/i.test(text)) return 'playground';
+  if (/(готел|hotel|хостел)/i.test(text)) return 'hotel';
+  if (/(спорт|стадіон|зал|фітнес|басейн)/i.test(text)) return 'sport';
+  if (/(театр|музей|культур|бібліот|опера)/i.test(text)) return 'culture';
+  if (/(адмін|цнап|рада|держ|муніцип)/i.test(text)) return 'administration';
+  if (/(укрит|сховище|бомбосхов)/i.test(text)) return 'shelter';
+  if (/(соц|послуг|реаб|інклюз)/i.test(text)) return 'social_services';
+  if (/(житл|будин|жк|квартир|osbb|осбб)/i.test(text)) return 'housing';
+  return null;
+}
+
+function normalizePointTypeCode(rawCode, title = '', district = '') {
+  const direct = LEGACY_POINT_TYPE_ALIAS[String(rawCode || '').trim()] || String(rawCode || '').trim();
+  const known = POINT_TYPE_META_BY_CODE.has(direct) ? direct : null;
+  if (known && known !== 'social_services') return known;
+  const inferred = inferPointTypeCodeFromText(`${title} ${district}`);
+  return inferred || known || 'other';
+}
+
+function normalizePointTypes(rows = []) {
+  const canonical = CANONICAL_POINT_TYPES.map((pt, index) => ({
+    id: index + 1,
+    code: pt.code,
+    labelUk: pt.labelUk,
+    labelEn: pt.labelEn,
+    color: pt.color,
+  }));
+  if (!Array.isArray(rows) || !rows.length) return canonical;
+  const rowByCode = new Map(
+    rows.map((row) => [
+      normalizePointTypeCode(row?.code, row?.labelUk || row?.label_uk || '', ''),
+      row,
+    ])
+  );
+  return canonical.map((pt) => {
+    const source = rowByCode.get(pt.code);
+    return {
+      id: source?.id || pt.id,
+      code: pt.code,
+      labelUk: pt.labelUk,
+      labelEn: pt.labelEn,
+      color: pt.color,
+    };
+  });
+}
+
+function normalizePointRecord(point) {
+  if (!point) return point;
+  const normalizedCode = normalizePointTypeCode(point?.pointType?.code, point?.title, point?.district);
+  const meta = POINT_TYPE_META_BY_CODE.get(normalizedCode) || POINT_TYPE_META_BY_CODE.get('other');
+  return {
+    ...point,
+    pointType: {
+      ...(point.pointType || {}),
+      code: normalizedCode,
+      labelUk: meta.labelUk,
+      labelEn: meta.labelEn,
+      color: meta.color,
+    },
+  };
 }
 
 function renderTypePreview(selectId, previewId) {
@@ -1051,8 +1178,8 @@ async function refreshDashboardData() {
     apiRequest('/api/proposals').catch(() => []),
   ]);
   dashboardNews = news || [];
-  pointTypes = typeRows || [];
-  dashboardPoints = pointRows || [];
+  pointTypes = normalizePointTypes(typeRows || []);
+  dashboardPoints = (pointRows || []).map((point) => normalizePointRecord(point));
   dashboardRoutes = (routeRows || []).map((r) => ({
     ...r,
     routeColor: r.routeColor || getRouteColor(r.id),
@@ -1079,8 +1206,8 @@ async function refreshPublicData() {
       apiRequest('/api/routes'),
     ]);
     dashboardNews = news || [];
-    pointTypes = typeRows || [];
-    dashboardPoints = pointRows || [];
+    pointTypes = normalizePointTypes(typeRows || []);
+    dashboardPoints = (pointRows || []).map((point) => normalizePointRecord(point));
     dashboardRoutes = (routeRows || []).map((r) => ({
       ...r,
       routeColor: r.routeColor || getRouteColor(r.id),
@@ -2606,7 +2733,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (filter.certified) {
             query.set('certified', 'true');
           }
-          return apiRequest(`/api/points${query.toString() ? `?${query.toString()}` : ''}`);
+          const points = await apiRequest(`/api/points${query.toString() ? `?${query.toString()}` : ''}`);
+          return (points || []).map((point) => normalizePointRecord(point));
         },
       });
       bindFilterMenu();

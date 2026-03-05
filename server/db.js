@@ -121,27 +121,30 @@ if (!routeColumns.some((c) => c.name === 'route_color')) {
 }
 
 const seedPointTypes = [
-  ['administration', 'Адміністрація', 'Administration', '#13315C'],
-  ['fuel_station', 'АЗС', 'Fuel Station', '#0B2545'],
-  ['pharmacy', 'Аптека', 'Pharmacy', '#B12B2B'],
-  ['bank', 'Банк', 'Bank', '#C5A059'],
-  ['station', 'Вокзал', 'Station', '#2C7A7B'],
+  ['school', 'Школа', 'School', '#1D4ED8'],
   ['housing', 'Житло', 'Housing', '#2B6CB0'],
-  ['stop_a', 'Зупинка А', 'Stop A', '#805AD5'],
-  ['stop_p', 'Зупинка П', 'Stop P', '#0F766E'],
-  ['stop_t', 'Зупинка Т', 'Stop T', '#7C2D12'],
   ['cafe', 'Кафе', 'Cafe', '#A16207'],
-  ['culture', 'Культура', 'Culture', '#6D28D9'],
-  ['playground', 'Майданчик', 'Playground', '#0369A1'],
-  ['medical', 'Мед заклад', 'Medical', '#BE123C'],
-  ['education', 'Навчал заклад', 'Education', '#1D4ED8'],
-  ['park', 'Парк', 'Park', '#15803D'],
-  ['hairdresser', 'Перукарня', 'Hairdresser', '#7E22CE'],
-  ['post', 'Пошта', 'Post', '#0E7490'],
   ['restaurant', 'Ресторан', 'Restaurant', '#9A3412'],
+  ['administration', 'Адміністрація', 'Administration', '#13315C'],
   ['social_services', 'Соціальні послуги', 'Social Services', '#1E3A8A'],
-  ['sport', 'Спорт', 'Sport', '#166534'],
   ['shelter', 'Укриття', 'Shelter', '#334155'],
+  ['medical', 'Мед заклад', 'Medical', '#BE123C'],
+  ['pharmacy', 'Аптека', 'Pharmacy', '#B12B2B'],
+  ['education', 'Освіта', 'Education', '#1D4ED8'],
+  ['sport', 'Спорт', 'Sport', '#166534'],
+  ['culture', 'Культура', 'Culture', '#6D28D9'],
+  ['hairdresser', 'Перукарня', 'Hairdresser', '#7E22CE'],
+  ['station', 'Вокзал', 'Station', '#2C7A7B'],
+  ['transport_stop', 'Транспортна зупинка', 'Transport Stop', '#7C2D12'],
+  ['bank', 'Банк', 'Bank', '#C5A059'],
+  ['post', 'Пошта', 'Post', '#0E7490'],
+  ['fuel_station', 'АЗС', 'Fuel Station', '#0B2545'],
+  ['street', 'Вулиці', 'Street', '#3D5263'],
+  ['square', 'Площі', 'Square', '#3D5263'],
+  ['park', 'Парк', 'Park', '#15803D'],
+  ['playground', 'Майданчик', 'Playground', '#0369A1'],
+  ['hotel', 'Готель', 'Hotel', '#2B6CB0'],
+  ['other', 'Інше', 'Other', '#64748B'],
 ];
 
 const upsertPointType = db.prepare(`
@@ -160,8 +163,10 @@ const legacyToNewTypeCode = {
   toilet: 'medical',
   parking: 'fuel_station',
   entrance: 'administration',
-  crossing: 'park',
-  transport_stop: 'stop_t',
+  crossing: 'street',
+  stop_a: 'transport_stop',
+  stop_p: 'transport_stop',
+  stop_t: 'transport_stop',
 };
 
 const getTypeIdByCode = db.prepare('SELECT id FROM point_types WHERE code = ?');
@@ -175,6 +180,49 @@ Object.entries(legacyToNewTypeCode).forEach(([legacyCode, newCode]) => {
 });
 const deleteLegacyType = db.prepare('DELETE FROM point_types WHERE code = ?');
 Object.keys(legacyToNewTypeCode).forEach((legacyCode) => deleteLegacyType.run(legacyCode));
+
+const inferTypeByTitle = db.prepare(`
+UPDATE points
+SET point_type_id = ?
+WHERE lower(title) LIKE ?
+`);
+const inferredRules = [
+  ['school', '%школ%'],
+  ['education', '%ліцей%'],
+  ['education', '%гімназ%'],
+  ['education', '%універс%'],
+  ['education', '%коледж%'],
+  ['pharmacy', '%аптек%'],
+  ['medical', '%лікар%'],
+  ['medical', '%мед заклад%'],
+  ['medical', '%мед центр%'],
+  ['medical', '%медпункт%'],
+  ['cafe', '%кафе%'],
+  ['restaurant', '%ресторан%'],
+  ['hairdresser', '%перукар%'],
+  ['station', '%вокзал%'],
+  ['transport_stop', '%зупинк%'],
+  ['bank', '%банк%'],
+  ['post', '%пошт%'],
+  ['fuel_station', '%азс%'],
+  ['shelter', '%укрит%'],
+  ['culture', '%театр%'],
+  ['culture', '%музей%'],
+  ['park', '%парк%'],
+  ['park', '%сквер%'],
+  ['park', '%лавк%'],
+  ['park', '%відпочин%'],
+  ['square', '%площ%'],
+  ['street', '%вул.%'],
+  ['street', '%бульвар%'],
+  ['hotel', '%готел%'],
+  ['sport', '%спорт%'],
+];
+inferredRules.forEach(([code, pattern]) => {
+  const typeId = getTypeIdByCode.get(code)?.id;
+  if (!typeId) return;
+  inferTypeByTitle.run(typeId, pattern);
+});
 
 const adminEmail = 'admin@odesa-map.local';
 const specialistEmail = 'specialist@odesa-map.local';

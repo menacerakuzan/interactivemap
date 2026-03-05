@@ -178,9 +178,24 @@ async function supabaseCreateProposal(payload) {
 }
 
 async function supabaseGetPointTypeIdByCode(code) {
-  const { data, error } = await supabase.from('point_types').select('id').eq('code', code).single();
-  if (error) throw error;
-  return data.id;
+  const requested = String(code || '').trim();
+  const fallbackByCode = {
+    school: 'education',
+    transport_stop: 'stop_t',
+    street: 'park',
+    square: 'park',
+    hotel: 'housing',
+    other: 'social_services',
+  };
+  let { data, error } = await supabase.from('point_types').select('id').eq('code', requested).single();
+  if (!error && data?.id) return data.id;
+
+  const fallback = fallbackByCode[requested];
+  if (!fallback) throw error;
+
+  const fallbackResult = await supabase.from('point_types').select('id').eq('code', fallback).single();
+  if (fallbackResult.error) throw fallbackResult.error;
+  return fallbackResult.data.id;
 }
 
 async function supabaseGetPoints(query = {}) {

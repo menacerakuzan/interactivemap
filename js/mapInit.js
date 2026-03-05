@@ -16,20 +16,23 @@ let lineToolColor = '#E7C769';
 let lineDraftVertices = [];
 
 const POINT_TYPE_MARKER_FILE = {
+  school: 'навчал заклад.svg',
   administration: 'адміністрація.svg',
   fuel_station: 'азс.svg',
   pharmacy: 'аптека.svg',
   bank: 'банк.svg',
   station: 'вокзал.svg',
   housing: 'житло.svg',
-  stop_a: 'зупинка А.svg',
-  stop_p: 'зупинка П.svg',
-  stop_t: 'зупинка Т.svg',
+  transport_stop: 'зупинка Т.svg',
   cafe: 'кафе.svg',
   culture: 'культура.svg',
   playground: 'майданчик.svg',
   medical: 'мед заклад.svg',
   education: 'навчал заклад.svg',
+  street: 'парк.svg',
+  square: 'парк.svg',
+  hotel: 'житло.svg',
+  other: 'соціальні послуги.svg',
   park: 'парк.svg',
   hairdresser: 'перукарня.svg',
   post: 'пошта.svg',
@@ -37,6 +40,16 @@ const POINT_TYPE_MARKER_FILE = {
   social_services: 'соціальні послуги.svg',
   sport: 'спорт.svg',
   shelter: 'укриття.svg',
+  // Legacy aliases.
+  stop_a: 'зупинка Т.svg',
+  stop_p: 'зупинка Т.svg',
+  stop_t: 'зупинка Т.svg',
+  ramp: 'соціальні послуги.svg',
+  elevator: 'соціальні послуги.svg',
+  toilet: 'мед заклад.svg',
+  parking: 'азс.svg',
+  entrance: 'адміністрація.svg',
+  crossing: 'парк.svg',
 };
 
 const MARKER_FILES = [
