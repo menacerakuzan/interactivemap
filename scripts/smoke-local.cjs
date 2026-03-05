@@ -91,7 +91,7 @@ async function runSmoke() {
         description: 'Smoke created point',
         lat: 46.4825,
         lng: 30.7233,
-        pointTypeCode: 'ramp',
+        pointTypeCode: 'culture',
         district: 'Одеський район',
         isCertified: false,
         sections: [

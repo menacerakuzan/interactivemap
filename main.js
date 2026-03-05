@@ -93,13 +93,27 @@ const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
 const POINT_TYPE_MARKER_FILE = {
-  transport_stop: 'зупинка Т.svg',
-  parking: 'азс.svg',
-  toilet: 'мед заклад.svg',
-  entrance: 'адміністрація.svg',
-  crossing: 'парк.svg',
-  ramp: 'соціальні послуги.svg',
-  elevator: 'соціальні послуги.svg',
+  administration: 'адміністрація.svg',
+  fuel_station: 'азс.svg',
+  pharmacy: 'аптека.svg',
+  bank: 'банк.svg',
+  station: 'вокзал.svg',
+  housing: 'житло.svg',
+  stop_a: 'зупинка А.svg',
+  stop_p: 'зупинка П.svg',
+  stop_t: 'зупинка Т.svg',
+  cafe: 'кафе.svg',
+  culture: 'культура.svg',
+  playground: 'майданчик.svg',
+  medical: 'мед заклад.svg',
+  education: 'навчал заклад.svg',
+  park: 'парк.svg',
+  hairdresser: 'перукарня.svg',
+  post: 'пошта.svg',
+  restaurant: 'ресторан.svg',
+  social_services: 'соціальні послуги.svg',
+  sport: 'спорт.svg',
+  shelter: 'укриття.svg',
 };
 const DEFAULT_POINT_MARKER_FILE = 'соціальні послуги.svg';
 const dashboardBlockIds = [

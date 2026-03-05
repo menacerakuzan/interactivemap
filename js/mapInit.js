@@ -16,13 +16,27 @@ let lineToolColor = '#E7C769';
 let lineDraftVertices = [];
 
 const POINT_TYPE_MARKER_FILE = {
-  transport_stop: 'зупинка Т.svg',
-  parking: 'азс.svg',
-  toilet: 'мед заклад.svg',
-  entrance: 'адміністрація.svg',
-  crossing: 'парк.svg',
-  ramp: 'соціальні послуги.svg',
-  elevator: 'соціальні послуги.svg',
+  administration: 'адміністрація.svg',
+  fuel_station: 'азс.svg',
+  pharmacy: 'аптека.svg',
+  bank: 'банк.svg',
+  station: 'вокзал.svg',
+  housing: 'житло.svg',
+  stop_a: 'зупинка А.svg',
+  stop_p: 'зупинка П.svg',
+  stop_t: 'зупинка Т.svg',
+  cafe: 'кафе.svg',
+  culture: 'культура.svg',
+  playground: 'майданчик.svg',
+  medical: 'мед заклад.svg',
+  education: 'навчал заклад.svg',
+  park: 'парк.svg',
+  hairdresser: 'перукарня.svg',
+  post: 'пошта.svg',
+  restaurant: 'ресторан.svg',
+  social_services: 'соціальні послуги.svg',
+  sport: 'спорт.svg',
+  shelter: 'укриття.svg',
 };
 
 const MARKER_FILES = [
@@ -155,8 +169,8 @@ function createIcon(point) {
   return L.divIcon({
     className: 'custom-map-marker',
     html,
-    iconSize: [160, 86],
-    iconAnchor: [31, 72],
+    iconSize: [142, 74],
+    iconAnchor: [25, 62],
   });
 }
 
@@ -269,6 +283,14 @@ async function loadAndRenderPoints() {
       const icon = createIcon(point);
       const marker = L.marker([lat, lng], { icon }).addTo(markerLayer);
       marker.on('click', () => {
+        if (lineToolVisible) {
+          if (lineToolMode === 'erase') {
+            eraseLineDraftVertex({ lat, lng });
+            return;
+          }
+          addLineDraftFromPoint(point);
+          return;
+        }
         map.panTo([lat, lng], {
           animate: true,
           duration: 0.35,
@@ -489,6 +511,28 @@ function addLineDraftVertex(latlng) {
   return true;
 }
 
+function addLineDraftFromPoint(point) {
+  const lat = Number(point?.lat);
+  const lng = Number(point?.lng);
+  const pointId = Number(point?.id);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(pointId)) return false;
+
+  const prev = lineDraftVertices[lineDraftVertices.length - 1];
+  if (prev && Number(prev.pointId) === pointId) {
+    return false;
+  }
+
+  lineDraftVertices.push({
+    lat,
+    lng,
+    pointId,
+    title: point?.title || '',
+    snapped: true,
+  });
+  renderLineDraft();
+  return true;
+}
+
 function eraseLineDraftVertex(latlng) {
   if (!lineDraftVertices.length || !map) return false;
   const target = map.latLngToContainerPoint(latlng);
@@ -553,6 +597,12 @@ function setLineToolColor(color = '#E7C769') {
     lineToolColor = color;
     renderLineDraft();
   }
+}
+
+function updateMarkerZoomClass() {
+  const container = map?.getContainer();
+  if (!container || !map) return;
+  container.classList.toggle('markers-compact', map.getZoom() < 11.2);
 }
 
 function applyLineDraftToRoute() {
@@ -841,6 +891,7 @@ export async function initMap(options = {}) {
     if (!isWheelAnimating) {
       targetZoom = map.getZoom();
     }
+    updateMarkerZoomClass();
   });
 
   const zoomInBtn = mapContainer.querySelector('.leaflet-control-zoom-in');
@@ -866,9 +917,7 @@ export async function initMap(options = {}) {
     if (lineToolVisible) {
       if (lineToolMode === 'erase') {
         eraseLineDraftVertex(e.latlng);
-        return;
       }
-      addLineDraftVertex(e.latlng);
       return;
     }
 
@@ -882,6 +931,7 @@ export async function initMap(options = {}) {
 
   window.addEventListener('resize', () => map.invalidateSize());
   setTimeout(() => map.invalidateSize(), 500);
+  updateMarkerZoomClass();
 
   await loadAndRenderPoints();
 

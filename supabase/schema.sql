@@ -183,11 +183,25 @@ with check (public.is_specialist_or_admin());
 
 insert into public.point_types (code, label_uk, label_en, color)
 values
-  ('ramp', 'Пандус', 'Ramp', '#13315C'),
-  ('elevator', 'Ліфт', 'Elevator', '#0B2545'),
-  ('toilet', 'Туалет', 'Toilet', '#B12B2B'),
-  ('parking', 'Паркування', 'Parking', '#C5A059'),
-  ('entrance', 'Вхід', 'Entrance', '#2C7A7B'),
-  ('crossing', 'Пішохідний перехід', 'Crossing', '#2B6CB0'),
-  ('transport_stop', 'Зупинка транспорту', 'Transport Stop', '#805AD5')
+  ('administration', 'Адміністрація', 'Administration', '#13315C'),
+  ('fuel_station', 'АЗС', 'Fuel Station', '#0B2545'),
+  ('pharmacy', 'Аптека', 'Pharmacy', '#B12B2B'),
+  ('bank', 'Банк', 'Bank', '#C5A059'),
+  ('station', 'Вокзал', 'Station', '#2C7A7B'),
+  ('housing', 'Житло', 'Housing', '#2B6CB0'),
+  ('stop_a', 'Зупинка А', 'Stop A', '#805AD5'),
+  ('stop_p', 'Зупинка П', 'Stop P', '#0F766E'),
+  ('stop_t', 'Зупинка Т', 'Stop T', '#7C2D12'),
+  ('cafe', 'Кафе', 'Cafe', '#A16207'),
+  ('culture', 'Культура', 'Culture', '#6D28D9'),
+  ('playground', 'Майданчик', 'Playground', '#0369A1'),
+  ('medical', 'Мед заклад', 'Medical', '#BE123C'),
+  ('education', 'Навчал заклад', 'Education', '#1D4ED8'),
+  ('park', 'Парк', 'Park', '#15803D'),
+  ('hairdresser', 'Перукарня', 'Hairdresser', '#7E22CE'),
+  ('post', 'Пошта', 'Post', '#0E7490'),
+  ('restaurant', 'Ресторан', 'Restaurant', '#9A3412'),
+  ('social_services', 'Соціальні послуги', 'Social Services', '#1E3A8A'),
+  ('sport', 'Спорт', 'Sport', '#166534'),
+  ('shelter', 'Укриття', 'Shelter', '#334155')
 on conflict (code) do nothing;
