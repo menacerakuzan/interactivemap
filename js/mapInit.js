@@ -128,8 +128,8 @@ function normalizeGeoText(value) {
 }
 
 const ODESA_BOUNDS = {
-  center: [46.7, 30.2],
-  defaultZoom: 8,
+  center: [46.4825, 30.7233],
+  defaultZoom: 11,
   cityZoom: 13,
 };
 

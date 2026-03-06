@@ -94,6 +94,7 @@ const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
 const DEFAULT_NEWS_IMAGE_FOCUS_Y = 50;
+const ODESA_START_FOCUS = { lat: 46.4825, lng: 30.7233, zoom: 11 };
 const MARKER_URL_BY_FILE = {
   'адміністрація.svg': new URL('./assets/markers/адміністрація.svg', import.meta.url).href,
   'азс.svg': new URL('./assets/markers/азс.svg', import.meta.url).href,
@@ -728,6 +729,37 @@ async function geocodeCommunity(district, community) {
       lat: Number(data[0].lat),
       lng: Number(data[0].lon),
       zoom: 12,
+      geojson: data[0].geojson || null,
+    };
+    localStorage.setItem(cacheKey, JSON.stringify(result));
+    return result;
+  } catch (_e) {
+    return null;
+  }
+}
+
+async function geocodeDistrict(district) {
+  const cacheKey = `geo::district::${district}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (_e) {
+      localStorage.removeItem(cacheKey);
+    }
+  }
+
+  try {
+    const query = encodeURIComponent(`${district}, Odesa Oblast, Ukraine`);
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&limit=1&q=${query}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!Array.isArray(data) || !data.length) return null;
+    const result = {
+      lat: Number(data[0].lat),
+      lng: Number(data[0].lon),
+      zoom: 11,
       geojson: data[0].geojson || null,
     };
     localStorage.setItem(cacheKey, JSON.stringify(result));
@@ -2063,8 +2095,14 @@ function bindFilterMenu() {
         btn.classList.add('active');
         filterMenu.classList.remove('active');
         if (!mapController) return;
+        selectedDistrict = '';
+        selectedCommunity = '';
+        if (communitySelect) communitySelect.value = '';
+        mapController.clearFocusBoundary?.();
+        mapController.focusLocation?.(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
         await mapController.setFilter({ type: 'all', certified: false, district: '', community: '' });
         setSpecialistMessage('Точки не приховуються: фільтр використовується для навігації.');
+        saveUiState();
       });
     });
   }
@@ -2103,6 +2141,8 @@ function bindFilterMenu() {
 
       if (!value) {
         mapController?.clearFocusBoundary?.();
+        mapController?.focusLocation?.(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
+        setSpecialistMessage('Фокус на Одесі');
         saveUiState();
         return;
       }
@@ -2110,13 +2150,19 @@ function bindFilterMenu() {
       if (value.startsWith('district::')) {
         const district = value.split('::')[1];
         selectedDistrict = district;
-        mapController?.clearFocusBoundary?.();
+        const districtGeo = await geocodeDistrict(district);
+        const hasBoundary = districtGeo?.geojson ? mapController?.setFocusBoundary?.(districtGeo.geojson) : false;
+        if (!hasBoundary) mapController?.clearFocusBoundary?.();
         const districtNeedle = normalizeGeoText(district);
         const points = dashboardPoints.filter((p) =>
           normalizeGeoText(p.district).includes(districtNeedle)
         );
         const focusedByPoints = mapController?.focusPoints?.(points, { maxZoom: 11, singleZoom: 11 });
-        if (!focusedByPoints) {
+        if (districtGeo && hasBoundary) {
+          mapController?.focusBoundary?.({ maxZoom: 11 });
+        } else if (districtGeo) {
+          mapController?.focusLocation?.(districtGeo.lat, districtGeo.lng, districtGeo.zoom || 11);
+        } else if (!focusedByPoints) {
           const center = DISTRICT_CENTERS[district];
           if (center) {
             mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 11);
@@ -3190,6 +3236,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await refreshPublicData();
+
+    if (!selectedDistrict && !selectedCommunity) {
+      mapController?.clearFocusBoundary?.();
+      mapController?.focusLocation?.(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
+      const communitySelect = document.getElementById('community-select');
+      if (communitySelect) communitySelect.value = '';
+    }
 
     if (authUser && ['admin', 'specialist'].includes(authUser.role)) {
       setAuthState(authToken, authUser);
