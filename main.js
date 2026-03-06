@@ -1079,19 +1079,21 @@ function renderNews() {
     .map(
       (item) => `
       <div class="card reveal news-card">
-        <div class="news-cover" style="${
-          item.imageUrl
-            ? `background-image:url('${item.imageUrl}');background-size:cover;background-repeat:no-repeat;background-position:50% ${normalizeNewsImageFocusY(
-                item.imageFocusY
-              )}%;`
-            : 'background:linear-gradient(120deg, rgba(11,37,69,0.18), rgba(197,160,89,0.2));'
-        }"></div>
+        <div class="news-cover">
+          ${
+            item.imageUrl
+              ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title || 'Новина')}" loading="lazy" decoding="async" style="object-position:50% ${normalizeNewsImageFocusY(
+                  item.imageFocusY
+                )}%;" />`
+              : ''
+          }
+        </div>
         <div class="t-data text-muted" style="margin-bottom: 16px;">${formatIsoDate(item.createdAt)}</div>
-        <h3 class="t-h3" style="font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 12px;">${item.title}</h3>
-        <p class="t-body text-muted" style="margin-bottom: 24px;">${item.summary}</p>
+        <h3 class="t-h3" style="font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 12px;">${escapeHtml(item.title)}</h3>
+        <p class="t-body text-muted" style="margin-bottom: 24px;">${escapeHtml(item.summary)}</p>
         ${
           item.link
-            ? `<a href="${item.link}" target="_blank" rel="noopener noreferrer" class="t-body" style="color: var(--c-cerulean); text-decoration: none;">Читати &rarr;</a>`
+            ? `<a href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer" class="t-body" style="color: var(--c-cerulean); text-decoration: none;">Читати &rarr;</a>`
             : '<span class="t-body text-muted">Джерело не вказано</span>'
         }
       </div>
@@ -1599,11 +1601,8 @@ function renderNewsImagePreview() {
     return;
   }
 
-  preview.innerHTML = '';
-  preview.style.backgroundImage = `url('${imageUrl}')`;
-  preview.style.backgroundSize = 'cover';
-  preview.style.backgroundRepeat = 'no-repeat';
-  preview.style.backgroundPosition = `50% ${focusY}%`;
+  preview.style.background = 'linear-gradient(120deg, rgba(11, 37, 69, 0.12), rgba(197, 160, 89, 0.16))';
+  preview.innerHTML = `<img src="${escapeHtml(imageUrl)}" alt="Превʼю новини" loading="lazy" decoding="async" style="object-position:50% ${focusY}%;" />`;
 }
 
 function resetNewsEditor() {
@@ -2117,6 +2116,7 @@ function bindFloatingUiControls() {
   const legendWrap = document.getElementById('map-legend-wrap');
   const btnToggleLegend = document.getElementById('btn-toggle-legend');
   const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
+  const routeLineToolbar = document.getElementById('route-line-toolbar');
   const mapContainer = document.querySelector('.map-container');
 
   if (btnHideSpecialist && specialistPanel) {
@@ -2152,6 +2152,9 @@ function bindFloatingUiControls() {
       setNodeDisplay(filterMenu, false);
       setNodeDisplay(legendWrap, false);
       setNodeDisplay(btnMapFullscreen, false);
+      if (routeLineToolbar && routeLineToolbar.style.display !== 'none') {
+        setNodeDisplay(routeLineToolbar, false);
+      }
       if (specialistPanel?.classList.contains('active')) {
         setNodeDisplay(specialistPanel, false);
       }
@@ -2160,7 +2163,11 @@ function bindFloatingUiControls() {
     setNodeDisplay(filterMenu, true);
     setNodeDisplay(legendWrap, true);
     setNodeDisplay(btnMapFullscreen, true);
+    if (routeLineToolbar && routeLineToolbar.style.display !== 'none') {
+      setNodeDisplay(routeLineToolbar, true);
+    }
     if (specialistPanel?.classList.contains('active')) {
+      setNodeDisplay(specialistPanel, true);
       if (specialistPanel.style.display !== 'flex') {
         specialistPanel.style.display = 'flex';
       }
