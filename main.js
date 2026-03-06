@@ -94,7 +94,7 @@ const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
 const DEFAULT_NEWS_IMAGE_FOCUS_Y = 50;
-const ODESA_START_FOCUS = { lat: 46.4825, lng: 30.7233, zoom: 11 };
+const ODESA_START_FOCUS = { lat: 46.4825, lng: 30.7233, zoom: 12 };
 const MARKER_URL_BY_FILE = {
   'адміністрація.svg': new URL('./assets/markers/адміністрація.svg', import.meta.url).href,
   'азс.svg': new URL('./assets/markers/азс.svg', import.meta.url).href,
