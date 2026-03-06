@@ -42,6 +42,13 @@ function normalizeOptionalText(value, maxLen = 2000) {
   return trimmed.slice(0, maxLen);
 }
 
+function normalizeNewsImageFocusY(value) {
+  if (value === undefined || value === null || value === '') return 50;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 50;
+  return Math.max(0, Math.min(100, parsed));
+}
+
 async function resolveSourceImage(link) {
   if (!link) return null;
   let normalizedLink = null;
@@ -567,7 +574,7 @@ app.delete('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), 
 app.get('/api/news', (_req, res) => {
   const rows = db
     .prepare(
-      `SELECT n.id, n.title, n.summary, n.link, n.image_url, n.created_at, u.full_name AS author_name
+      `SELECT n.id, n.title, n.summary, n.link, n.image_url, n.image_focus_y, n.created_at, u.full_name AS author_name
        FROM news n
        JOIN users u ON u.id = n.created_by
        ORDER BY n.created_at DESC`
@@ -581,6 +588,7 @@ app.get('/api/news', (_req, res) => {
       summary: r.summary,
       link: r.link,
       imageUrl: r.image_url || null,
+      imageFocusY: normalizeNewsImageFocusY(r.image_focus_y),
       authorName: r.author_name,
       createdAt: r.created_at,
     }))
@@ -588,7 +596,7 @@ app.get('/api/news', (_req, res) => {
 });
 
 app.post('/api/news', authenticate, requireRole('admin', 'specialist'), async (req, res) => {
-  const { title, summary, link, imageUrl } = req.body;
+  const { title, summary, link, imageUrl, imageFocusY } = req.body;
   if (!isNonEmptyText(title, 180) || !isNonEmptyText(summary, 1000)) {
     return res.status(400).json({ error: 'title and summary are required' });
   }
@@ -599,12 +607,12 @@ app.post('/api/news', authenticate, requireRole('admin', 'specialist'), async (r
   }
 
   const result = db
-    .prepare(`INSERT INTO news (title, summary, link, image_url, created_by) VALUES (?, ?, ?, ?, ?)`)
-    .run(title.trim(), summary.trim(), normalizedLink, normalizedImage, req.user.id);
+    .prepare(`INSERT INTO news (title, summary, link, image_url, image_focus_y, created_by) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(title.trim(), summary.trim(), normalizedLink, normalizedImage, normalizeNewsImageFocusY(imageFocusY), req.user.id);
 
   const row = db
     .prepare(
-      `SELECT n.id, n.title, n.summary, n.link, n.image_url, n.created_at, u.full_name AS author_name
+      `SELECT n.id, n.title, n.summary, n.link, n.image_url, n.image_focus_y, n.created_at, u.full_name AS author_name
        FROM news n
        JOIN users u ON u.id = n.created_by
        WHERE n.id = ?`
@@ -617,6 +625,7 @@ app.post('/api/news', authenticate, requireRole('admin', 'specialist'), async (r
     summary: row.summary,
     link: row.link,
     imageUrl: row.image_url || null,
+    imageFocusY: normalizeNewsImageFocusY(row.image_focus_y),
     authorName: row.author_name,
     createdAt: row.created_at,
   });
@@ -629,7 +638,7 @@ app.put('/api/news/:id', authenticate, requireRole('admin', 'specialist'), async
     return res.status(404).json({ error: 'News not found' });
   }
 
-  const { title, summary, link, imageUrl } = req.body;
+  const { title, summary, link, imageUrl, imageFocusY } = req.body;
   if (title !== undefined && !isNonEmptyText(title, 180)) {
     return res.status(400).json({ error: 'Invalid title' });
   }
@@ -664,6 +673,10 @@ app.put('/api/news/:id', authenticate, requireRole('admin', 'specialist'), async
       }
     }
   }
+  if (imageFocusY !== undefined) {
+    fields.push('image_focus_y = ?');
+    values.push(normalizeNewsImageFocusY(imageFocusY));
+  }
   if (!fields.length) {
     return res.status(400).json({ error: 'No fields to update' });
   }
@@ -672,7 +685,7 @@ app.put('/api/news/:id', authenticate, requireRole('admin', 'specialist'), async
 
   const row = db
     .prepare(
-      `SELECT n.id, n.title, n.summary, n.link, n.image_url, n.created_at, u.full_name AS author_name
+      `SELECT n.id, n.title, n.summary, n.link, n.image_url, n.image_focus_y, n.created_at, u.full_name AS author_name
        FROM news n
        JOIN users u ON u.id = n.created_by
        WHERE n.id = ?`
@@ -685,6 +698,7 @@ app.put('/api/news/:id', authenticate, requireRole('admin', 'specialist'), async
     summary: row.summary,
     link: row.link,
     imageUrl: row.image_url || null,
+    imageFocusY: normalizeNewsImageFocusY(row.image_focus_y),
     authorName: row.author_name,
     createdAt: row.created_at,
   });

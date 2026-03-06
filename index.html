@@ -272,6 +272,13 @@
                     <input id="news-link-input" type="text" placeholder="Посилання (опційно)" />
                     <input id="news-image-url-input" type="text"
                         placeholder="URL картинки (опційно, якщо пусто - спробуємо взяти з джерела)" />
+                    <label class="t-data text-muted" for="news-image-focus-y-input">
+                        Позиція фото по вертикалі: <span id="news-image-focus-y-value">50%</span>
+                    </label>
+                    <input id="news-image-focus-y-input" type="range" min="0" max="100" step="1" value="50" />
+                    <div id="news-image-preview" class="news-image-preview">
+                        <span class="t-data text-muted">Превʼю фото відсутнє</span>
+                    </div>
                     <button id="btn-create-news" class="btn-primary">Опублікувати новину</button>
                     <button id="btn-save-news" class="btn-primary">Оновити новину</button>
                     <button id="btn-delete-news" class="btn-flat">Видалити новину</button>

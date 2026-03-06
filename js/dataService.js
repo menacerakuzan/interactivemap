@@ -18,6 +18,11 @@ function isMissingNewsImageError(error) {
   return message.includes('image_url') && message.includes('news');
 }
 
+function isMissingNewsImageFocusError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('image_focus_y') && message.includes('news');
+}
+
 function isMissingRouteColorError(error) {
   const message = String(error?.message || error || '').toLowerCase();
   return message.includes('route_color') && message.includes('routes');
@@ -73,12 +78,14 @@ function mapPoint(row) {
 }
 
 function mapNews(row, authorName = null) {
+  const parsedFocus = Number(row.image_focus_y);
   return {
     id: row.id,
     title: row.title,
     summary: row.summary,
     link: row.link,
     imageUrl: row.image_url || null,
+    imageFocusY: Number.isFinite(parsedFocus) ? Math.max(0, Math.min(100, parsedFocus)) : 50,
     authorName: row.author_name || authorName || null,
     createdAt: row.created_at,
   };
@@ -558,9 +565,9 @@ async function supabaseGetCurrentUser() {
 async function supabaseGetNews() {
   let { data, error } = await supabase
     .from('news')
-    .select('id,title,summary,link,image_url,created_at,created_by')
+    .select('id,title,summary,link,image_url,image_focus_y,created_at,created_by')
     .order('created_at', { ascending: false });
-  if (error && isMissingNewsImageError(error)) {
+  if (error && (isMissingNewsImageError(error) || isMissingNewsImageFocusError(error))) {
     const fallback = await supabase
       .from('news')
       .select('id,title,summary,link,created_at,created_by')
@@ -597,11 +604,12 @@ async function supabaseCreateNews(payload) {
       summary: payload.summary,
       link: payload.link || null,
       image_url: imageUrl,
+      image_focus_y: Number.isFinite(Number(payload.imageFocusY)) ? Number(payload.imageFocusY) : 50,
       created_by: user.id,
     })
-    .select('id,title,summary,link,image_url,created_at')
+    .select('id,title,summary,link,image_url,image_focus_y,created_at')
     .single();
-  if (error && isMissingNewsImageError(error)) {
+  if (error && (isMissingNewsImageError(error) || isMissingNewsImageFocusError(error))) {
     const fallback = await supabase
       .from('news')
       .insert({
@@ -624,6 +632,10 @@ async function supabaseUpdateNews(newsId, payload) {
   if (payload.title !== undefined) updateData.title = payload.title;
   if (payload.summary !== undefined) updateData.summary = payload.summary;
   if (payload.link !== undefined) updateData.link = payload.link || null;
+  if (payload.imageFocusY !== undefined) {
+    const parsedFocus = Number(payload.imageFocusY);
+    updateData.image_focus_y = Number.isFinite(parsedFocus) ? Math.max(0, Math.min(100, parsedFocus)) : 50;
+  }
   const hasCustomImage = typeof payload.imageUrl === 'string' && payload.imageUrl.trim().length > 0;
   if (hasCustomImage) {
     updateData.image_url = payload.imageUrl.trim();
@@ -639,11 +651,12 @@ async function supabaseUpdateNews(newsId, payload) {
     .from('news')
     .update(updateData)
     .eq('id', newsId)
-    .select('id,title,summary,link,image_url,created_at')
+    .select('id,title,summary,link,image_url,image_focus_y,created_at')
     .single();
-  if (error && isMissingNewsImageError(error)) {
+  if (error && (isMissingNewsImageError(error) || isMissingNewsImageFocusError(error))) {
     const fallbackData = { ...updateData };
     delete fallbackData.image_url;
+    delete fallbackData.image_focus_y;
     const fallback = await supabase
       .from('news')
       .update(fallbackData)

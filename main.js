@@ -93,6 +93,7 @@ const hiddenPointTypeCodes = new Set();
 const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
+const DEFAULT_NEWS_IMAGE_FOCUS_Y = 50;
 const MARKER_URL_BY_FILE = {
   'адміністрація.svg': new URL('./assets/markers/адміністрація.svg', import.meta.url).href,
   'азс.svg': new URL('./assets/markers/азс.svg', import.meta.url).href,
@@ -1048,6 +1049,12 @@ function renderLegend() {
   });
 }
 
+function normalizeNewsImageFocusY(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_NEWS_IMAGE_FOCUS_Y;
+  return Math.max(0, Math.min(100, parsed));
+}
+
 function renderNews() {
   const newsList = document.getElementById('news-list');
   const newsPager = document.getElementById('news-pager');
@@ -1072,11 +1079,13 @@ function renderNews() {
     .map(
       (item) => `
       <div class="card reveal news-card">
-        <div class="news-cover" style="background: ${
+        <div class="news-cover" style="${
           item.imageUrl
-            ? `url('${item.imageUrl}') center/cover`
-            : 'linear-gradient(120deg, rgba(11,37,69,0.18), rgba(197,160,89,0.2))'
-        };"></div>
+            ? `background-image:url('${item.imageUrl}');background-size:cover;background-repeat:no-repeat;background-position:50% ${normalizeNewsImageFocusY(
+                item.imageFocusY
+              )}%;`
+            : 'background:linear-gradient(120deg, rgba(11,37,69,0.18), rgba(197,160,89,0.2));'
+        }"></div>
         <div class="t-data text-muted" style="margin-bottom: 16px;">${formatIsoDate(item.createdAt)}</div>
         <h3 class="t-h3" style="font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 12px;">${item.title}</h3>
         <p class="t-body text-muted" style="margin-bottom: 24px;">${item.summary}</p>
@@ -1572,18 +1581,46 @@ function openPointInEditor(pointId) {
   saveUiState();
 }
 
+function renderNewsImagePreview() {
+  const preview = document.getElementById('news-image-preview');
+  const imageUrlInput = document.getElementById('news-image-url-input');
+  const focusInput = document.getElementById('news-image-focus-y-input');
+  const focusValue = document.getElementById('news-image-focus-y-value');
+  if (!preview || !focusInput || !focusValue) return;
+
+  const imageUrl = imageUrlInput?.value?.trim() || '';
+  const focusY = normalizeNewsImageFocusY(focusInput.value);
+  focusInput.value = String(Math.round(focusY));
+  focusValue.textContent = `${Math.round(focusY)}%`;
+
+  if (!imageUrl) {
+    preview.innerHTML = '<span class="t-data text-muted">Превʼю фото відсутнє</span>';
+    preview.style.background = 'linear-gradient(120deg, rgba(11, 37, 69, 0.12), rgba(197, 160, 89, 0.16))';
+    return;
+  }
+
+  preview.innerHTML = '';
+  preview.style.backgroundImage = `url('${imageUrl}')`;
+  preview.style.backgroundSize = 'cover';
+  preview.style.backgroundRepeat = 'no-repeat';
+  preview.style.backgroundPosition = `50% ${focusY}%`;
+}
+
 function resetNewsEditor() {
   editingNewsId = null;
   const title = document.getElementById('news-title-input');
   const summary = document.getElementById('news-summary-input');
   const link = document.getElementById('news-link-input');
   const imageUrl = document.getElementById('news-image-url-input');
+  const imageFocusY = document.getElementById('news-image-focus-y-input');
   const select = document.getElementById('news-edit-select');
   if (title) title.value = '';
   if (summary) summary.value = '';
   if (link) link.value = '';
   if (imageUrl) imageUrl.value = '';
+  if (imageFocusY) imageFocusY.value = String(DEFAULT_NEWS_IMAGE_FOCUS_Y);
   if (select) select.value = '';
+  renderNewsImagePreview();
   syncEditorActionButtons();
 }
 
@@ -1595,12 +1632,15 @@ function openNewsInEditor(newsId) {
   const summary = document.getElementById('news-summary-input');
   const link = document.getElementById('news-link-input');
   const imageUrl = document.getElementById('news-image-url-input');
+  const imageFocusY = document.getElementById('news-image-focus-y-input');
   const select = document.getElementById('news-edit-select');
   if (title) title.value = news.title || '';
   if (summary) summary.value = news.summary || '';
   if (link) link.value = news.link || '';
   if (imageUrl) imageUrl.value = news.imageUrl || '';
+  if (imageFocusY) imageFocusY.value = String(normalizeNewsImageFocusY(news.imageFocusY));
   if (select) select.value = String(news.id);
+  renderNewsImagePreview();
   setActiveSpecialistTab('news-editor');
   setSpecialistMessage(`Редагування новини: ${news.title}`);
   syncEditorActionButtons();
@@ -2164,6 +2204,8 @@ function bindSpecialistTools() {
   const btnDeleteNews = document.getElementById('btn-delete-news');
   const newsEditSelect = document.getElementById('news-edit-select');
   const btnNewNews = document.getElementById('btn-new-news');
+  const newsImageUrlInput = document.getElementById('news-image-url-input');
+  const newsImageFocusYInput = document.getElementById('news-image-focus-y-input');
   const editPointSelect = document.getElementById('edit-point-select');
   const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
   const routeColorInput = document.getElementById('route-color');
@@ -2193,6 +2235,7 @@ function bindSpecialistTools() {
   renderTypePreview('edit-point-type', 'edit-point-type-preview');
   renderPointPhotoPreview('point-photo-preview');
   renderPointPhotoPreview('edit-point-photo-preview');
+  renderNewsImagePreview();
 
   if (pointTypeSelect) {
     pointTypeSelect.addEventListener('change', () => {
@@ -2224,6 +2267,16 @@ function bindSpecialistTools() {
     editPointPhotoFileInput.addEventListener('change', () => {
       const file = editPointPhotoFileInput.files?.[0] || null;
       renderPointPhotoPreview('edit-point-photo-preview', { url: editPointPhotoUrlInput?.value || '', file });
+    });
+  }
+  if (newsImageUrlInput) {
+    newsImageUrlInput.addEventListener('input', () => {
+      renderNewsImagePreview();
+    });
+  }
+  if (newsImageFocusYInput) {
+    newsImageFocusYInput.addEventListener('input', () => {
+      renderNewsImagePreview();
     });
   }
 
@@ -2789,6 +2842,7 @@ function bindSpecialistTools() {
         summary: document.getElementById('news-summary-input').value.trim(),
         link: document.getElementById('news-link-input').value.trim() || null,
         imageUrl: document.getElementById('news-image-url-input').value.trim() || null,
+        imageFocusY: normalizeNewsImageFocusY(document.getElementById('news-image-focus-y-input')?.value),
       };
 
       if (!payload.title || !payload.summary) {
@@ -2846,6 +2900,7 @@ function bindSpecialistTools() {
         summary: document.getElementById('news-summary-input').value.trim(),
         link: document.getElementById('news-link-input').value.trim() || null,
         imageUrl: document.getElementById('news-image-url-input').value.trim() || null,
+        imageFocusY: normalizeNewsImageFocusY(document.getElementById('news-image-focus-y-input')?.value),
       };
       if (!payload.title || !payload.summary) {
         setSpecialistMessage('Заповніть заголовок і опис новини', true);

@@ -114,6 +114,9 @@ const newsColumns = db.prepare("PRAGMA table_info(news)").all();
 if (!newsColumns.some((c) => c.name === 'image_url')) {
   db.exec('ALTER TABLE news ADD COLUMN image_url TEXT');
 }
+if (!newsColumns.some((c) => c.name === 'image_focus_y')) {
+  db.exec('ALTER TABLE news ADD COLUMN image_focus_y REAL');
+}
 
 const routeColumns = db.prepare("PRAGMA table_info(routes)").all();
 if (!routeColumns.some((c) => c.name === 'route_color')) {
