@@ -1055,6 +1055,52 @@ function normalizeNewsImageFocusY(value) {
   return Math.max(0, Math.min(100, parsed));
 }
 
+function normalizeNewsImageUrl(value) {
+  let raw = String(value || '').trim();
+  if (!raw) return '';
+
+  const cssUrlMatch = raw.match(/^url\((.*)\)$/i);
+  if (cssUrlMatch?.[1]) {
+    raw = cssUrlMatch[1].trim().replace(/^['"]|['"]$/g, '');
+  }
+
+  if (raw.startsWith('//')) {
+    raw = `https:${raw}`;
+  }
+
+  if (raw.startsWith('http://')) {
+    raw = `https://${raw.slice('http://'.length)}`;
+  }
+
+  return isValidHttpUrl(raw) ? raw : '';
+}
+
+function resolveNewsImageForRender(item) {
+  const normalizedImageUrl = normalizeNewsImageUrl(item?.imageUrl);
+  if (normalizedImageUrl) return normalizedImageUrl;
+  const normalizedLink = normalizeNewsImageUrl(item?.link);
+  if (!normalizedLink) return '';
+  return `https://image.thum.io/get/width/1200/noanimate/${encodeURIComponent(normalizedLink)}`;
+}
+
+function hydrateNewsCardImages(container) {
+  if (!container) return;
+  container.querySelectorAll('img[data-news-src]').forEach((imgEl) => {
+    const src = String(imgEl.getAttribute('data-news-src') || '').trim();
+    const fallback = String(imgEl.getAttribute('data-news-fallback') || '').trim();
+    if (!src) return;
+    imgEl.onerror = () => {
+      if (!fallback || imgEl.dataset.fallbackApplied === '1') {
+        imgEl.style.display = 'none';
+        return;
+      }
+      imgEl.dataset.fallbackApplied = '1';
+      imgEl.src = fallback;
+    };
+    imgEl.src = src;
+  });
+}
+
 function renderNews() {
   const newsList = document.getElementById('news-list');
   const newsPager = document.getElementById('news-pager');
@@ -1077,12 +1123,19 @@ function renderNews() {
 
   newsList.innerHTML = visibleNews
     .map(
-      (item) => `
+      (item) => {
+        const cardImageUrl = resolveNewsImageForRender(item);
+        const fallbackImageUrl = normalizeNewsImageUrl(item?.link)
+          ? `https://image.thum.io/get/width/1200/noanimate/${encodeURIComponent(normalizeNewsImageUrl(item.link))}`
+          : '';
+        return `
       <div class="card reveal news-card">
         <div class="news-cover">
           ${
-            item.imageUrl
-              ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title || 'Новина')}" loading="lazy" decoding="async" style="object-position:50% ${normalizeNewsImageFocusY(
+            cardImageUrl
+              ? `<img data-news-src="${escapeHtml(cardImageUrl)}" data-news-fallback="${escapeHtml(fallbackImageUrl)}" alt="${escapeHtml(
+                  item.title || 'Новина'
+                )}" loading="lazy" decoding="async" style="object-position:50% ${normalizeNewsImageFocusY(
                   item.imageFocusY
                 )}%;" />`
               : ''
@@ -1097,9 +1150,11 @@ function renderNews() {
             : '<span class="t-body text-muted">Джерело не вказано</span>'
         }
       </div>
-    `
+    `;
+      }
     )
     .join('');
+  hydrateNewsCardImages(newsList);
 }
 
 function renderDashboard(points, routes) {
@@ -1590,19 +1645,21 @@ function renderNewsImagePreview() {
   const focusValue = document.getElementById('news-image-focus-y-value');
   if (!preview || !focusInput || !focusValue) return;
 
-  const imageUrl = imageUrlInput?.value?.trim() || '';
+  const imageUrl = normalizeNewsImageUrl(imageUrlInput?.value?.trim() || '');
+  const linkUrl = normalizeNewsImageUrl(document.getElementById('news-link-input')?.value?.trim() || '');
+  const previewUrl = imageUrl || (linkUrl ? `https://image.thum.io/get/width/1200/noanimate/${encodeURIComponent(linkUrl)}` : '');
   const focusY = normalizeNewsImageFocusY(focusInput.value);
   focusInput.value = String(Math.round(focusY));
   focusValue.textContent = `${Math.round(focusY)}%`;
 
-  if (!imageUrl) {
+  if (!previewUrl) {
     preview.innerHTML = '<span class="t-data text-muted">Превʼю фото відсутнє</span>';
     preview.style.background = 'linear-gradient(120deg, rgba(11, 37, 69, 0.12), rgba(197, 160, 89, 0.16))';
     return;
   }
 
   preview.style.background = 'linear-gradient(120deg, rgba(11, 37, 69, 0.12), rgba(197, 160, 89, 0.16))';
-  preview.innerHTML = `<img src="${escapeHtml(imageUrl)}" alt="Превʼю новини" loading="lazy" decoding="async" style="object-position:50% ${focusY}%;" />`;
+  preview.innerHTML = `<img src="${escapeHtml(previewUrl)}" alt="Превʼю новини" loading="lazy" decoding="async" style="object-position:50% ${focusY}%;" />`;
 }
 
 function resetNewsEditor() {
@@ -2211,6 +2268,7 @@ function bindSpecialistTools() {
   const btnDeleteNews = document.getElementById('btn-delete-news');
   const newsEditSelect = document.getElementById('news-edit-select');
   const btnNewNews = document.getElementById('btn-new-news');
+  const newsLinkInput = document.getElementById('news-link-input');
   const newsImageUrlInput = document.getElementById('news-image-url-input');
   const newsImageFocusYInput = document.getElementById('news-image-focus-y-input');
   const editPointSelect = document.getElementById('edit-point-select');
@@ -2278,6 +2336,11 @@ function bindSpecialistTools() {
   }
   if (newsImageUrlInput) {
     newsImageUrlInput.addEventListener('input', () => {
+      renderNewsImagePreview();
+    });
+  }
+  if (newsLinkInput) {
+    newsLinkInput.addEventListener('input', () => {
       renderNewsImagePreview();
     });
   }
@@ -2848,7 +2911,7 @@ function bindSpecialistTools() {
         title: document.getElementById('news-title-input').value.trim(),
         summary: document.getElementById('news-summary-input').value.trim(),
         link: document.getElementById('news-link-input').value.trim() || null,
-        imageUrl: document.getElementById('news-image-url-input').value.trim() || null,
+        imageUrl: normalizeNewsImageUrl(document.getElementById('news-image-url-input').value.trim()) || null,
         imageFocusY: normalizeNewsImageFocusY(document.getElementById('news-image-focus-y-input')?.value),
       };
 
@@ -2906,7 +2969,7 @@ function bindSpecialistTools() {
         title: document.getElementById('news-title-input').value.trim(),
         summary: document.getElementById('news-summary-input').value.trim(),
         link: document.getElementById('news-link-input').value.trim() || null,
-        imageUrl: document.getElementById('news-image-url-input').value.trim() || null,
+        imageUrl: normalizeNewsImageUrl(document.getElementById('news-image-url-input').value.trim()) || null,
         imageFocusY: normalizeNewsImageFocusY(document.getElementById('news-image-focus-y-input')?.value),
       };
       if (!payload.title || !payload.summary) {
