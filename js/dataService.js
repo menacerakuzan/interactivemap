@@ -23,6 +23,20 @@ function isMissingNewsImageFocusError(error) {
   return message.includes('image_focus_y') && message.includes('news');
 }
 
+function buildNewsSelect({
+  includeImageUrl = true,
+  includeImageFocusY = true,
+  includeAuthorName = false,
+} = {}) {
+  const fields = ['id', 'title', 'summary', 'link'];
+  if (includeImageUrl) fields.push('image_url');
+  if (includeImageFocusY) fields.push('image_focus_y');
+  fields.push('created_at');
+  if (includeAuthorName) fields.push('author_name');
+  else fields.push('created_by');
+  return fields.join(',');
+}
+
 function isMissingRouteColorError(error) {
   const message = String(error?.message || error || '').toLowerCase();
   return message.includes('route_color') && message.includes('routes');
@@ -563,14 +577,18 @@ async function supabaseGetCurrentUser() {
 }
 
 async function supabaseGetNews() {
+  let includeImageUrl = true;
+  let includeImageFocusY = true;
   let { data, error } = await supabase
     .from('news')
-    .select('id,title,summary,link,image_url,image_focus_y,created_at,created_by')
+    .select(buildNewsSelect({ includeImageUrl, includeImageFocusY }))
     .order('created_at', { ascending: false });
   if (error && (isMissingNewsImageError(error) || isMissingNewsImageFocusError(error))) {
+    includeImageUrl = !isMissingNewsImageError(error);
+    includeImageFocusY = !isMissingNewsImageFocusError(error);
     const fallback = await supabase
       .from('news')
-      .select('id,title,summary,link,created_at,created_by')
+      .select(buildNewsSelect({ includeImageUrl, includeImageFocusY }))
       .order('created_at', { ascending: false });
     data = fallback.data;
     error = fallback.error;
@@ -597,28 +615,45 @@ async function supabaseCreateNews(payload) {
   if (!imageUrl && payload.link) {
     imageUrl = await tryExtractSourceImage(payload.link);
   }
+  const payloadBase = {
+    title: payload.title,
+    summary: payload.summary,
+    link: payload.link || null,
+    created_by: user.id,
+  };
+  const payloadWithImage = {
+    ...payloadBase,
+    image_url: imageUrl,
+  };
+  const payloadWithImageAndFocus = {
+    ...payloadWithImage,
+    image_focus_y: Number.isFinite(Number(payload.imageFocusY)) ? Number(payload.imageFocusY) : 50,
+  };
   const { data, error } = await supabase
     .from('news')
-    .insert({
-      title: payload.title,
-      summary: payload.summary,
-      link: payload.link || null,
-      image_url: imageUrl,
-      image_focus_y: Number.isFinite(Number(payload.imageFocusY)) ? Number(payload.imageFocusY) : 50,
-      created_by: user.id,
-    })
-    .select('id,title,summary,link,image_url,image_focus_y,created_at')
+    .insert(payloadWithImageAndFocus)
+    .select(buildNewsSelect({ includeImageUrl: true, includeImageFocusY: true, includeAuthorName: false }))
     .single();
   if (error && (isMissingNewsImageError(error) || isMissingNewsImageFocusError(error))) {
+    const includeImageUrl = !isMissingNewsImageError(error);
+    const includeImageFocusY = !isMissingNewsImageFocusError(error);
+    const insertPayload = includeImageFocusY
+      ? includeImageUrl
+        ? payloadWithImageAndFocus
+        : {
+            ...payloadBase,
+            image_focus_y: Number.isFinite(Number(payload.imageFocusY))
+              ? Number(payload.imageFocusY)
+              : 50,
+          }
+      : includeImageUrl
+      ? payloadWithImage
+      : payloadBase;
+
     const fallback = await supabase
       .from('news')
-      .insert({
-        title: payload.title,
-        summary: payload.summary,
-        link: payload.link || null,
-        created_by: user.id,
-      })
-      .select('id,title,summary,link,created_at')
+      .insert(insertPayload)
+      .select(buildNewsSelect({ includeImageUrl, includeImageFocusY, includeAuthorName: false }))
       .single();
     if (fallback.error) throw fallback.error;
     return mapNews(fallback.data);
@@ -651,17 +686,19 @@ async function supabaseUpdateNews(newsId, payload) {
     .from('news')
     .update(updateData)
     .eq('id', newsId)
-    .select('id,title,summary,link,image_url,image_focus_y,created_at')
+    .select(buildNewsSelect({ includeImageUrl: true, includeImageFocusY: true, includeAuthorName: false }))
     .single();
   if (error && (isMissingNewsImageError(error) || isMissingNewsImageFocusError(error))) {
     const fallbackData = { ...updateData };
-    delete fallbackData.image_url;
-    delete fallbackData.image_focus_y;
+    const includeImageUrl = !isMissingNewsImageError(error);
+    const includeImageFocusY = !isMissingNewsImageFocusError(error);
+    if (!includeImageUrl) delete fallbackData.image_url;
+    if (!includeImageFocusY) delete fallbackData.image_focus_y;
     const fallback = await supabase
       .from('news')
       .update(fallbackData)
       .eq('id', newsId)
-      .select('id,title,summary,link,created_at')
+      .select(buildNewsSelect({ includeImageUrl, includeImageFocusY, includeAuthorName: false }))
       .single();
     data = fallback.data;
     error = fallback.error;
