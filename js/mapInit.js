@@ -16,6 +16,7 @@ let lineToolStyle = 'dashed';
 let lineToolColor = '#E7C769';
 let lineDraftVertices = [];
 let hiddenPointTypes = new Set();
+let markerAssetsPreloaded = false;
 
 const POINT_TYPE_MARKER_FILE = {
   school: 'навчал заклад.svg',
@@ -31,9 +32,9 @@ const POINT_TYPE_MARKER_FILE = {
   playground: 'майданчик.svg',
   medical: 'мед заклад.svg',
   education: 'навчал заклад.svg',
-  street: 'парк.svg',
-  square: 'парк.svg',
-  hotel: 'житло.svg',
+  street: 'пішохідний перехід.svg',
+  square: 'пішохідний перехід.svg',
+  hotel: 'готель.svg',
   other: 'соціальні послуги.svg',
   park: 'парк.svg',
   hairdresser: 'перукарня.svg',
@@ -51,7 +52,7 @@ const POINT_TYPE_MARKER_FILE = {
   toilet: 'мед заклад.svg',
   parking: 'азс.svg',
   entrance: 'адміністрація.svg',
-  crossing: 'парк.svg',
+  crossing: 'пішохідний перехід.svg',
 };
 
 const MARKER_FILES = [
@@ -60,6 +61,7 @@ const MARKER_FILES = [
   'аптека.svg',
   'банк.svg',
   'вокзал.svg',
+  'готель.svg',
   'житло.svg',
   'зупинка А.svg',
   'зупинка П.svg',
@@ -72,6 +74,7 @@ const MARKER_FILES = [
   'парк.svg',
   'перукарня.svg',
   'пошта.svg',
+  'пішохідний перехід.svg',
   'ресторан.svg',
   'соціальні послуги.svg',
   'спорт.svg',
@@ -84,6 +87,7 @@ const MARKER_URL_BY_FILE = {
   'аптека.svg': new URL('../assets/markers/аптека.svg', import.meta.url).href,
   'банк.svg': new URL('../assets/markers/банк.svg', import.meta.url).href,
   'вокзал.svg': new URL('../assets/markers/вокзал.svg', import.meta.url).href,
+  'готель.svg': new URL('../assets/markers/готель.svg', import.meta.url).href,
   'житло.svg': new URL('../assets/markers/житло.svg', import.meta.url).href,
   'зупинка А.svg': new URL('../assets/markers/зупинка А.svg', import.meta.url).href,
   'зупинка П.svg': new URL('../assets/markers/зупинка П.svg', import.meta.url).href,
@@ -96,6 +100,7 @@ const MARKER_URL_BY_FILE = {
   'парк.svg': new URL('../assets/markers/парк.svg', import.meta.url).href,
   'перукарня.svg': new URL('../assets/markers/перукарня.svg', import.meta.url).href,
   'пошта.svg': new URL('../assets/markers/пошта.svg', import.meta.url).href,
+  'пішохідний перехід.svg': new URL('../assets/markers/пішохідний перехід.svg', import.meta.url).href,
   'ресторан.svg': new URL('../assets/markers/ресторан.svg', import.meta.url).href,
   'соціальні послуги.svg': new URL('../assets/markers/соціальні послуги.svg', import.meta.url).href,
   'спорт.svg': new URL('../assets/markers/спорт.svg', import.meta.url).href,
@@ -109,6 +114,16 @@ let fetchPointsFn = async (filter) => {
   }
   return response.json();
 };
+
+function preloadMarkerAssets() {
+  if (markerAssetsPreloaded || typeof Image === 'undefined') return;
+  markerAssetsPreloaded = true;
+  Object.values(MARKER_URL_BY_FILE).forEach((url) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+  });
+}
 
 function escapeHtml(value) {
   return String(value || '')
@@ -168,13 +183,21 @@ function resolveMarkerFile(point) {
 }
 
 function createIcon(point) {
+  const zoom = map?.getZoom?.() ?? ODESA_BOUNDS.defaultZoom;
   const markerFile = resolveMarkerFile(point);
   const markerUrl = markerFileToUrl(markerFile);
   const markerLabel = markerFileToLabel(markerFile);
   const markerTitle = escapeHtml(markerLabel);
+  const scale = Math.max(0.72, Math.min(1, 0.72 + (zoom - 10) * 0.11));
+  const pinSize = Math.round(38 * scale);
+  const captionWidth = Math.round(132 * scale);
+  const iconW = Math.max(pinSize, captionWidth) + 8;
+  const iconH = pinSize + Math.round(24 * scale);
+  const anchorX = Math.round(iconW / 2);
+  const anchorY = Math.round(pinSize / 2);
 
   const html = `
-    <div class="map-marker-wrap">
+    <div class="map-marker-wrap" style="--marker-wrap-width:${iconW}px; --marker-pin-size:${pinSize}px; --marker-caption-width:${captionWidth}px; --marker-caption-font:${Math.max(9, Math.round(10 * scale))}px;">
       <div class="map-marker-pin" style="--marker-color: ${escapeHtml(point?.pointType?.color || '#3D5263')}">
         <img src="${markerUrl}" alt="${markerTitle}" loading="lazy" decoding="async" />
       </div>
@@ -184,9 +207,71 @@ function createIcon(point) {
   return L.divIcon({
     className: 'custom-map-marker',
     html,
-    iconSize: [142, 74],
-    iconAnchor: [25, 62],
+    iconSize: [iconW, iconH],
+    iconAnchor: [anchorX, anchorY],
   });
+}
+
+function shouldUseCompactMarker() {
+  const zoom = Number(map?.getZoom?.());
+  if (!Number.isFinite(zoom)) return false;
+  return zoom <= 10.4;
+}
+
+function bindPointInteraction(layer, point, lat, lng) {
+  layer.on('click', () => {
+    if (lineToolVisible) {
+      if (lineToolMode === 'erase') {
+        eraseLineDraftVertex({ lat, lng });
+        return;
+      }
+      if (lineToolMode === 'draw' || lineToolMode === 'curve') {
+        addLineDraftFromPoint(point);
+        return;
+      }
+      return;
+    }
+    map.panTo([lat, lng], {
+      animate: true,
+      duration: 0.35,
+      easeLinearity: 0.25,
+    });
+    showInfoCard(point);
+  });
+}
+
+function renderPoints(points = [], { emitUpdateEvent = true } = {}) {
+  if (!markerLayer) return;
+  markerLayer.clearLayers();
+  const compact = shouldUseCompactMarker();
+
+  points.forEach((point) => {
+    const pointTypeCode = String(point?.pointType?.code || '');
+    if (pointTypeCode && hiddenPointTypes.has(pointTypeCode)) return;
+
+    const lat = Number(point?.lat);
+    const lng = Number(point?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    const color = String(point?.pointType?.color || '#3D5263');
+    const zoom = Number(map?.getZoom?.());
+    const compactRadius = Number.isFinite(zoom) ? Math.max(3, Math.min(6, 3 + (zoom - 8) * 0.45)) : 5;
+    const layer = compact
+      ? L.circleMarker([lat, lng], {
+          radius: compactRadius,
+          color: '#11365C',
+          weight: 1.5,
+          fillColor: color,
+          fillOpacity: 0.95,
+        }).addTo(markerLayer)
+      : L.marker([lat, lng], { icon: createIcon(point) }).addTo(markerLayer);
+
+    bindPointInteraction(layer, point, lat, lng);
+  });
+
+  if (emitUpdateEvent) {
+    window.dispatchEvent(new CustomEvent('map:points-updated', { detail: points }));
+  }
 }
 
 function getQueryFromFilter(filter) {
@@ -288,47 +373,12 @@ async function loadAndRenderPoints() {
       points = [];
     }
 
-    markerLayer.clearLayers();
-    points.forEach((point) => {
-      const pointTypeCode = String(point?.pointType?.code || '');
-      if (pointTypeCode && hiddenPointTypes.has(pointTypeCode)) {
-        return;
-      }
-      const lat = Number(point?.lat);
-      const lng = Number(point?.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        return;
-      }
-      const icon = createIcon(point);
-      const marker = L.marker([lat, lng], { icon }).addTo(markerLayer);
-      marker.on('click', () => {
-        if (lineToolVisible) {
-          if (lineToolMode === 'erase') {
-            eraseLineDraftVertex({ lat, lng });
-            return;
-          }
-          if (lineToolMode === 'draw' || lineToolMode === 'curve') {
-            addLineDraftFromPoint(point);
-            return;
-          }
-          // edit mode: do not add points on marker click
-          return;
-        }
-        map.panTo([lat, lng], {
-          animate: true,
-          duration: 0.35,
-          easeLinearity: 0.25,
-        });
-        showInfoCard(point);
-      });
-    });
-
     lastStablePoints = points;
+    renderPoints(points, { emitUpdateEvent: true });
     if (reloadRetryTimer) {
       clearTimeout(reloadRetryTimer);
       reloadRetryTimer = null;
     }
-    window.dispatchEvent(new CustomEvent('map:points-updated', { detail: points }));
     return points;
   } catch (error) {
     console.warn('Points load failed, keeping previous markers', error);
@@ -339,7 +389,7 @@ async function loadAndRenderPoints() {
       }, 1500);
     }
     const fallback = lastStablePoints || [];
-    window.dispatchEvent(new CustomEvent('map:points-updated', { detail: fallback }));
+    renderPoints(fallback, { emitUpdateEvent: true });
     return fallback;
   }
 }
@@ -977,6 +1027,7 @@ export async function initMap(options = {}) {
     updateWhenZooming: false,
     keepBuffer: 6,
   }).addTo(map);
+  preloadMarkerAssets();
 
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -1045,6 +1096,9 @@ export async function initMap(options = {}) {
   map.on('zoomend', () => {
     if (!isWheelAnimating) {
       targetZoom = map.getZoom();
+    }
+    if (Array.isArray(lastStablePoints) && lastStablePoints.length) {
+      renderPoints(lastStablePoints, { emitUpdateEvent: false });
     }
   });
 

@@ -232,6 +232,12 @@
                         <option value="published">Published</option>
                     </select>
                     <textarea id="route-description" placeholder="Опис маршруту"></textarea>
+                    <div class="t-label">Типи транспорту</div>
+                    <div class="route-transport-modes">
+                        <label class="transport-chip"><input type="checkbox" value="bus" data-route-transport /> 🚌 Автобус</label>
+                        <label class="transport-chip"><input type="checkbox" value="tram" data-route-transport /> 🚋 Трамвай</label>
+                        <label class="transport-chip"><input type="checkbox" value="car" data-route-transport /> 🚗 Авто</label>
+                    </div>
                     <div class="specialist-grid">
                         <select id="route-point-add"></select>
                         <button id="btn-add-route-point" class="btn-flat">Додати</button>
@@ -250,6 +256,8 @@
                     <div id="edit-point-type-preview" class="point-type-preview" aria-live="polite"></div>
                     <input id="edit-point-district" type="text" placeholder="Район" />
                     <textarea id="edit-point-description" placeholder="Коментар"></textarea>
+                    <div id="edit-point-coords" class="t-data text-muted">Координати: -</div>
+                    <button id="btn-move-point-on-map" class="btn-flat" type="button">Перемістити точку на карті</button>
                     <input id="edit-point-photo-file" type="file" accept="image/*" />
                     <input id="edit-point-photo-url" type="text" placeholder="URL фото (опційно)" />
                     <div id="edit-point-photo-preview" class="point-photo-preview">

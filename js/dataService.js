@@ -42,6 +42,33 @@ function isMissingRouteColorError(error) {
   return message.includes('route_color') && message.includes('routes');
 }
 
+function isMissingRouteTransportModesError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('transport_modes') && message.includes('routes');
+}
+
+function normalizeTransportModes(value) {
+  const allowed = new Set(['bus', 'tram', 'car']);
+  let arrayValue = [];
+  if (Array.isArray(value)) {
+    arrayValue = value;
+  } else if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value || '[]');
+      arrayValue = Array.isArray(parsed) ? parsed : [];
+    } catch (_e) {
+      arrayValue = [];
+    }
+  }
+  const normalized = [];
+  arrayValue.forEach((mode) => {
+    const next = String(mode || '').trim().toLowerCase();
+    if (!allowed.has(next)) return;
+    if (!normalized.includes(next)) normalized.push(next);
+  });
+  return normalized;
+}
+
 function parsePath(path) {
   const url = new URL(path, 'http://local');
   return { pathname: url.pathname, searchParams: url.searchParams };
@@ -136,6 +163,12 @@ async function tryExtractSourceImage(link) {
 }
 
 function mapRoute(row, authorName = null) {
+  let transportModes = [];
+  try {
+    transportModes = normalizeTransportModes(row.transport_modes);
+  } catch (_e) {
+    transportModes = [];
+  }
   return {
     id: row.id,
     name: row.name,
@@ -144,6 +177,7 @@ function mapRoute(row, authorName = null) {
     createdBy: row.created_by,
     authorName,
     routeColor: row.route_color || null,
+    transportModes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     points: (row.route_points || [])
@@ -266,34 +300,42 @@ async function supabaseGetPoints(query = {}) {
 async function supabaseGetRoutes() {
   const { data: sessionData } = await supabase.auth.getSession();
   const isPublic = !sessionData?.session?.access_token;
+  let includeRouteColor = true;
+  let includeTransportModes = true;
+  const buildRouteSelect = (opts = {}) => {
+    const fields = ['id', 'name', 'description', 'status'];
+    if (opts.includeRouteColor !== false) fields.push('route_color');
+    if (opts.includeTransportModes !== false) fields.push('transport_modes');
+    fields.push('created_by', 'created_at', 'updated_at', 'route_points(position,note,point:points(id,title,lat,lng))');
+    return fields.join(',');
+  };
 
   let { data, error } = await supabase
     .from('routes')
-    .select(
-      'id,name,description,status,route_color,created_by,created_at,updated_at,route_points(position,note,point:points(id,title,lat,lng))'
-    )
+    .select(buildRouteSelect({ includeRouteColor, includeTransportModes }))
     .order('updated_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
   if (isPublic) {
     ({ data, error } = await supabase
       .from('routes')
-      .select(
-        'id,name,description,status,route_color,created_by,created_at,updated_at,route_points(position,note,point:points(id,title,lat,lng))'
-      )
+      .select(buildRouteSelect({ includeRouteColor, includeTransportModes }))
       .eq('status', 'published')
       .order('updated_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false }));
   }
-  if (error && isMissingRouteColorError(error)) {
-    const fallback = await supabase
+  if (error && (isMissingRouteColorError(error) || isMissingRouteTransportModesError(error))) {
+    if (isMissingRouteColorError(error)) includeRouteColor = false;
+    if (isMissingRouteTransportModesError(error)) includeTransportModes = false;
+
+    let fallback = supabase
       .from('routes')
-      .select(
-        'id,name,description,status,created_by,created_at,updated_at,route_points(position,note,point:points(id,title,lat,lng))'
-      )
+      .select(buildRouteSelect({ includeRouteColor, includeTransportModes }))
       .order('updated_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
-    data = fallback.data;
-    error = fallback.error;
+    if (isPublic) fallback = fallback.eq('status', 'published');
+    const fallbackResult = await fallback;
+    data = fallbackResult.data;
+    error = fallbackResult.error;
   }
 
   if (error) throw error;
@@ -447,6 +489,7 @@ async function supabaseDeletePoint(pointId) {
 
 async function supabaseCreateRoute(payload) {
   const user = await supabaseGetCurrentUser();
+  const transportModes = normalizeTransportModes(payload.transportModes);
 
   let { data: route, error: routeError } = await supabase
     .from('routes')
@@ -454,17 +497,23 @@ async function supabaseCreateRoute(payload) {
       name: payload.name,
       description: payload.description || null,
       route_color: payload.routeColor || null,
+      transport_modes: transportModes,
       status: payload.status || 'draft',
       created_by: user.id,
     })
     .select('id')
     .single();
-  if (routeError && isMissingRouteColorError(routeError)) {
+  if (
+    routeError &&
+    (isMissingRouteColorError(routeError) || isMissingRouteTransportModesError(routeError))
+  ) {
     const fallback = await supabase
       .from('routes')
       .insert({
         name: payload.name,
         description: payload.description || null,
+        ...(isMissingRouteTransportModesError(routeError) ? {} : { transport_modes: transportModes }),
+        ...(isMissingRouteColorError(routeError) ? {} : { route_color: payload.routeColor || null }),
         status: payload.status || 'draft',
         created_by: user.id,
       })
@@ -502,11 +551,18 @@ async function supabaseUpdateRoute(routeId, payload) {
   if (payload.description !== undefined) updateData.description = payload.description || null;
   if (payload.status !== undefined) updateData.status = payload.status;
   if (payload.routeColor !== undefined) updateData.route_color = payload.routeColor || null;
+  if (payload.transportModes !== undefined) {
+    updateData.transport_modes = normalizeTransportModes(payload.transportModes);
+  }
 
   let { error: routeError } = await supabase.from('routes').update(updateData).eq('id', routeId);
-  if (routeError && isMissingRouteColorError(routeError)) {
+  if (
+    routeError &&
+    (isMissingRouteColorError(routeError) || isMissingRouteTransportModesError(routeError))
+  ) {
     const fallbackData = { ...updateData };
-    delete fallbackData.route_color;
+    if (isMissingRouteColorError(routeError)) delete fallbackData.route_color;
+    if (isMissingRouteTransportModesError(routeError)) delete fallbackData.transport_modes;
     const fallback = await supabase.from('routes').update(fallbackData).eq('id', routeId);
     routeError = fallback.error;
   }

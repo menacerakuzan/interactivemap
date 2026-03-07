@@ -122,6 +122,9 @@ const routeColumns = db.prepare("PRAGMA table_info(routes)").all();
 if (!routeColumns.some((c) => c.name === 'route_color')) {
   db.exec('ALTER TABLE routes ADD COLUMN route_color TEXT');
 }
+if (!routeColumns.some((c) => c.name === 'transport_modes')) {
+  db.exec('ALTER TABLE routes ADD COLUMN transport_modes TEXT');
+}
 
 const seedPointTypes = [
   ['school', 'Школа', 'School', '#1D4ED8'],

@@ -72,6 +72,7 @@ let dashboardProposals = [];
 let pointTypes = [];
 let editingRouteId = null;
 let editingPointId = null;
+let editingPointPosition = null;
 let editingNewsId = null;
 let routeEditorPoints = [];
 let routeOrderHistory = [];
@@ -101,6 +102,7 @@ const MARKER_URL_BY_FILE = {
   'аптека.svg': new URL('./assets/markers/аптека.svg', import.meta.url).href,
   'банк.svg': new URL('./assets/markers/банк.svg', import.meta.url).href,
   'вокзал.svg': new URL('./assets/markers/вокзал.svg', import.meta.url).href,
+  'готель.svg': new URL('./assets/markers/готель.svg', import.meta.url).href,
   'житло.svg': new URL('./assets/markers/житло.svg', import.meta.url).href,
   'зупинка А.svg': new URL('./assets/markers/зупинка А.svg', import.meta.url).href,
   'зупинка П.svg': new URL('./assets/markers/зупинка П.svg', import.meta.url).href,
@@ -113,6 +115,7 @@ const MARKER_URL_BY_FILE = {
   'парк.svg': new URL('./assets/markers/парк.svg', import.meta.url).href,
   'перукарня.svg': new URL('./assets/markers/перукарня.svg', import.meta.url).href,
   'пошта.svg': new URL('./assets/markers/пошта.svg', import.meta.url).href,
+  'пішохідний перехід.svg': new URL('./assets/markers/пішохідний перехід.svg', import.meta.url).href,
   'ресторан.svg': new URL('./assets/markers/ресторан.svg', import.meta.url).href,
   'соціальні послуги.svg': new URL('./assets/markers/соціальні послуги.svg', import.meta.url).href,
   'спорт.svg': new URL('./assets/markers/спорт.svg', import.meta.url).href,
@@ -161,11 +164,11 @@ const CANONICAL_POINT_TYPES = [
   { code: 'bank', labelUk: 'Банк', labelEn: 'Bank', color: '#C5A059', markerFile: 'банк.svg' },
   { code: 'post', labelUk: 'Пошта', labelEn: 'Post', color: '#0E7490', markerFile: 'пошта.svg' },
   { code: 'fuel_station', labelUk: 'АЗС', labelEn: 'Fuel Station', color: '#0B2545', markerFile: 'азс.svg' },
-  { code: 'street', labelUk: 'Вулиці', labelEn: 'Street', color: '#3D5263', markerFile: 'парк.svg' },
-  { code: 'square', labelUk: 'Площі', labelEn: 'Square', color: '#3D5263', markerFile: 'парк.svg' },
+  { code: 'street', labelUk: 'Вулиці', labelEn: 'Street', color: '#3D5263', markerFile: 'пішохідний перехід.svg' },
+  { code: 'square', labelUk: 'Площі', labelEn: 'Square', color: '#3D5263', markerFile: 'пішохідний перехід.svg' },
   { code: 'park', labelUk: 'Парк', labelEn: 'Park', color: '#15803D', markerFile: 'парк.svg' },
   { code: 'playground', labelUk: 'Дитячий майданчик', labelEn: 'Playground', color: '#0369A1', markerFile: 'майданчик.svg' },
-  { code: 'hotel', labelUk: 'Готель', labelEn: 'Hotel', color: '#2B6CB0', markerFile: 'житло.svg' },
+  { code: 'hotel', labelUk: 'Готель', labelEn: 'Hotel', color: '#2B6CB0', markerFile: 'готель.svg' },
   { code: 'other', labelUk: 'Інше', labelEn: 'Other', color: '#64748B', markerFile: 'соціальні послуги.svg' },
 ];
 const POINT_TYPE_META_BY_CODE = new Map(CANONICAL_POINT_TYPES.map((pt) => [pt.code, pt]));
@@ -236,6 +239,42 @@ function deleteRouteColor(routeId) {
   const colors = loadRouteColors();
   delete colors[String(routeId)];
   saveRouteColors(colors);
+}
+
+function normalizeTransportModes(value) {
+  const allowed = new Set(['bus', 'tram', 'car']);
+  if (!Array.isArray(value)) return [];
+  const result = [];
+  value.forEach((mode) => {
+    const normalized = String(mode || '').trim().toLowerCase();
+    if (!allowed.has(normalized)) return;
+    if (!result.includes(normalized)) result.push(normalized);
+  });
+  return result;
+}
+
+function collectSelectedRouteTransportModes() {
+  return normalizeTransportModes(
+    Array.from(document.querySelectorAll('input[data-route-transport]:checked')).map((el) => el.value)
+  );
+}
+
+function setSelectedRouteTransportModes(modes = []) {
+  const normalized = new Set(normalizeTransportModes(modes));
+  document.querySelectorAll('input[data-route-transport]').forEach((el) => {
+    el.checked = normalized.has(String(el.value || '').trim().toLowerCase());
+  });
+}
+
+function formatRouteTransportModes(modes = []) {
+  const labels = {
+    bus: 'Автобус',
+    tram: 'Трамвай',
+    car: 'Авто',
+  };
+  const normalized = normalizeTransportModes(modes);
+  if (!normalized.length) return 'Без класифікатора';
+  return normalized.map((mode) => labels[mode] || mode).join(', ');
 }
 
 function resolvePointTypeMarkerFile(pointTypeCode) {
@@ -1230,6 +1269,7 @@ function renderDashboard(points, routes) {
               <span class="route-status ${r.status}">${r.status}</span>
             </div>
             <div class="t-data text-muted">${r.points.length} точок • ${formatIsoDate(r.updatedAt || r.createdAt)}</div>
+            <div class="t-data text-muted">${formatRouteTransportModes(r.transportModes)}</div>
             <div class="route-actions">
               <button class="btn-flat" data-action="edit-route" data-route-id="${r.id}">Edit</button>
               <button class="btn-flat" data-action="advance-route" data-route-id="${r.id}">Next status</button>
@@ -1381,6 +1421,7 @@ async function refreshDashboardData() {
   dashboardRoutes = (routeRows || []).map((r) => ({
     ...r,
     routeColor: r.routeColor || getRouteColor(r.id),
+    transportModes: normalizeTransportModes(r.transportModes),
   }));
   dashboardProposals = proposals || [];
   mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
@@ -1414,6 +1455,7 @@ async function refreshPublicData() {
     dashboardRoutes = (routeRows || []).map((r) => ({
       ...r,
       routeColor: r.routeColor || getRouteColor(r.id),
+      transportModes: normalizeTransportModes(r.transportModes),
     }));
     mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
     mapController?.setHiddenPointTypes?.(Array.from(hiddenPointTypeCodes));
@@ -1614,6 +1656,11 @@ function resetRouteEditor() {
   const lineColorInput = document.getElementById('line-color-input');
   if (lineColorInput) lineColorInput.value = DEFAULT_ROUTE_COLOR;
   mapController?.setLineToolColor?.(DEFAULT_ROUTE_COLOR);
+  setSelectedRouteTransportModes([]);
+  mapController?.clearLineDraft?.();
+  mapController?.setLineToolMode?.('draw');
+  mapController?.setLineToolVisible?.(true);
+  mapController?.setLineToolSnapEnabled?.(true);
   renderRoutePointOrder();
   mapController?.clearRouteHighlight?.();
   syncEditorActionButtons();
@@ -1633,8 +1680,20 @@ function openRouteInEditor(routeId, options = {}) {
   const lineColorInput = document.getElementById('line-color-input');
   if (lineColorInput) lineColorInput.value = route.routeColor || getRouteColor(route.id);
   mapController?.setLineToolColor?.(route.routeColor || getRouteColor(route.id));
+  setSelectedRouteTransportModes(route.transportModes || []);
   routeEditorPoints = route.points.map((p) => ({ pointId: p.id, title: p.title }));
   routeOrderHistory = [];
+  mapController?.setLineDraftFromPoints?.(
+    route.points.map((p) => ({
+      lat: p.lat,
+      lng: p.lng,
+      pointId: p.id,
+      title: p.title || '',
+      snapped: true,
+    }))
+  );
+  mapController?.setLineToolMode?.('draw');
+  mapController?.setLineToolVisible?.(true);
   renderRoutePointOrder();
   mapController?.highlightRoute?.(route);
   setActiveSpecialistTab('route-editor');
@@ -1655,6 +1714,14 @@ function openPointInEditor(pointId) {
   document.getElementById('edit-point-type').value = normalizedTypeCode;
   document.getElementById('edit-point-district').value = point.district || '';
   document.getElementById('edit-point-description').value = point.description || '';
+  editingPointPosition = { lat: Number(point.lat), lng: Number(point.lng) };
+  const coordsLabel = document.getElementById('edit-point-coords');
+  if (coordsLabel) {
+    coordsLabel.textContent =
+      Number.isFinite(editingPointPosition.lat) && Number.isFinite(editingPointPosition.lng)
+        ? `Координати: ${editingPointPosition.lat.toFixed(6)}, ${editingPointPosition.lng.toFixed(6)}`
+        : 'Координати: -';
+  }
   document.getElementById('edit-point-photo-url').value = point.photoUrl || '';
   const editPhotoFileInput = document.getElementById('edit-point-photo-file');
   if (editPhotoFileInput) editPhotoFileInput.value = '';
@@ -2305,6 +2372,7 @@ function bindSpecialistTools() {
   const routeEditSelect = document.getElementById('route-edit-select');
   const btnAddRoutePoint = document.getElementById('btn-add-route-point');
   const btnSavePoint = document.getElementById('btn-save-point');
+  const btnMovePointOnMap = document.getElementById('btn-move-point-on-map');
   const editPointPhotoFileInput = document.getElementById('edit-point-photo-file');
   const editPointPhotoUrlInput = document.getElementById('edit-point-photo-url');
   const btnDeletePoint = document.getElementById('btn-delete-point');
@@ -2690,6 +2758,7 @@ function bindSpecialistTools() {
         description: document.getElementById('route-description').value.trim(),
         status: document.getElementById('route-status').value,
         routeColor: document.getElementById('route-color')?.value || DEFAULT_ROUTE_COLOR,
+        transportModes: collectSelectedRouteTransportModes(),
         points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
       };
       if (!payload.name) {
@@ -2726,6 +2795,7 @@ function bindSpecialistTools() {
         description: document.getElementById('route-description').value.trim(),
         status: document.getElementById('route-status').value,
         routeColor: document.getElementById('route-color')?.value || getRouteColor(editingRouteId),
+        transportModes: collectSelectedRouteTransportModes(),
         points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
       };
       if (!payload.name) {
@@ -2770,6 +2840,28 @@ function bindSpecialistTools() {
     });
   }
 
+  if (btnMovePointOnMap) {
+    btnMovePointOnMap.addEventListener('click', () => {
+      if (!editingPointId) {
+        setSpecialistMessage('Спочатку виберіть точку для редагування', true);
+        return;
+      }
+      if (!mapController) {
+        setSpecialistMessage('Карта ще не готова', true);
+        return;
+      }
+      setSpecialistMessage('Клікніть на карті, щоб задати нові координати точки');
+      mapController.enablePointPicking(({ lat, lng }) => {
+        editingPointPosition = { lat: Number(lat), lng: Number(lng) };
+        const coordsLabel = document.getElementById('edit-point-coords');
+        if (coordsLabel) {
+          coordsLabel.textContent = `Координати: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`;
+        }
+        setSpecialistSuccess('Нові координати зафіксовано (натисніть "Зберегти точку")');
+      });
+    });
+  }
+
   if (btnSavePoint) {
     btnSavePoint.addEventListener('click', async () => {
       if (!editingPointId) {
@@ -2786,6 +2878,14 @@ function bindSpecialistTools() {
         isCertified: false,
       };
       const existingPoint = dashboardPoints.find((p) => p.id === editingPointId);
+      if (
+        editingPointPosition &&
+        Number.isFinite(Number(editingPointPosition.lat)) &&
+        Number.isFinite(Number(editingPointPosition.lng))
+      ) {
+        payload.lat = Number(editingPointPosition.lat);
+        payload.lng = Number(editingPointPosition.lng);
+      }
       if (!payload.title || !payload.pointTypeCode) {
         setSpecialistMessage('Назва і тип точки обовʼязкові', true);
         return;
@@ -2854,10 +2954,13 @@ function bindSpecialistTools() {
       const pointId = Number(editPointSelect.value);
       if (!pointId) {
         editingPointId = null;
+        editingPointPosition = null;
         document.getElementById('edit-point-title').value = '';
         document.getElementById('edit-point-type').value = pointTypes[0]?.code || '';
         document.getElementById('edit-point-district').value = '';
         document.getElementById('edit-point-description').value = '';
+        const coordsLabel = document.getElementById('edit-point-coords');
+        if (coordsLabel) coordsLabel.textContent = 'Координати: -';
         document.getElementById('edit-point-photo-url').value = '';
         document.getElementById('edit-point-photo-file').value = '';
         renderPointPhotoPreview('edit-point-photo-preview');
@@ -2893,10 +2996,13 @@ function bindSpecialistTools() {
           }
           await apiRequest(`/api/points/${editingPointId}`, { method: 'DELETE' });
           editingPointId = null;
+          editingPointPosition = null;
           document.getElementById('edit-point-title').value = '';
           document.getElementById('edit-point-type').value = pointTypes[0]?.code || '';
           document.getElementById('edit-point-district').value = '';
           document.getElementById('edit-point-description').value = '';
+          const coordsLabel = document.getElementById('edit-point-coords');
+          if (coordsLabel) coordsLabel.textContent = 'Координати: -';
           document.getElementById('edit-point-photo-url').value = '';
           document.getElementById('edit-point-photo-file').value = '';
           renderPointPhotoPreview('edit-point-photo-preview');

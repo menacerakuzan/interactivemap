@@ -42,6 +42,27 @@ function normalizeOptionalText(value, maxLen = 2000) {
   return trimmed.slice(0, maxLen);
 }
 
+function normalizeRouteTransportModes(value) {
+  const allowed = new Set(['bus', 'tram', 'car']);
+  if (!Array.isArray(value)) return [];
+  const normalized = [];
+  value.forEach((mode) => {
+    const next = String(mode || '').trim().toLowerCase();
+    if (!allowed.has(next)) return;
+    if (!normalized.includes(next)) normalized.push(next);
+  });
+  return normalized;
+}
+
+function parseRouteTransportModes(value) {
+  if (!value) return [];
+  try {
+    return normalizeRouteTransportModes(JSON.parse(value));
+  } catch (_e) {
+    return [];
+  }
+}
+
 function normalizeNewsImageFocusY(value) {
   if (value === undefined || value === null || value === '') return 50;
   const parsed = Number(value);
@@ -442,6 +463,7 @@ app.get('/api/routes', optionalAuthenticate, (req, res) => {
       name: r.name,
       description: r.description,
       routeColor: r.route_color || null,
+      transportModes: parseRouteTransportModes(r.transport_modes),
       status: r.status,
       createdBy: r.created_by,
       authorName: r.author_name,
@@ -460,7 +482,7 @@ app.get('/api/routes', optionalAuthenticate, (req, res) => {
 });
 
 app.post('/api/routes', authenticate, requireRole('admin', 'specialist'), (req, res) => {
-  const { name, description, routeColor, status = 'draft', points = [] } = req.body;
+  const { name, description, routeColor, transportModes, status = 'draft', points = [] } = req.body;
   if (!isNonEmptyText(name, 180)) {
     return res.status(400).json({ error: 'name is required' });
   }
@@ -469,12 +491,21 @@ app.post('/api/routes', authenticate, requireRole('admin', 'specialist'), (req, 
     return res.status(400).json({ error: 'Invalid route status' });
   }
 
+  const normalizedTransportModes = normalizeRouteTransportModes(transportModes);
+
   const tx = db.transaction(() => {
     const routeResult = db
       .prepare(
-        'INSERT INTO routes (name, description, route_color, status, created_by) VALUES (?, ?, ?, ?, ?)'
+        'INSERT INTO routes (name, description, route_color, transport_modes, status, created_by) VALUES (?, ?, ?, ?, ?, ?)'
       )
-      .run(name.trim(), normalizeOptionalText(description, 3000), normalizeOptionalText(routeColor, 16), status, req.user.id);
+      .run(
+        name.trim(),
+        normalizeOptionalText(description, 3000),
+        normalizeOptionalText(routeColor, 16),
+        JSON.stringify(normalizedTransportModes),
+        status,
+        req.user.id
+      );
 
     const routeId = routeResult.lastInsertRowid;
 
@@ -509,13 +540,15 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
     return res.status(404).json({ error: 'Route not found' });
   }
 
-  const { name, description, routeColor, status, points } = req.body;
+  const { name, description, routeColor, transportModes, status, points } = req.body;
   if (status && !ROUTE_STATUSES.has(status)) {
     return res.status(400).json({ error: 'Invalid route status' });
   }
   if (name !== undefined && !isNonEmptyText(name, 180)) {
     return res.status(400).json({ error: 'Invalid route name' });
   }
+
+  const normalizedTransportModes = normalizeRouteTransportModes(transportModes);
 
   const tx = db.transaction(() => {
     db.prepare(`
@@ -524,6 +557,7 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
         name = COALESCE(?, name),
         description = COALESCE(?, description),
         route_color = COALESCE(?, route_color),
+        transport_modes = COALESCE(?, transport_modes),
         status = COALESCE(?, status),
         updated_by = ?,
         updated_at = datetime('now')
@@ -532,6 +566,7 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
       name !== undefined ? String(name).trim() : null,
       description !== undefined ? normalizeOptionalText(description, 3000) : null,
       routeColor !== undefined ? normalizeOptionalText(routeColor, 16) : null,
+      transportModes !== undefined ? JSON.stringify(normalizedTransportModes) : null,
       status ?? null,
       req.user.id,
       routeId
