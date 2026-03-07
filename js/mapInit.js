@@ -120,6 +120,14 @@ function markerFileToLabel(fileName) {
   return base.charAt(0).toUpperCase() + base.slice(1);
 }
 
+function resolvePointDisplayLabel(point, markerFile) {
+  const labelUk = String(point?.pointType?.labelUk || '').trim();
+  if (labelUk) return labelUk;
+  const code = String(point?.pointType?.code || '').trim();
+  if (code) return code.replaceAll('_', ' ');
+  return markerFileToLabel(markerFile);
+}
+
 function markerFileToUrl(fileName) {
   return MARKER_URL_BY_FILE[fileName] || MARKER_URL_BY_FILE['social_services.svg'];
 }
@@ -141,7 +149,7 @@ function resolveMarkerFile(point) {
 function createIcon(point) {
   const markerFile = resolveMarkerFile(point);
   const markerUrl = markerFileToUrl(markerFile);
-  const markerLabel = markerFileToLabel(markerFile);
+  const markerLabel = resolvePointDisplayLabel(point, markerFile);
   const markerTitle = escapeHtml(markerLabel);
   const pinSize = 38;
   const captionWidth = 132;
