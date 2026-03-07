@@ -415,10 +415,14 @@ body::before {
 
 .map-legend.collapsed {
   opacity: 0.94;
-  transform: translateY(-2px) scale(0.98);
+  transform: translateY(-2px);
   min-width: 0;
+  width: 44px;
+  height: 44px;
   max-width: none;
-  padding: 6px 8px;
+  padding: 0;
+  justify-content: center;
+  align-items: center;
 }
 
 #map-legend {
@@ -1148,7 +1152,7 @@ body.context-open .filter-menu {
   overflow: hidden;
 }
 
-.specialist-panel.collapsed > *:not(#btn-hide-specialist) {
+.specialist-panel.collapsed>*:not(#btn-hide-specialist) {
   display: none !important;
 }
 
@@ -1369,14 +1373,32 @@ body.context-open .filter-menu {
 }
 
 @keyframes pointDragIdle {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.06);
+  }
 }
 
 @keyframes pointDragActive {
-  0% { transform: scale(1); box-shadow: 0 8px 18px rgba(3, 105, 161, 0.42); }
-  50% { transform: scale(1.12); box-shadow: 0 14px 28px rgba(3, 105, 161, 0.5); }
-  100% { transform: scale(1); box-shadow: 0 8px 18px rgba(3, 105, 161, 0.42); }
+  0% {
+    transform: scale(1);
+    box-shadow: 0 8px 18px rgba(3, 105, 161, 0.42);
+  }
+
+  50% {
+    transform: scale(1.12);
+    box-shadow: 0 14px 28px rgba(3, 105, 161, 0.5);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 8px 18px rgba(3, 105, 161, 0.42);
+  }
 }
 
 .route-meta {
@@ -1474,6 +1496,7 @@ body.context-open .filter-menu {
     opacity: 0;
     transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1485,6 +1508,7 @@ body.context-open .filter-menu {
     opacity: 0.72;
     transform: scale(0.995);
   }
+
   to {
     opacity: 1;
     transform: scale(1);

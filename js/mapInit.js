@@ -18,6 +18,7 @@ let lineDraftVertices = [];
 let hiddenPointTypes = new Set();
 let markerAssetsPreloaded = false;
 let pointDragSession = null;
+let pointLayerMap = new Map();
 
 const POINT_TYPE_MARKER_FILE = {
   school: 'навчал заклад.svg',
@@ -199,7 +200,7 @@ function createIcon(point) {
     <div class="map-marker-wrap" style="--marker-wrap-width:${iconW}px; --marker-pin-size:${pinSize}px; --marker-caption-width:${captionWidth}px; --marker-caption-font:10px;">
       <span class="map-marker-dot" style="--marker-color: ${escapeHtml(point?.pointType?.color || '#3D5263')}"></span>
       <div class="map-marker-pin" style="--marker-color: ${escapeHtml(point?.pointType?.color || '#3D5263')}">
-        <img src="${markerUrl}" alt="${markerTitle}" loading="lazy" decoding="async" />
+        <img src="${markerUrl}" alt="${markerTitle}" />
       </div>
       <div class="map-marker-caption">${markerTitle}</div>
     </div>`;
@@ -238,6 +239,7 @@ function bindPointInteraction(layer, point, lat, lng) {
 function renderPoints(points = [], { emitUpdateEvent = true } = {}) {
   if (!markerLayer) return;
   markerLayer.clearLayers();
+  pointLayerMap.clear();
 
   points.forEach((point) => {
     const pointTypeCode = String(point?.pointType?.code || '');
@@ -248,6 +250,7 @@ function renderPoints(points = [], { emitUpdateEvent = true } = {}) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
     const layer = L.marker([lat, lng], { icon: createIcon(point) }).addTo(markerLayer);
+    pointLayerMap.set(point.id, layer);
 
     bindPointInteraction(layer, point, lat, lng);
   });
@@ -433,6 +436,11 @@ function stopPointDrag({ commit = false } = {}) {
   const session = pointDragSession;
   pointDragSession = null;
 
+  if (session.pointId) {
+    const origLayer = pointLayerMap.get(session.pointId);
+    if (origLayer) origLayer.setOpacity(1);
+  }
+
   const finalLatLng = session.marker?.getLatLng?.() || null;
   if (session.marker && lineDraftLayer) {
     lineDraftLayer.removeLayer(session.marker);
@@ -453,7 +461,7 @@ function stopPointDrag({ commit = false } = {}) {
   return finalLatLng ? { lat: Number(finalLatLng.lat), lng: Number(finalLatLng.lng) } : null;
 }
 
-function startPointDrag({ lat, lng, onMove = null, onCommit = null, onCancel = null } = {}) {
+function startPointDrag({ pointId = null, lat, lng, onMove = null, onCommit = null, onCancel = null } = {}) {
   if (!map || !lineDraftLayer) return false;
   const startLat = Number(lat);
   const startLng = Number(lng);
@@ -472,6 +480,11 @@ function startPointDrag({ lat, lng, onMove = null, onCommit = null, onCancel = n
       iconAnchor: [14, 14],
     }),
   }).addTo(lineDraftLayer);
+
+  if (pointId) {
+    const origLayer = pointLayerMap.get(pointId);
+    if (origLayer) origLayer.setOpacity(0);
+  }
 
   const container = map.getContainer();
   container.classList.add('point-drag');
@@ -1076,10 +1089,10 @@ export async function initMap(options = {}) {
     markerZoomAnimation: true,
     fadeAnimation: true,
     zoomSnap: 0,
-    zoomDelta: 0.2,
+    zoomDelta: 0.5,
     scrollWheelZoom: 'center',
     touchZoom: 'center',
-    wheelPxPerZoomLevel: 280,
+    wheelPxPerZoomLevel: 60,
     inertia: true,
     inertiaDeceleration: 1800,
     easeLinearity: 0.2,

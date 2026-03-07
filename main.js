@@ -1064,27 +1064,27 @@ function renderLegend() {
 
   const legendRows = grouped.size
     ? Array.from(grouped.entries())
-        .map(([code, stat]) => {
-          const meta = typeMetaByCode.get(code);
-          const label = meta?.labelUk || code;
-          const color = meta?.color || '#3D5263';
-          const markerUrl = resolvePointTypeMarkerUrl(code);
-          return {
-            code,
-            label,
-            color,
-            markerUrl,
-            total: stat.total,
-          };
-        })
-        .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'uk'))
+      .map(([code, stat]) => {
+        const meta = typeMetaByCode.get(code);
+        const label = meta?.labelUk || code;
+        const color = meta?.color || '#3D5263';
+        const markerUrl = resolvePointTypeMarkerUrl(code);
+        return {
+          code,
+          label,
+          color,
+          markerUrl,
+          total: stat.total,
+        };
+      })
+      .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'uk'))
     : pointTypes.map((pt) => ({
-        code: pt.code,
-        label: pt.labelUk,
-        color: pt.color,
-        markerUrl: resolvePointTypeMarkerUrl(pt.code),
-        total: 0,
-      }));
+      code: pt.code,
+      label: pt.labelUk,
+      color: pt.color,
+      markerUrl: resolvePointTypeMarkerUrl(pt.code),
+      total: 0,
+    }));
   const visibleCount = Math.max(0, legendRows.length - hiddenPointTypeCodes.size);
   legend.innerHTML = [
     `
@@ -1100,7 +1100,7 @@ function renderLegend() {
         <button class="legend-item ${isHidden ? 'is-hidden' : ''}" data-legend-toggle="${row.code}" type="button"
           title="${isHidden ? 'Показати тип' : 'Сховати тип'}">
           <span class="legend-marker">
-            <img src="${row.markerUrl}" alt="${row.label}" loading="lazy" decoding="async" />
+            <img src="${row.markerUrl}" alt="${row.label}" />
           </span>
           <span class="legend-label">${row.label}</span>
           <span class="legend-count">${row.total}</span>
@@ -1212,24 +1212,22 @@ function renderNews() {
         return `
       <div class="card reveal news-card">
         <div class="news-cover">
-          ${
-            cardImageUrl
-              ? `<img data-news-src="${escapeHtml(cardImageUrl)}" data-news-fallback="${escapeHtml(fallbackImageUrl)}" alt="${escapeHtml(
-                  item.title || 'Новина'
-                )}" loading="lazy" decoding="async" style="object-position:50% ${normalizeNewsImageFocusY(
-                  item.imageFocusY
-                )}%;" />`
-              : ''
+          ${cardImageUrl
+            ? `<img data-news-src="${escapeHtml(cardImageUrl)}" data-news-fallback="${escapeHtml(fallbackImageUrl)}" alt="${escapeHtml(
+              item.title || 'Новина'
+            )}" loading="lazy" decoding="async" style="object-position:50% ${normalizeNewsImageFocusY(
+              item.imageFocusY
+            )}%;" />`
+            : ''
           }
         </div>
         <div class="t-data text-muted" style="margin-bottom: 16px;">${formatIsoDate(item.createdAt)}</div>
         <h3 class="t-h3" style="font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 12px;">${escapeHtml(item.title)}</h3>
         <p class="t-body text-muted" style="margin-bottom: 24px;">${escapeHtml(item.summary)}</p>
-        ${
-          item.link
+        ${item.link
             ? `<a href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer" class="t-body" style="color: var(--c-cerulean); text-decoration: none;">Читати &rarr;</a>`
             : '<span class="t-body text-muted">Джерело не вказано</span>'
-        }
+          }
       </div>
     `;
       }
@@ -1268,8 +1266,8 @@ function renderDashboard(points, routes) {
     routeList.innerHTML =
       routeSlice.length > 0
         ? routeSlice
-            .map(
-              (r) => `
+          .map(
+            (r) => `
           <article class="route-item">
             <div class="route-meta">
               <strong class="t-body" style="display:flex;align-items:center;gap:8px;">
@@ -1286,8 +1284,8 @@ function renderDashboard(points, routes) {
             </div>
           </article>
         `
-            )
-            .join('')
+          )
+          .join('')
         : '<div class="activity-item t-body text-muted">Поки немає маршрутів</div>';
   }
 
@@ -1296,8 +1294,8 @@ function renderDashboard(points, routes) {
     reviewList.innerHTML =
       queue.length > 0
         ? queue
-            .map(
-              (r) => `
+          .map(
+            (r) => `
           <article class="activity-item">
             <div class="route-meta">
               <strong class="t-body">${r.name}</strong>
@@ -1309,8 +1307,8 @@ function renderDashboard(points, routes) {
             </div>
           </article>
         `
-            )
-            .join('')
+          )
+          .join('')
         : '<div class="activity-item t-body text-muted">Черга порожня</div>';
   }
 
@@ -1328,8 +1326,8 @@ function renderDashboard(points, routes) {
     pointList.innerHTML =
       pointSlice.length > 0
         ? pointSlice
-            .map(
-              (p) => `
+          .map(
+            (p) => `
           <article class="route-item">
             <div class="route-meta">
               <strong class="t-body">${p.title}</strong>
@@ -1340,8 +1338,8 @@ function renderDashboard(points, routes) {
             </div>
           </article>
         `
-            )
-            .join('')
+          )
+          .join('')
         : '<div class="activity-item t-body text-muted">Поки немає точок</div>';
   }
 
@@ -1363,15 +1361,15 @@ function renderDashboard(points, routes) {
     activityList.innerHTML =
       events.length > 0
         ? events
-            .map(
-              (e) => `
+          .map(
+            (e) => `
           <article class="activity-item">
             <div class="t-body">${e.title}</div>
             <div class="t-data text-muted">${e.meta} • ${formatIsoDate(e.time)}</div>
           </article>
         `
-            )
-            .join('')
+          )
+          .join('')
         : '<div class="activity-item t-body text-muted">Поки немає активності</div>';
   }
 
@@ -1386,8 +1384,8 @@ function renderDashboard(points, routes) {
     proposalList.innerHTML =
       pageSlice.length > 0
         ? pageSlice
-            .map(
-              (p) => `
+          .map(
+            (p) => `
           <article class="route-item">
             <div class="route-meta">
               <strong class="t-body">${p.name || 'Без назви'}</strong>
@@ -1402,8 +1400,8 @@ function renderDashboard(points, routes) {
             </div>
           </article>
         `
-            )
-            .join('')
+          )
+          .join('')
         : '<div class="activity-item t-body text-muted">Поки немає заявок</div>';
   }
   saveUiState();
@@ -2021,45 +2019,45 @@ function bindAuthFlow() {
   }
 
   const submitAuth = async () => {
-      const email = document.getElementById('auth-email')?.value?.trim();
-      const password = document.getElementById('auth-password')?.value || '';
+    const email = document.getElementById('auth-email')?.value?.trim();
+    const password = document.getElementById('auth-password')?.value || '';
+    clearAuthError();
+
+    if (!email || !password) {
+      setAuthError('Введіть email і пароль');
+      return;
+    }
+
+    try {
+      const data = await apiRequest('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+
+      setAuthState(data.token, data.user, data.session || null);
       clearAuthError();
 
-      if (!email || !password) {
-        setAuthError('Введіть email і пароль');
-        return;
-      }
+      if (authView) authView.style.display = 'none';
+      setFilterMenuHidden(false);
+      setSpecialistSuccess(`Вхід виконано: ${data.user.fullName}`);
+      setActiveSpecialistTab(data.user.role === 'viewer' ? 'menu' : 'dashboard');
 
       try {
-        const data = await apiRequest('/api/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email, password }),
-        });
-
-        setAuthState(data.token, data.user, data.session || null);
-        clearAuthError();
-
-        if (authView) authView.style.display = 'none';
-        setFilterMenuHidden(false);
-        setSpecialistSuccess(`Вхід виконано: ${data.user.fullName}`);
-        setActiveSpecialistTab(data.user.role === 'viewer' ? 'menu' : 'dashboard');
-
-        try {
-          await refreshDashboardData();
-        } catch (dashboardError) {
-          setSpecialistMessage(
-            `Вхід виконано, але є помилка завантаження даних: ${dashboardError.message}`,
-            true
-          );
-        }
-      } catch (error) {
-        const uiMessage =
-          error.message === 'Load failed' || error.message === 'Failed to fetch'
-            ? 'Немає зʼєднання з Supabase або заблоковано мережевий запит.'
-            : error.message;
-        setAuthError(uiMessage);
-        setSpecialistMessage(uiMessage, true);
+        await refreshDashboardData();
+      } catch (dashboardError) {
+        setSpecialistMessage(
+          `Вхід виконано, але є помилка завантаження даних: ${dashboardError.message}`,
+          true
+        );
       }
+    } catch (error) {
+      const uiMessage =
+        error.message === 'Load failed' || error.message === 'Failed to fetch'
+          ? 'Немає зʼєднання з Supabase або заблоковано мережевий запит.'
+          : error.message;
+      setAuthError(uiMessage);
+      setSpecialistMessage(uiMessage, true);
+    }
   };
 
   if (btnAuthSubmit) {
@@ -2295,6 +2293,7 @@ function bindFilterMenu() {
           const center = DISTRICT_CENTERS[district];
           mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 11);
         }
+        await mapController?.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: selectedCommunity });
         setSpecialistMessage(
           hasBoundary
             ? `Фокус на громаді: ${community} (межі показано)`
@@ -2845,6 +2844,7 @@ function bindSpecialistTools() {
         return;
       }
       const started = mapController.startPointDrag?.({
+        pointId: current.id,
         lat,
         lng,
         onMove: ({ lat: movedLat, lng: movedLng }) => {
@@ -3317,13 +3317,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const scrollToInterfaceSection = (targetId) => {
     const target = targetId ? document.getElementById(targetId) : null;
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-    const mapSection = document.querySelector('.map-container');
-    if (mapSection) {
-      mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const finalTarget = target || document.querySelector('.map-container');
+    if (finalTarget) {
+      const offsetTop = Math.max(0, finalTarget.getBoundingClientRect().top + window.scrollY - 90);
+      window.scrollTo({ top: offsetTop, behavior: 'smooth' });
     }
   };
 
