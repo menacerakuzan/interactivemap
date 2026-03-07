@@ -17,6 +17,8 @@ let lineToolColor = '#E7C769';
 let lineDraftVertices = [];
 let hiddenPointTypes = new Set();
 let markerAssetsPreloaded = false;
+let lastRenderedCompactMode = null;
+let lastRenderedZoomBucket = null;
 
 const POINT_TYPE_MARKER_FILE = {
   school: 'навчал заклад.svg',
@@ -192,7 +194,8 @@ function createIcon(point) {
   const pinSize = Math.round(38 * scale);
   const captionWidth = Math.round(132 * scale);
   const iconW = Math.max(pinSize, captionWidth) + 8;
-  const iconH = pinSize + Math.round(24 * scale);
+  const showCaption = zoom >= 12.2;
+  const iconH = pinSize + (showCaption ? Math.round(24 * scale) : 2);
   const anchorX = Math.round(iconW / 2);
   const anchorY = Math.round(pinSize / 2);
 
@@ -201,7 +204,7 @@ function createIcon(point) {
       <div class="map-marker-pin" style="--marker-color: ${escapeHtml(point?.pointType?.color || '#3D5263')}">
         <img src="${markerUrl}" alt="${markerTitle}" loading="lazy" decoding="async" />
       </div>
-      <div class="map-marker-caption">${markerTitle}</div>
+      ${showCaption ? `<div class="map-marker-caption">${markerTitle}</div>` : ''}
     </div>`;
 
   return L.divIcon({
@@ -215,7 +218,13 @@ function createIcon(point) {
 function shouldUseCompactMarker() {
   const zoom = Number(map?.getZoom?.());
   if (!Number.isFinite(zoom)) return false;
-  return zoom <= 10.4;
+  return zoom <= 11.2;
+}
+
+function getZoomBucket() {
+  const zoom = Number(map?.getZoom?.());
+  if (!Number.isFinite(zoom)) return null;
+  return Math.round(zoom * 2) / 2; // 0.5 zoom step bucket
 }
 
 function bindPointInteraction(layer, point, lat, lng) {
@@ -244,6 +253,8 @@ function renderPoints(points = [], { emitUpdateEvent = true } = {}) {
   if (!markerLayer) return;
   markerLayer.clearLayers();
   const compact = shouldUseCompactMarker();
+  lastRenderedCompactMode = compact;
+  lastRenderedZoomBucket = getZoomBucket();
 
   points.forEach((point) => {
     const pointTypeCode = String(point?.pointType?.code || '');
@@ -1007,10 +1018,10 @@ export async function initMap(options = {}) {
     fadeAnimation: true,
     zoomSnap: 0.1,
     zoomDelta: 1,
-    scrollWheelZoom: false,
+    scrollWheelZoom: 'center',
     touchZoom: 'center',
-    wheelDebounceTime: 20,
-    wheelPxPerZoomLevel: 90,
+    wheelDebounceTime: 40,
+    wheelPxPerZoomLevel: 120,
     inertia: true,
     inertiaDeceleration: 1800,
     easeLinearity: 0.2,
@@ -1037,83 +1048,14 @@ export async function initMap(options = {}) {
   focusBoundaryLayer = L.layerGroup().addTo(map);
   lineDraftLayer = L.layerGroup().addTo(map);
 
-  // Custom trackpad-friendly wheel zoom: continuous and stable like modern map UIs.
-  const mapContainer = map.getContainer();
-  let targetZoom = map.getZoom();
-  let zoomAnimationFrame = null;
-  let isWheelAnimating = false;
-  const minStep = 0.03;
-  const maxStep = 0.6;
-  const zoomSensitivity = 0.0022;
-  const stopWheelZoomAnimation = () => {
-    if (zoomAnimationFrame) {
-      cancelAnimationFrame(zoomAnimationFrame);
-      zoomAnimationFrame = null;
-    }
-    isWheelAnimating = false;
-    targetZoom = map.getZoom();
-  };
-
-  const normalizeWheelDelta = (event) => {
-    if (event.deltaMode === 1) return event.deltaY * 16;
-    if (event.deltaMode === 2) return event.deltaY * window.innerHeight;
-    return event.deltaY;
-  };
-
-  mapContainer.addEventListener(
-    'wheel',
-    (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const delta = normalizeWheelDelta(event);
-      let step = -delta * zoomSensitivity;
-      if (Math.abs(step) > 0 && Math.abs(step) < minStep) {
-        step = Math.sign(step) * minStep;
-      }
-      step = Math.max(-maxStep, Math.min(maxStep, step));
-      targetZoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), targetZoom + step));
-
-      if (zoomAnimationFrame) return;
-      const animateWheelZoom = () => {
-        isWheelAnimating = true;
-        const currentZoom = map.getZoom();
-        const diff = targetZoom - currentZoom;
-        if (Math.abs(diff) < 0.005) {
-          map.setZoomAround(map.getCenter(), targetZoom, { animate: false });
-          isWheelAnimating = false;
-          zoomAnimationFrame = null;
-          return;
-        }
-        const nextZoom = currentZoom + diff * 0.28;
-        map.setZoomAround(map.getCenter(), nextZoom, { animate: false });
-        zoomAnimationFrame = requestAnimationFrame(animateWheelZoom);
-      };
-      zoomAnimationFrame = requestAnimationFrame(animateWheelZoom);
-    },
-    { passive: false }
-  );
-
   map.on('zoomend', () => {
-    if (!isWheelAnimating) {
-      targetZoom = map.getZoom();
-    }
-    if (Array.isArray(lastStablePoints) && lastStablePoints.length) {
+    const compactNow = shouldUseCompactMarker();
+    const zoomBucketNow = getZoomBucket();
+    const shouldRerenderMarkers =
+      compactNow !== lastRenderedCompactMode || zoomBucketNow !== lastRenderedZoomBucket;
+    if (shouldRerenderMarkers && Array.isArray(lastStablePoints) && lastStablePoints.length) {
       renderPoints(lastStablePoints, { emitUpdateEvent: false });
     }
-  });
-
-  const zoomInBtn = mapContainer.querySelector('.leaflet-control-zoom-in');
-  const zoomOutBtn = mapContainer.querySelector('.leaflet-control-zoom-out');
-  [zoomInBtn, zoomOutBtn].forEach((btn) => {
-    if (!btn) return;
-    const syncManualZoom = () => {
-      stopWheelZoomAnimation();
-      requestAnimationFrame(() => {
-        targetZoom = map.getZoom();
-      });
-    };
-    btn.addEventListener('pointerdown', syncManualZoom);
-    btn.addEventListener('click', syncManualZoom);
   });
 
   map.on('click', (e) => {

@@ -2465,6 +2465,7 @@ function bindSpecialistTools() {
   }
 
   let lineSnapEnabled = true;
+  const canUseLineTools = Boolean(authUser && ['admin', 'specialist'].includes(authUser.role));
 
   const setLineToolButtonState = (mode) => {
     if (btnLineCursor) btnLineCursor.classList.toggle('active', mode === 'cursor');
@@ -2475,7 +2476,7 @@ function bindSpecialistTools() {
   };
 
   setLineToolButtonState('draw');
-  mapController?.setLineToolVisible?.(true);
+  mapController?.setLineToolVisible?.(canUseLineTools && currentSpecialistAction === 'route-editor');
   mapController?.setLineToolMode?.('draw');
   mapController?.setLineToolSnapEnabled?.(lineSnapEnabled);
   if (btnLineSnap) btnLineSnap.classList.toggle('active', lineSnapEnabled);
