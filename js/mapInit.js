@@ -17,8 +17,6 @@ let lineToolColor = '#E7C769';
 let lineDraftVertices = [];
 let hiddenPointTypes = new Set();
 let markerAssetsPreloaded = false;
-let lastRenderedCompactMode = null;
-let lastRenderedZoomBucket = null;
 
 const POINT_TYPE_MARKER_FILE = {
   school: 'навчал заклад.svg',
@@ -185,26 +183,24 @@ function resolveMarkerFile(point) {
 }
 
 function createIcon(point) {
-  const zoom = map?.getZoom?.() ?? ODESA_BOUNDS.defaultZoom;
   const markerFile = resolveMarkerFile(point);
   const markerUrl = markerFileToUrl(markerFile);
   const markerLabel = markerFileToLabel(markerFile);
   const markerTitle = escapeHtml(markerLabel);
-  const scale = Math.max(0.72, Math.min(1, 0.72 + (zoom - 10) * 0.11));
-  const pinSize = Math.round(38 * scale);
-  const captionWidth = Math.round(132 * scale);
+  const pinSize = 38;
+  const captionWidth = 132;
   const iconW = Math.max(pinSize, captionWidth) + 8;
-  const showCaption = zoom >= 12.2;
-  const iconH = pinSize + (showCaption ? Math.round(24 * scale) : 2);
+  const iconH = pinSize + 24;
   const anchorX = Math.round(iconW / 2);
   const anchorY = Math.round(pinSize / 2);
 
   const html = `
-    <div class="map-marker-wrap" style="--marker-wrap-width:${iconW}px; --marker-pin-size:${pinSize}px; --marker-caption-width:${captionWidth}px; --marker-caption-font:${Math.max(9, Math.round(10 * scale))}px;">
+    <div class="map-marker-wrap" style="--marker-wrap-width:${iconW}px; --marker-pin-size:${pinSize}px; --marker-caption-width:${captionWidth}px; --marker-caption-font:10px;">
+      <span class="map-marker-dot" style="--marker-color: ${escapeHtml(point?.pointType?.color || '#3D5263')}"></span>
       <div class="map-marker-pin" style="--marker-color: ${escapeHtml(point?.pointType?.color || '#3D5263')}">
         <img src="${markerUrl}" alt="${markerTitle}" loading="lazy" decoding="async" />
       </div>
-      ${showCaption ? `<div class="map-marker-caption">${markerTitle}</div>` : ''}
+      <div class="map-marker-caption">${markerTitle}</div>
     </div>`;
 
   return L.divIcon({
@@ -213,18 +209,6 @@ function createIcon(point) {
     iconSize: [iconW, iconH],
     iconAnchor: [anchorX, anchorY],
   });
-}
-
-function shouldUseCompactMarker() {
-  const zoom = Number(map?.getZoom?.());
-  if (!Number.isFinite(zoom)) return false;
-  return zoom <= 11.2;
-}
-
-function getZoomBucket() {
-  const zoom = Number(map?.getZoom?.());
-  if (!Number.isFinite(zoom)) return null;
-  return Math.round(zoom * 2) / 2; // 0.5 zoom step bucket
 }
 
 function bindPointInteraction(layer, point, lat, lng) {
@@ -252,9 +236,6 @@ function bindPointInteraction(layer, point, lat, lng) {
 function renderPoints(points = [], { emitUpdateEvent = true } = {}) {
   if (!markerLayer) return;
   markerLayer.clearLayers();
-  const compact = shouldUseCompactMarker();
-  lastRenderedCompactMode = compact;
-  lastRenderedZoomBucket = getZoomBucket();
 
   points.forEach((point) => {
     const pointTypeCode = String(point?.pointType?.code || '');
@@ -264,18 +245,7 @@ function renderPoints(points = [], { emitUpdateEvent = true } = {}) {
     const lng = Number(point?.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-    const color = String(point?.pointType?.color || '#3D5263');
-    const zoom = Number(map?.getZoom?.());
-    const compactRadius = Number.isFinite(zoom) ? Math.max(3, Math.min(6, 3 + (zoom - 8) * 0.45)) : 5;
-    const layer = compact
-      ? L.circleMarker([lat, lng], {
-          radius: compactRadius,
-          color: '#11365C',
-          weight: 1.5,
-          fillColor: color,
-          fillOpacity: 0.95,
-        }).addTo(markerLayer)
-      : L.marker([lat, lng], { icon: createIcon(point) }).addTo(markerLayer);
+    const layer = L.marker([lat, lng], { icon: createIcon(point) }).addTo(markerLayer);
 
     bindPointInteraction(layer, point, lat, lng);
   });
@@ -1016,8 +986,8 @@ export async function initMap(options = {}) {
     zoomAnimation: true,
     markerZoomAnimation: false,
     fadeAnimation: true,
-    zoomSnap: 0.1,
-    zoomDelta: 1,
+    zoomSnap: 0,
+    zoomDelta: 0.2,
     scrollWheelZoom: 'center',
     touchZoom: 'center',
     wheelDebounceTime: 40,
@@ -1048,14 +1018,10 @@ export async function initMap(options = {}) {
   focusBoundaryLayer = L.layerGroup().addTo(map);
   lineDraftLayer = L.layerGroup().addTo(map);
 
-  map.on('zoomend', () => {
-    const compactNow = shouldUseCompactMarker();
-    const zoomBucketNow = getZoomBucket();
-    const shouldRerenderMarkers =
-      compactNow !== lastRenderedCompactMode || zoomBucketNow !== lastRenderedZoomBucket;
-    if (shouldRerenderMarkers && Array.isArray(lastStablePoints) && lastStablePoints.length) {
-      renderPoints(lastStablePoints, { emitUpdateEvent: false });
-    }
+  const mapContainer = map.getContainer();
+  mapContainer.style.setProperty('--map-zoom', String(map.getZoom() ?? ODESA_BOUNDS.defaultZoom));
+  map.on('zoom', () => {
+    mapContainer.style.setProperty('--map-zoom', String(map.getZoom()));
   });
 
   map.on('click', (e) => {

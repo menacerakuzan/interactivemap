@@ -894,7 +894,8 @@ function setActiveSpecialistTab(tabName) {
   if (mapView) {
     mapView.classList.toggle('route-toolbar-visible', showRouteLineToolbar);
   }
-  mapController?.setLineToolVisible?.(showRouteLineToolbar);
+  // Do not auto-arm drawing on tab open.
+  mapController?.setLineToolVisible?.(false);
 
   saveUiState();
 }
@@ -1659,7 +1660,7 @@ function resetRouteEditor() {
   setSelectedRouteTransportModes([]);
   mapController?.clearLineDraft?.();
   mapController?.setLineToolMode?.('draw');
-  mapController?.setLineToolVisible?.(true);
+  mapController?.setLineToolVisible?.(false);
   mapController?.setLineToolSnapEnabled?.(true);
   renderRoutePointOrder();
   mapController?.clearRouteHighlight?.();
@@ -1693,7 +1694,7 @@ function openRouteInEditor(routeId, options = {}) {
     }))
   );
   mapController?.setLineToolMode?.('draw');
-  mapController?.setLineToolVisible?.(true);
+  mapController?.setLineToolVisible?.(false);
   renderRoutePointOrder();
   mapController?.highlightRoute?.(route);
   setActiveSpecialistTab('route-editor');
@@ -2475,8 +2476,8 @@ function bindSpecialistTools() {
     if (btnLineErase) btnLineErase.classList.toggle('active', mode === 'erase');
   };
 
-  setLineToolButtonState('draw');
-  mapController?.setLineToolVisible?.(canUseLineTools && currentSpecialistAction === 'route-editor');
+  setLineToolButtonState('cursor');
+  mapController?.setLineToolVisible?.(false);
   mapController?.setLineToolMode?.('draw');
   mapController?.setLineToolSnapEnabled?.(lineSnapEnabled);
   if (btnLineSnap) btnLineSnap.classList.toggle('active', lineSnapEnabled);

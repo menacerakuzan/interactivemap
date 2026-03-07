@@ -945,6 +945,7 @@ body.context-open .filter-menu {
   background: var(--c-bg) !important;
   font-family: var(--font-ui) !important;
   overscroll-behavior: contain;
+  --map-zoom: 12;
 }
 
 .leaflet-tile-pane {
@@ -983,6 +984,22 @@ body.context-open .filter-menu {
   align-items: center;
   gap: 4px;
   transform: translateZ(0);
+  --z: var(--map-zoom, 12);
+  --dot-alpha: clamp(0, calc((11.2 - var(--z)) / 1.8), 1);
+  --icon-alpha: clamp(0, calc((var(--z) - 9.8) / 1.8), 1);
+  --caption-alpha: clamp(0, calc((var(--z) - 11.7) / 1.2), 1);
+}
+
+.map-marker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--marker-color, #3d5263);
+  border: 1px solid rgba(17, 54, 92, 0.42);
+  opacity: var(--dot-alpha);
+  transform: scale(calc(0.72 + var(--dot-alpha) * 0.28));
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: none;
 }
 
 .map-marker-pin {
@@ -995,6 +1012,9 @@ body.context-open .filter-menu {
   box-shadow: none !important;
   display: grid;
   place-items: center;
+  opacity: var(--icon-alpha);
+  transform: scale(calc(0.84 + var(--icon-alpha) * 0.16));
+  transition: opacity 180ms ease, transform 180ms ease;
 }
 
 .map-marker-pin img {
@@ -1019,6 +1039,10 @@ body.context-open .filter-menu {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  opacity: var(--caption-alpha);
+  transform: translateY(calc((1 - var(--caption-alpha)) * -4px));
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: none;
 }
 
 .leaflet-container.point-pick {
