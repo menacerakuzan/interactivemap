@@ -406,7 +406,15 @@ function renderTypePreview(selectId, previewId) {
   const markerUrl = resolvePointTypeMarkerUrl(selectedCode);
   const label = getPointTypeLabelByCode(selectedCode);
   previewEl.innerHTML = `
-    <span class="legend-marker"><img src="${markerUrl}" alt="${label}" loading="lazy" decoding="async" /></span>
+    <span class="legend-marker" style="--legend-color:${POINT_TYPE_META_BY_CODE.get(selectedCode)?.color || '#3D5263'}">
+      <img
+        src="${markerUrl}"
+        alt="${label}"
+        loading="lazy"
+        decoding="async"
+        onerror="this.style.display='none'; this.parentElement && this.parentElement.classList.add('is-image-broken');"
+      />
+    </span>
     <span class="t-body">${label}</span>
   `;
 }
@@ -1099,8 +1107,14 @@ function renderLegend() {
       return `
         <button class="legend-item ${isHidden ? 'is-hidden' : ''}" data-legend-toggle="${row.code}" type="button"
           title="${isHidden ? 'Показати тип' : 'Сховати тип'}">
-          <span class="legend-marker">
-            <img src="${row.markerUrl}" alt="${row.label}" />
+          <span class="legend-marker" style="--legend-color:${row.color}">
+            <img
+              src="${row.markerUrl}"
+              alt="${row.label}"
+              loading="lazy"
+              decoding="async"
+              onerror="this.style.display='none'; this.parentElement && this.parentElement.classList.add('is-image-broken');"
+            />
           </span>
           <span class="legend-label">${row.label}</span>
           <span class="legend-count">${row.total}</span>

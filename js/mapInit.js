@@ -200,7 +200,14 @@ function createIcon(point) {
     <div class="map-marker-wrap" style="--marker-wrap-width:${iconW}px; --marker-pin-size:${pinSize}px; --marker-caption-width:${captionWidth}px; --marker-caption-font:10px;">
       <span class="map-marker-dot" style="--marker-color: ${escapeHtml(point?.pointType?.color || '#3D5263')}"></span>
       <div class="map-marker-pin" style="--marker-color: ${escapeHtml(point?.pointType?.color || '#3D5263')}">
-        <img src="${markerUrl}" alt="${markerTitle}" />
+        <img
+          src="${markerUrl}"
+          alt="${markerTitle}"
+          loading="lazy"
+          decoding="async"
+          onerror="this.style.display='none'; this.closest('.map-marker-wrap') && this.closest('.map-marker-wrap').classList.add('is-image-broken');"
+          onload="this.closest('.map-marker-wrap') && this.closest('.map-marker-wrap').classList.remove('is-image-broken'); this.style.display='block';"
+        />
       </div>
       <div class="map-marker-caption">${markerTitle}</div>
     </div>`;

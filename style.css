@@ -649,6 +649,21 @@ body::before {
   place-items: center;
   flex-shrink: 0;
   overflow: hidden;
+  position: relative;
+}
+
+.legend-marker::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--legend-color, #3d5263);
+  border: 1px solid rgba(17, 54, 92, 0.35);
+  display: none;
+}
+
+.legend-marker.is-image-broken::before {
+  display: block;
 }
 
 .legend-marker img {
@@ -1001,6 +1016,16 @@ body.context-open .filter-menu {
   align-items: center;
   gap: 4px;
   transform: translateZ(0);
+}
+
+.map-marker-wrap.is-image-broken .map-marker-pin {
+  display: none;
+}
+
+.map-marker-wrap.is-image-broken .map-marker-dot {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(17, 54, 92, 0.45);
 }
 
 .map-marker-dot {
