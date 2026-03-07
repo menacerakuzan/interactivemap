@@ -21,70 +21,99 @@ let pointDragSession = null;
 let pointLayerMap = new Map();
 
 const POINT_TYPE_MARKER_FILE = {
-  school: 'навчал заклад.svg',
-  administration: 'адміністрація.svg',
-  fuel_station: 'азс.svg',
-  pharmacy: 'аптека.svg',
-  bank: 'банк.svg',
-  station: 'вокзал.svg',
-  housing: 'житло.svg',
-  transport_stop: 'зупинка Т.svg',
-  cafe: 'кафе.svg',
-  culture: 'культура.svg',
-  playground: 'майданчик.svg',
-  medical: 'мед заклад.svg',
-  education: 'навчал заклад.svg',
-  street: 'пішохідний перехід.svg',
-  square: 'пішохідний перехід.svg',
-  hotel: 'готель.svg',
-  other: 'соціальні послуги.svg',
-  park: 'парк.svg',
-  hairdresser: 'перукарня.svg',
-  post: 'пошта.svg',
-  restaurant: 'ресторан.svg',
-  social_services: 'соціальні послуги.svg',
-  sport: 'спорт.svg',
-  shelter: 'укриття.svg',
+  school: 'education.svg',
+  administration: 'administration.svg',
+  fuel_station: 'fuel_station.svg',
+  pharmacy: 'pharmacy.svg',
+  bank: 'bank.svg',
+  station: 'station.svg',
+  housing: 'housing.svg',
+  transport_stop: 'stop_t.svg',
+  cafe: 'cafe.svg',
+  culture: 'culture.svg',
+  playground: 'playground.svg',
+  medical: 'medical.svg',
+  education: 'education.svg',
+  street: 'crossing.svg',
+  square: 'crossing.svg',
+  hotel: 'hotel.svg',
+  other: 'social_services.svg',
+  park: 'park.svg',
+  hairdresser: 'hairdresser.svg',
+  post: 'post.svg',
+  restaurant: 'restaurant.svg',
+  social_services: 'social_services.svg',
+  sport: 'sport.svg',
+  shelter: 'shelter.svg',
   // Legacy aliases.
-  stop_a: 'зупинка Т.svg',
-  stop_p: 'зупинка Т.svg',
-  stop_t: 'зупинка Т.svg',
-  ramp: 'соціальні послуги.svg',
-  elevator: 'соціальні послуги.svg',
-  toilet: 'мед заклад.svg',
-  parking: 'азс.svg',
-  entrance: 'адміністрація.svg',
-  crossing: 'пішохідний перехід.svg',
+  stop_a: 'stop_t.svg',
+  stop_p: 'stop_t.svg',
+  stop_t: 'stop_t.svg',
+  ramp: 'social_services.svg',
+  elevator: 'social_services.svg',
+  toilet: 'medical.svg',
+  parking: 'fuel_station.svg',
+  entrance: 'administration.svg',
+  crossing: 'crossing.svg',
 };
 
 const MARKER_FILES = [
-  'адміністрація.svg',
-  'азс.svg',
-  'аптека.svg',
-  'банк.svg',
-  'вокзал.svg',
-  'готель.svg',
-  'житло.svg',
-  'зупинка А.svg',
-  'зупинка П.svg',
-  'зупинка Т.svg',
-  'кафе.svg',
-  'культура.svg',
-  'майданчик.svg',
-  'мед заклад.svg',
-  'навчал заклад.svg',
-  'парк.svg',
-  'перукарня.svg',
-  'пошта.svg',
-  'пішохідний перехід.svg',
-  'ресторан.svg',
-  'соціальні послуги.svg',
-  'спорт.svg',
-  'укриття.svg',
+  'administration.svg',
+  'fuel_station.svg',
+  'pharmacy.svg',
+  'bank.svg',
+  'station.svg',
+  'hotel.svg',
+  'housing.svg',
+  'stop_a.svg',
+  'stop_p.svg',
+  'stop_t.svg',
+  'cafe.svg',
+  'culture.svg',
+  'playground.svg',
+  'medical.svg',
+  'education.svg',
+  'park.svg',
+  'hairdresser.svg',
+  'post.svg',
+  'crossing.svg',
+  'restaurant.svg',
+  'social_services.svg',
+  'sport.svg',
+  'shelter.svg',
 ];
 
+const MARKER_PUBLIC_FILE_BY_SOURCE = {
+  'administration.svg': 'administration.svg',
+  'fuel_station.svg': 'fuel_station.svg',
+  'pharmacy.svg': 'pharmacy.svg',
+  'bank.svg': 'bank.svg',
+  'station.svg': 'station.svg',
+  'hotel.svg': 'hotel.svg',
+  'housing.svg': 'housing.svg',
+  'stop_a.svg': 'stop_a.svg',
+  'stop_p.svg': 'stop_p.svg',
+  'stop_t.svg': 'stop_t.svg',
+  'cafe.svg': 'cafe.svg',
+  'culture.svg': 'culture.svg',
+  'playground.svg': 'playground.svg',
+  'medical.svg': 'medical.svg',
+  'education.svg': 'education.svg',
+  'park.svg': 'park.svg',
+  'hairdresser.svg': 'hairdresser.svg',
+  'post.svg': 'post.svg',
+  'crossing.svg': 'crossing.svg',
+  'restaurant.svg': 'restaurant.svg',
+  'social_services.svg': 'social_services.svg',
+  'sport.svg': 'sport.svg',
+  'shelter.svg': 'shelter.svg',
+};
+
 const MARKER_URL_BY_FILE = Object.fromEntries(
-  MARKER_FILES.map((fileName) => [fileName, `/markers/${encodeURIComponent(fileName)}`])
+  MARKER_FILES.map((fileName) => [
+    fileName,
+    `/markers/${encodeURIComponent(MARKER_PUBLIC_FILE_BY_SOURCE[fileName] || fileName)}`,
+  ])
 );
 let fetchPointsFn = async (filter) => {
   const query = getQueryFromFilter(filter);
@@ -145,7 +174,7 @@ function markerFileToLabel(fileName) {
 }
 
 function markerFileToUrl(fileName) {
-  return MARKER_URL_BY_FILE[fileName] || MARKER_URL_BY_FILE['соціальні послуги.svg'];
+  return MARKER_URL_BY_FILE[fileName] || MARKER_URL_BY_FILE['social_services.svg'];
 }
 
 function resolveMarkerFile(point) {
@@ -159,7 +188,7 @@ function resolveMarkerFile(point) {
     const matched = MARKER_FILES.find((fileName) => normalizeMarkerKey(fileName).includes(label));
     if (matched) return matched;
   }
-  return 'соціальні послуги.svg';
+  return 'social_services.svg';
 }
 
 function createIcon(point) {
