@@ -57,10 +57,90 @@ const POINT_TYPE_MARKER_FILE = {
   crossing: 'crossing.svg',
 };
 
+const EXPECTED_MARKER_FILES = [
+  'administration.svg',
+  'fuel_station.svg',
+  'pharmacy.svg',
+  'bank.svg',
+  'station.svg',
+  'hotel.svg',
+  'housing.svg',
+  'stop_a.svg',
+  'stop_p.svg',
+  'stop_t.svg',
+  'cafe.svg',
+  'culture.svg',
+  'playground.svg',
+  'medical.svg',
+  'education.svg',
+  'park.svg',
+  'hairdresser.svg',
+  'post.svg',
+  'crossing.svg',
+  'restaurant.svg',
+  'social_services.svg',
+  'sport.svg',
+  'shelter.svg',
+];
+const MARKER_LOCALIZED_CANDIDATES = {
+  'administration.svg': ['адміністрація.svg'],
+  'fuel_station.svg': ['азс.svg'],
+  'pharmacy.svg': ['аптека.svg'],
+  'bank.svg': ['банк.svg'],
+  'station.svg': ['вокзал.svg'],
+  'hotel.svg': ['готель.svg'],
+  'housing.svg': ['житло.svg'],
+  'stop_a.svg': ['зупинка а.svg'],
+  'stop_p.svg': ['зупинка п.svg'],
+  'stop_t.svg': ['зупинка т.svg'],
+  'cafe.svg': ['кафе.svg'],
+  'culture.svg': ['культура.svg'],
+  'playground.svg': ['майданчик.svg'],
+  'medical.svg': ['мед заклад.svg'],
+  'education.svg': ['навчал заклад.svg'],
+  'park.svg': ['парк.svg'],
+  'hairdresser.svg': ['перукарня.svg'],
+  'post.svg': ['пошта.svg'],
+  'crossing.svg': ['пішохідний перехід.svg'],
+  'restaurant.svg': ['ресторан.svg'],
+  'social_services.svg': ['соціальні послуги.svg'],
+  'sport.svg': ['спорт.svg'],
+  'shelter.svg': ['укриття.svg'],
+};
 const MARKER_MODULES = import.meta.glob('../assets/markers/*.svg', { eager: true, import: 'default' });
-const MARKER_URL_BY_FILE = Object.fromEntries(
+const RAW_MARKER_URL_BY_FILE = Object.fromEntries(
   Object.entries(MARKER_MODULES).map(([modulePath, url]) => [modulePath.split('/').pop(), url])
 );
+
+function normalizeMarkerFileKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’'`]/g, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const RAW_MARKER_URL_BY_NORMALIZED_FILE = Object.fromEntries(
+  Object.entries(RAW_MARKER_URL_BY_FILE).map(([fileName, url]) => [normalizeMarkerFileKey(fileName), url])
+);
+
+const MARKER_URL_BY_FILE = EXPECTED_MARKER_FILES.reduce((acc, expectedFileName) => {
+  const expectedNormalized = normalizeMarkerFileKey(expectedFileName);
+  const candidates = [expectedFileName, ...(MARKER_LOCALIZED_CANDIDATES[expectedFileName] || [])];
+  let resolvedUrl = RAW_MARKER_URL_BY_NORMALIZED_FILE[expectedNormalized] || '';
+  if (!resolvedUrl) {
+    resolvedUrl = candidates
+      .map((candidate) => RAW_MARKER_URL_BY_NORMALIZED_FILE[normalizeMarkerFileKey(candidate)])
+      .find(Boolean);
+  }
+  if (resolvedUrl) {
+    acc[expectedFileName] = resolvedUrl;
+  }
+  return acc;
+}, {});
 const MARKER_FILES = Object.keys(MARKER_URL_BY_FILE);
 let fetchPointsFn = async (filter) => {
   const query = getQueryFromFilter(filter);
