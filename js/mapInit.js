@@ -17,6 +17,7 @@ let lineToolColor = '#E7C769';
 let lineDraftVertices = [];
 let hiddenPointTypes = new Set();
 let markerAssetsPreloaded = false;
+let pointDragSession = null;
 
 const POINT_TYPE_MARKER_FILE = {
   school: 'навчал заклад.svg',
@@ -213,6 +214,7 @@ function createIcon(point) {
 
 function bindPointInteraction(layer, point, lat, lng) {
   layer.on('click', () => {
+    if (pointDragSession?.active) return;
     if (lineToolVisible) {
       if (lineToolMode === 'erase') {
         eraseLineDraftVertex({ lat, lng });
@@ -425,6 +427,86 @@ function disablePointPicking() {
   if (container) {
     container.classList.remove('point-pick');
   }
+}
+
+function stopPointDrag({ commit = false } = {}) {
+  if (!pointDragSession) return null;
+  const session = pointDragSession;
+  pointDragSession = null;
+
+  const finalLatLng = session.marker?.getLatLng?.() || null;
+  if (session.marker && lineDraftLayer) {
+    lineDraftLayer.removeLayer(session.marker);
+  }
+  if (session.escapeHandler) {
+    document.removeEventListener('keydown', session.escapeHandler);
+  }
+
+  const container = map?.getContainer();
+  if (container) {
+    container.classList.remove('point-drag');
+    container.classList.remove('point-drag-active');
+  }
+
+  if (!commit && typeof session.onCancel === 'function') {
+    session.onCancel();
+  }
+  return finalLatLng ? { lat: Number(finalLatLng.lat), lng: Number(finalLatLng.lng) } : null;
+}
+
+function startPointDrag({ lat, lng, onMove = null, onCommit = null, onCancel = null } = {}) {
+  if (!map || !lineDraftLayer) return false;
+  const startLat = Number(lat);
+  const startLng = Number(lng);
+  if (!Number.isFinite(startLat) || !Number.isFinite(startLng)) return false;
+
+  stopPointDrag({ commit: false });
+  disablePointPicking();
+
+  const marker = L.marker([startLat, startLng], {
+    draggable: true,
+    zIndexOffset: 1000,
+    icon: L.divIcon({
+      className: 'point-drag-marker-icon',
+      html: '<span class="point-drag-marker"></span>',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    }),
+  }).addTo(lineDraftLayer);
+
+  const container = map.getContainer();
+  container.classList.add('point-drag');
+
+  marker.on('dragstart', () => {
+    container.classList.add('point-drag-active');
+  });
+  marker.on('drag', (event) => {
+    const latlng = event?.target?.getLatLng?.();
+    if (!latlng || typeof onMove !== 'function') return;
+    onMove({ lat: Number(latlng.lat), lng: Number(latlng.lng) });
+  });
+  marker.on('dragend', (event) => {
+    const latlng = event?.target?.getLatLng?.();
+    stopPointDrag({ commit: true });
+    if (latlng && typeof onCommit === 'function') {
+      onCommit({ lat: Number(latlng.lat), lng: Number(latlng.lng) });
+    }
+  });
+
+  const escapeHandler = (event) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    stopPointDrag({ commit: false });
+  };
+  document.addEventListener('keydown', escapeHandler);
+
+  pointDragSession = {
+    active: true,
+    marker,
+    onCancel,
+    escapeHandler,
+  };
+  return true;
 }
 
 function clearRouteHighlight() {
@@ -958,6 +1040,8 @@ export async function initMap(options = {}) {
       refresh: loadAndRenderPoints,
       enablePointPicking,
       disablePointPicking,
+      startPointDrag,
+      stopPointDrag,
       highlightRoute,
       clearRouteHighlight,
       setPublishedRoutes,
@@ -984,14 +1068,15 @@ export async function initMap(options = {}) {
     zoomControl: false,
     attributionControl: false,
     zoomAnimation: true,
-    markerZoomAnimation: false,
+    markerZoomAnimation: true,
     fadeAnimation: true,
     zoomSnap: 0,
-    zoomDelta: 0.2,
+    zoomDelta: 0.1,
     scrollWheelZoom: 'center',
     touchZoom: 'center',
-    wheelDebounceTime: 40,
-    wheelPxPerZoomLevel: 120,
+    // Trackpad-friendly zoom: smaller continuous step, no batch debounce jumps.
+    wheelDebounceTime: 0,
+    wheelPxPerZoomLevel: 500,
     inertia: true,
     inertiaDeceleration: 1800,
     easeLinearity: 0.2,
@@ -1025,6 +1110,7 @@ export async function initMap(options = {}) {
   });
 
   map.on('click', (e) => {
+    if (pointDragSession?.active) return;
     const originalTarget = e?.originalEvent?.target;
     if (originalTarget?.closest?.('#route-line-toolbar')) {
       return;
@@ -1059,6 +1145,8 @@ export async function initMap(options = {}) {
     refresh: loadAndRenderPoints,
     enablePointPicking,
     disablePointPicking,
+    startPointDrag,
+    stopPointDrag,
     highlightRoute,
     clearRouteHighlight,
     setPublishedRoutes,

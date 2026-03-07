@@ -7,6 +7,31 @@ const EXPLICIT_MODE = (import.meta.env.VITE_DATA_MODE || '').trim().toLowerCase(
 const DATA_MODE = EXPLICIT_MODE || (SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'local');
 const supabase = DATA_MODE === 'supabase' ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const LOCAL_PROPOSALS_KEY = 'odesaPointProposals';
+const AUTH_SESSION_STORAGE_KEY = 'odesaAuthSession';
+
+let cachedAuthSession = (() => {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_STORAGE_KEY) || '';
+    return raw ? JSON.parse(raw) : null;
+  } catch (_e) {
+    return null;
+  }
+})();
+
+function setCachedAuthSession(session) {
+  cachedAuthSession = session && session.access_token && session.refresh_token ? session : null;
+  if (typeof localStorage === 'undefined') return;
+  try {
+    if (cachedAuthSession) {
+      localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(cachedAuthSession));
+    } else {
+      localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+    }
+  } catch (_e) {
+    // no-op
+  }
+}
 
 function isMissingPointSectionsError(error) {
   const message = String(error?.message || error || '').toLowerCase();
@@ -72,6 +97,47 @@ function normalizeTransportModes(value) {
 function parsePath(path) {
   const url = new URL(path, 'http://local');
   return { pathname: url.pathname, searchParams: url.searchParams };
+}
+
+async function restoreSupabaseSessionFromCache() {
+  if (DATA_MODE !== 'supabase' || !cachedAuthSession?.access_token || !cachedAuthSession?.refresh_token) return false;
+  const { data, error } = await supabase.auth.setSession({
+    access_token: cachedAuthSession.access_token,
+    refresh_token: cachedAuthSession.refresh_token,
+  });
+  if (error) return false;
+  if (data?.session?.access_token && data?.session?.refresh_token) {
+    setCachedAuthSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_at: data.session.expires_at || null,
+      token_type: data.session.token_type || 'bearer',
+    });
+  }
+  return Boolean(data?.session);
+}
+
+async function ensureSupabaseSession() {
+  if (DATA_MODE !== 'supabase') return null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  if (data?.session) {
+    if (data.session.access_token && data.session.refresh_token) {
+      setCachedAuthSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_at: data.session.expires_at || null,
+        token_type: data.session.token_type || 'bearer',
+      });
+    }
+    return data.session;
+  }
+  const restored = await restoreSupabaseSessionFromCache();
+  if (!restored) throw new Error('Auth session missing');
+  const retry = await supabase.auth.getSession();
+  if (retry.error) throw retry.error;
+  if (!retry.data?.session) throw new Error('Auth session missing');
+  return retry.data.session;
 }
 
 function mapPointType(row) {
@@ -608,8 +674,23 @@ async function supabaseLogin(email, password) {
 
   if (profileError) throw profileError;
 
+  if (session?.access_token && session?.refresh_token) {
+    setCachedAuthSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: session.expires_at || null,
+      token_type: session.token_type || 'bearer',
+    });
+  }
+
   return {
     token: session.access_token,
+    session: {
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: session.expires_at || null,
+      token_type: session.token_type || 'bearer',
+    },
     user: {
       id: user.id,
       email: user.email,
@@ -622,10 +703,12 @@ async function supabaseLogin(email, password) {
 async function supabaseLogout() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  setCachedAuthSession(null);
   return { ok: true };
 }
 
 async function supabaseGetCurrentUser() {
+  await ensureSupabaseSession();
   const { data, error } = await supabase.auth.getUser();
   if (error) throw error;
   if (!data.user) throw new Error('Unauthorized');
@@ -852,6 +935,18 @@ async function localFetch(path, options = {}) {
 
 export const dataService = {
   mode: DATA_MODE,
+  setAuthSession(session) {
+    setCachedAuthSession(session);
+  },
+  async restoreAuthSession(session) {
+    if (DATA_MODE !== 'supabase') return { ok: true, mode: DATA_MODE };
+    setCachedAuthSession(session);
+    const restored = await restoreSupabaseSessionFromCache();
+    if (!restored) {
+      throw new Error('Auth session missing');
+    }
+    return { ok: true, mode: DATA_MODE };
+  },
 
   async request(path, options = {}) {
     if (DATA_MODE === 'local') {

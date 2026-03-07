@@ -63,6 +63,14 @@ const translations = {
 let currentLang = 'uk';
 let authToken = localStorage.getItem('odesaAuthToken') || '';
 let authUser = JSON.parse(localStorage.getItem('odesaAuthUser') || 'null');
+let authSession = (() => {
+  try {
+    const raw = localStorage.getItem('odesaAuthSession') || '';
+    return raw ? JSON.parse(raw) : null;
+  } catch (_e) {
+    return null;
+  }
+})();
 let mapController = null;
 
 let dashboardPoints = [];
@@ -896,6 +904,7 @@ function setActiveSpecialistTab(tabName) {
   }
   // Do not auto-arm drawing on tab open.
   mapController?.setLineToolVisible?.(false);
+  mapController?.stopPointDrag?.({ commit: false });
 
   saveUiState();
 }
@@ -1090,7 +1099,7 @@ function renderLegend() {
       return `
         <button class="legend-item ${isHidden ? 'is-hidden' : ''}" data-legend-toggle="${row.code}" type="button"
           title="${isHidden ? 'Показати тип' : 'Сховати тип'}">
-          <span class="legend-marker" style="border-color:${row.color}">
+          <span class="legend-marker">
             <img src="${row.markerUrl}" alt="${row.label}" loading="lazy" decoding="async" />
           </span>
           <span class="legend-label">${row.label}</span>
@@ -1550,16 +1559,26 @@ function bindLegendPointsSync() {
   });
 }
 
-function setAuthState(token, user) {
+function setAuthState(token, user, session = null) {
   authToken = token;
   authUser = user;
+  authSession = session || null;
 
   if (token && user) {
     localStorage.setItem('odesaAuthToken', token);
     localStorage.setItem('odesaAuthUser', JSON.stringify(user));
+    if (authSession && authSession.access_token && authSession.refresh_token) {
+      localStorage.setItem('odesaAuthSession', JSON.stringify(authSession));
+      dataService.setAuthSession?.(authSession);
+    } else {
+      localStorage.removeItem('odesaAuthSession');
+      dataService.setAuthSession?.(null);
+    }
   } else {
     localStorage.removeItem('odesaAuthToken');
     localStorage.removeItem('odesaAuthUser');
+    localStorage.removeItem('odesaAuthSession');
+    dataService.setAuthSession?.(null);
   }
 
   const panel = document.getElementById('specialist-panel');
@@ -1574,6 +1593,10 @@ function setAuthState(token, user) {
       panel.style.display = '';
       const btnHideSpecialist = document.getElementById('btn-hide-specialist');
       if (btnHideSpecialist) btnHideSpecialist.textContent = '⟨';
+    }
+    const mapView = document.querySelector('.map-view');
+    if (mapView) {
+      mapView.classList.toggle('specialist-open', Boolean(canEdit) && !panel.classList.contains('collapsed'));
     }
   }
   if (userLabel) {
@@ -1602,6 +1625,7 @@ function setAuthState(token, user) {
       mapView.classList.remove('route-toolbar-visible');
     }
     mapController?.setLineToolVisible?.(false);
+    mapController?.stopPointDrag?.({ commit: false });
   }
 }
 
@@ -1651,7 +1675,8 @@ function resetRouteEditor() {
   routeOrderHistory = [];
   document.getElementById('route-name').value = '';
   document.getElementById('route-description').value = '';
-  document.getElementById('route-status').value = 'draft';
+  const routeStatusInput = document.getElementById('route-status');
+  if (routeStatusInput) routeStatusInput.value = 'published';
   const routeColorInput = document.getElementById('route-color');
   if (routeColorInput) routeColorInput.value = DEFAULT_ROUTE_COLOR;
   const lineColorInput = document.getElementById('line-color-input');
@@ -1675,7 +1700,8 @@ function openRouteInEditor(routeId, options = {}) {
   editingRouteId = route.id;
   document.getElementById('route-name').value = route.name;
   document.getElementById('route-description').value = route.description || '';
-  document.getElementById('route-status').value = route.status;
+  const routeStatusInput = document.getElementById('route-status');
+  if (routeStatusInput) routeStatusInput.value = 'published';
   const routeColorInput = document.getElementById('route-color');
   if (routeColorInput) routeColorInput.value = route.routeColor || getRouteColor(route.id);
   const lineColorInput = document.getElementById('line-color-input');
@@ -2010,7 +2036,7 @@ function bindAuthFlow() {
           body: JSON.stringify({ email, password }),
         });
 
-        setAuthState(data.token, data.user);
+        setAuthState(data.token, data.user, data.session || null);
         clearAuthError();
 
         if (authView) authView.style.display = 'none';
@@ -2288,12 +2314,19 @@ function bindFloatingUiControls() {
   const btnToggleLegend = document.getElementById('btn-toggle-legend');
   const btnMapFullscreen = document.getElementById('btn-map-fullscreen');
   const routeLineToolbar = document.getElementById('route-line-toolbar');
-  const mapContainer = document.querySelector('.map-container');
+
+  const syncMapOverlayLayout = () => {
+    const mapView = document.querySelector('.map-view');
+    if (!mapView || !specialistPanel) return;
+    const specialistOpen = specialistPanel.classList.contains('active') && !specialistPanel.classList.contains('collapsed');
+    mapView.classList.toggle('specialist-open', specialistOpen);
+  };
 
   if (btnHideSpecialist && specialistPanel) {
     btnHideSpecialist.addEventListener('click', () => {
       const isCollapsed = specialistPanel.classList.toggle('collapsed');
       btnHideSpecialist.textContent = isCollapsed ? '⟩' : '⟨';
+      syncMapOverlayLayout();
     });
   }
 
@@ -2303,60 +2336,12 @@ function bindFloatingUiControls() {
       btnToggleLegend.textContent = isCollapsed ? '⟩' : '⟨';
     });
   }
-
-  let lastMapVisible = null;
-  let scrollTicking = false;
-
-  const setNodeDisplay = (node, value) => {
-    if (!node) return;
-    node.classList.toggle('ui-hidden', !value);
-  };
-
-  const syncFloatingByScroll = () => {
-    if (!mapContainer) return;
-    const rect = mapContainer.getBoundingClientRect();
-    const mapVisible = rect.bottom > 120 && rect.top < window.innerHeight - 80;
-    if (mapVisible === lastMapVisible) return;
-    lastMapVisible = mapVisible;
-
-    if (!mapVisible) {
-      setNodeDisplay(filterMenu, false);
-      setNodeDisplay(legendWrap, false);
-      setNodeDisplay(btnMapFullscreen, false);
-      if (routeLineToolbar && routeLineToolbar.style.display !== 'none') {
-        setNodeDisplay(routeLineToolbar, false);
-      }
-      if (specialistPanel?.classList.contains('active')) {
-        setNodeDisplay(specialistPanel, false);
-      }
-      return;
-    }
-    setNodeDisplay(filterMenu, true);
-    setNodeDisplay(legendWrap, true);
-    setNodeDisplay(btnMapFullscreen, true);
-    if (routeLineToolbar && routeLineToolbar.style.display !== 'none') {
-      setNodeDisplay(routeLineToolbar, true);
-    }
-    if (specialistPanel?.classList.contains('active')) {
-      setNodeDisplay(specialistPanel, true);
-      if (specialistPanel.style.display !== 'flex') {
-        specialistPanel.style.display = 'flex';
-      }
-    }
-  };
-
-  const scheduleSync = () => {
-    if (scrollTicking) return;
-    scrollTicking = true;
-    requestAnimationFrame(() => {
-      scrollTicking = false;
-      syncFloatingByScroll();
-    });
-  };
-
-  window.addEventListener('scroll', scheduleSync, { passive: true });
-  window.addEventListener('resize', scheduleSync);
-  syncFloatingByScroll();
+  filterMenu?.classList.remove('ui-hidden');
+  legendWrap?.classList.remove('ui-hidden');
+  btnMapFullscreen?.classList.remove('ui-hidden');
+  routeLineToolbar?.classList.remove('ui-hidden');
+  specialistPanel?.classList.remove('ui-hidden');
+  syncMapOverlayLayout();
 }
 
 function bindSpecialistTools() {
@@ -2758,7 +2743,7 @@ function bindSpecialistTools() {
       const payload = {
         name: document.getElementById('route-name').value.trim(),
         description: document.getElementById('route-description').value.trim(),
-        status: document.getElementById('route-status').value,
+        status: 'published',
         routeColor: document.getElementById('route-color')?.value || DEFAULT_ROUTE_COLOR,
         transportModes: collectSelectedRouteTransportModes(),
         points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
@@ -2795,7 +2780,7 @@ function bindSpecialistTools() {
       const payload = {
         name: document.getElementById('route-name').value.trim(),
         description: document.getElementById('route-description').value.trim(),
-        status: document.getElementById('route-status').value,
+        status: 'published',
         routeColor: document.getElementById('route-color')?.value || getRouteColor(editingRouteId),
         transportModes: collectSelectedRouteTransportModes(),
         points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
@@ -2852,15 +2837,45 @@ function bindSpecialistTools() {
         setSpecialistMessage('Карта ще не готова', true);
         return;
       }
-      setSpecialistMessage('Клікніть на карті, щоб задати нові координати точки');
-      mapController.enablePointPicking(({ lat, lng }) => {
-        editingPointPosition = { lat: Number(lat), lng: Number(lng) };
-        const coordsLabel = document.getElementById('edit-point-coords');
-        if (coordsLabel) {
-          coordsLabel.textContent = `Координати: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`;
-        }
-        setSpecialistSuccess('Нові координати зафіксовано (натисніть "Зберегти точку")');
+      const start = editingPointPosition || dashboardPoints.find((p) => Number(p.id) === Number(editingPointId));
+      const lat = Number(start?.lat);
+      const lng = Number(start?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        setSpecialistMessage('Немає валідних координат точки', true);
+        return;
+      }
+      const started = mapController.startPointDrag?.({
+        lat,
+        lng,
+        onMove: ({ lat: movedLat, lng: movedLng }) => {
+          const coordsLabel = document.getElementById('edit-point-coords');
+          if (coordsLabel) {
+            coordsLabel.textContent = `Координати: ${Number(movedLat).toFixed(6)}, ${Number(movedLng).toFixed(6)}`;
+          }
+        },
+        onCommit: ({ lat: movedLat, lng: movedLng }) => {
+          editingPointPosition = { lat: Number(movedLat), lng: Number(movedLng) };
+          const coordsLabel = document.getElementById('edit-point-coords');
+          if (coordsLabel) {
+            coordsLabel.textContent = `Координати: ${Number(movedLat).toFixed(6)}, ${Number(movedLng).toFixed(6)}`;
+          }
+          setSpecialistSuccess('Точку переміщено. Натисніть "Зберегти точку"');
+        },
+        onCancel: () => {
+          setSpecialistMessage('Переміщення точки скасовано');
+          if (editingPointPosition) {
+            const coordsLabel = document.getElementById('edit-point-coords');
+            if (coordsLabel) {
+              coordsLabel.textContent = `Координати: ${Number(editingPointPosition.lat).toFixed(6)}, ${Number(editingPointPosition.lng).toFixed(6)}`;
+            }
+          }
+        },
       });
+      if (!started) {
+        setSpecialistMessage('Не вдалося запустити режим переміщення точки', true);
+        return;
+      }
+      setSpecialistMessage('Перетягніть точку мишкою. Esc — скасувати');
     });
   }
 
@@ -3582,6 +3597,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   updateLanguage(currentLang);
+  if (authUser && authToken && (!authSession || !authSession.access_token || !authSession.refresh_token)) {
+    setAuthState('', null);
+  }
+  if (authSession && authSession.access_token && authSession.refresh_token) {
+    try {
+      await dataService.restoreAuthSession?.(authSession);
+    } catch (_e) {
+      setAuthState('', null);
+    }
+  }
   bindAuthFlow();
   bindPublicProposalForm();
 });
