@@ -283,11 +283,11 @@ function showInfoCard(data) {
       <div style="display:flex; flex-direction:column; gap:10px;">
         <div class="t-label text-muted">Детальні пункти</div>
         ${sections
-          .map((section, idx) => {
-            const sectionPhoto = section.photoUrl
-              ? `<div style="height:120px;border-radius:10px;background:url('${section.photoUrl}') center/cover;border:1px solid var(--c-divider);"></div>`
-              : '';
-            return `
+      .map((section, idx) => {
+        const sectionPhoto = section.photoUrl
+          ? `<div style="height:120px;border-radius:10px;background:url('${section.photoUrl}') center/cover;border:1px solid var(--c-divider);"></div>`
+          : '';
+        return `
               <article style="border:1px solid var(--c-divider); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px;">
                 <div class="t-data text-muted">Пункт ${idx + 1}</div>
                 ${section.title ? `<div class="t-body"><strong>${escapeHtml(section.title)}</strong></div>` : ''}
@@ -295,8 +295,8 @@ function showInfoCard(data) {
                 ${sectionPhoto}
               </article>
             `;
-          })
-          .join('')}
+      })
+      .join('')}
       </div>
     `
     : '';
@@ -304,11 +304,10 @@ function showInfoCard(data) {
   panel.innerHTML = `
     <div class="card card-3d" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; position: relative;">
       <button id="btn-close-context-panel" class="btn-flat context-close-btn" type="button">Закрити</button>
-      <div style="height: 160px; background: ${
-        data.photoUrl
-          ? `url('${data.photoUrl}') center/cover`
-          : 'linear-gradient(130deg, #dbeafe 0%, #f8fafc 100%)'
-      }; border-radius: var(--radius-md);"></div>
+      <div style="height: 160px; background: ${data.photoUrl
+      ? `url('${data.photoUrl}') center/cover`
+      : 'linear-gradient(130deg, #dbeafe 0%, #f8fafc 100%)'
+    }; border-radius: var(--radius-md);"></div>
       <div>
         <h2 class="t-h2" style="display: flex; align-items: center;">${data.title}</h2>
         <div class="t-label text-muted" style="margin-top: 4px;">${data.district || 'Одеська область'}</div>
@@ -617,7 +616,13 @@ function buildCurvedSegmentPoints(vertices, segmentIndex, steps = 18) {
   return points;
 }
 
+let _renderDraftRaf = null;
 function renderLineDraft() {
+  if (_renderDraftRaf) cancelAnimationFrame(_renderDraftRaf);
+  _renderDraftRaf = requestAnimationFrame(_renderLineDraftSync);
+}
+
+function _renderLineDraftSync() {
   if (!lineDraftLayer) return;
   lineDraftLayer.clearLayers();
 
@@ -632,9 +637,9 @@ function renderLineDraft() {
         segmentCurve && lineDraftVertices.length > 2
           ? buildCurvedSegmentPoints(lineDraftVertices, index - 1)
           : [
-              [prev.lat, prev.lng],
-              [next.lat, next.lng],
-            ];
+            [prev.lat, prev.lng],
+            [next.lat, next.lng],
+          ];
 
       const segmentLine = L.polyline(segmentPoints, {
         color: segmentColor,
@@ -721,25 +726,25 @@ function addLineDraftVertex(latlng, originalEvent = null) {
   const snap = lineSnapEnabled && !altOverride ? resolveNearestSnap(latlng) : null;
   const nextVertex = snap
     ? {
-        lat: snap.lat,
-        lng: snap.lng,
-        pointId: Number(snap.point.id),
-        title: snap.point.title || '',
+      lat: snap.lat,
+      lng: snap.lng,
+      pointId: Number(snap.point.id),
+      title: snap.point.title || '',
       snapped: true,
       edgeStyle: lineToolStyle,
       edgeColor: lineToolColor,
       edgeCurve: lineToolMode === 'curve',
     }
     : {
-        lat: Number(latlng.lat),
-        lng: Number(latlng.lng),
-        pointId: null,
-        title: '',
-        snapped: false,
-        edgeStyle: lineToolStyle,
-        edgeColor: lineToolColor,
-        edgeCurve: lineToolMode === 'curve',
-      };
+      lat: Number(latlng.lat),
+      lng: Number(latlng.lng),
+      pointId: null,
+      title: '',
+      snapped: false,
+      edgeStyle: lineToolStyle,
+      edgeColor: lineToolColor,
+      edgeCurve: lineToolMode === 'curve',
+    };
 
   const prev = lineDraftVertices[lineDraftVertices.length - 1];
   if (prev && Math.abs(prev.lat - nextVertex.lat) < 1e-7 && Math.abs(prev.lng - nextVertex.lng) < 1e-7) {
@@ -1071,12 +1076,10 @@ export async function initMap(options = {}) {
     markerZoomAnimation: true,
     fadeAnimation: true,
     zoomSnap: 0,
-    zoomDelta: 0.1,
+    zoomDelta: 0.2,
     scrollWheelZoom: 'center',
     touchZoom: 'center',
-    // Trackpad-friendly zoom: smaller continuous step, no batch debounce jumps.
-    wheelDebounceTime: 0,
-    wheelPxPerZoomLevel: 500,
+    wheelPxPerZoomLevel: 280,
     inertia: true,
     inertiaDeceleration: 1800,
     easeLinearity: 0.2,
@@ -1097,17 +1100,24 @@ export async function initMap(options = {}) {
 
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-  markerLayer = L.layerGroup().addTo(map);
+  if (L.markerClusterGroup) {
+    markerLayer = L.markerClusterGroup({
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      maxClusterRadius: 50,
+      disableClusteringAtZoom: 16
+    }).addTo(map);
+  } else {
+    markerLayer = L.layerGroup().addTo(map);
+  }
   routeLayer = L.layerGroup().addTo(map);
   publishedRouteLayer = L.layerGroup().addTo(map);
   focusBoundaryLayer = L.layerGroup().addTo(map);
   lineDraftLayer = L.layerGroup().addTo(map);
 
   const mapContainer = map.getContainer();
-  mapContainer.style.setProperty('--map-zoom', String(map.getZoom() ?? ODESA_BOUNDS.defaultZoom));
-  map.on('zoom', () => {
-    mapContainer.style.setProperty('--map-zoom', String(map.getZoom()));
-  });
+  // Removed --map-zoom DOM thrashing event here
 
   map.on('click', (e) => {
     if (pointDragSession?.active) return;
