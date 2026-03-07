@@ -104,31 +104,34 @@ const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
 const DEFAULT_NEWS_IMAGE_FOCUS_Y = 50;
 const ODESA_START_FOCUS = { lat: 46.4825, lng: 30.7233, zoom: 12 };
-const MARKER_URL_BY_FILE = {
-  'адміністрація.svg': new URL('./assets/markers/адміністрація.svg', import.meta.url).href,
-  'азс.svg': new URL('./assets/markers/азс.svg', import.meta.url).href,
-  'аптека.svg': new URL('./assets/markers/аптека.svg', import.meta.url).href,
-  'банк.svg': new URL('./assets/markers/банк.svg', import.meta.url).href,
-  'вокзал.svg': new URL('./assets/markers/вокзал.svg', import.meta.url).href,
-  'готель.svg': new URL('./assets/markers/готель.svg', import.meta.url).href,
-  'житло.svg': new URL('./assets/markers/житло.svg', import.meta.url).href,
-  'зупинка А.svg': new URL('./assets/markers/зупинка А.svg', import.meta.url).href,
-  'зупинка П.svg': new URL('./assets/markers/зупинка П.svg', import.meta.url).href,
-  'зупинка Т.svg': new URL('./assets/markers/зупинка Т.svg', import.meta.url).href,
-  'кафе.svg': new URL('./assets/markers/кафе.svg', import.meta.url).href,
-  'культура.svg': new URL('./assets/markers/культура.svg', import.meta.url).href,
-  'майданчик.svg': new URL('./assets/markers/майданчик.svg', import.meta.url).href,
-  'мед заклад.svg': new URL('./assets/markers/мед заклад.svg', import.meta.url).href,
-  'навчал заклад.svg': new URL('./assets/markers/навчал заклад.svg', import.meta.url).href,
-  'парк.svg': new URL('./assets/markers/парк.svg', import.meta.url).href,
-  'перукарня.svg': new URL('./assets/markers/перукарня.svg', import.meta.url).href,
-  'пошта.svg': new URL('./assets/markers/пошта.svg', import.meta.url).href,
-  'пішохідний перехід.svg': new URL('./assets/markers/пішохідний перехід.svg', import.meta.url).href,
-  'ресторан.svg': new URL('./assets/markers/ресторан.svg', import.meta.url).href,
-  'соціальні послуги.svg': new URL('./assets/markers/соціальні послуги.svg', import.meta.url).href,
-  'спорт.svg': new URL('./assets/markers/спорт.svg', import.meta.url).href,
-  'укриття.svg': new URL('./assets/markers/укриття.svg', import.meta.url).href,
-};
+const MARKER_FILES = [
+  'адміністрація.svg',
+  'азс.svg',
+  'аптека.svg',
+  'банк.svg',
+  'вокзал.svg',
+  'готель.svg',
+  'житло.svg',
+  'зупинка А.svg',
+  'зупинка П.svg',
+  'зупинка Т.svg',
+  'кафе.svg',
+  'культура.svg',
+  'майданчик.svg',
+  'мед заклад.svg',
+  'навчал заклад.svg',
+  'парк.svg',
+  'перукарня.svg',
+  'пошта.svg',
+  'пішохідний перехід.svg',
+  'ресторан.svg',
+  'соціальні послуги.svg',
+  'спорт.svg',
+  'укриття.svg',
+];
+const MARKER_URL_BY_FILE = Object.fromEntries(
+  MARKER_FILES.map((fileName) => [fileName, `/markers/${encodeURIComponent(fileName)}`])
+);
 const CANONICAL_POINT_TYPES = [
   { code: 'school', labelUk: 'Школа', labelEn: 'School', color: '#1D4ED8', markerFile: 'навчал заклад.svg' },
   { code: 'housing', labelUk: 'Житло', labelEn: 'Housing', color: '#2B6CB0', markerFile: 'житло.svg' },

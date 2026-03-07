@@ -1016,6 +1016,10 @@ body.context-open .filter-menu {
   align-items: center;
   gap: 4px;
   transform: translateZ(0);
+  --z: var(--map-zoom, 12);
+  --dot-alpha: clamp(0, calc((11.2 - var(--z)) / 1.8), 1);
+  --icon-alpha: clamp(0, calc((var(--z) - 9.8) / 1.8), 1);
+  --caption-alpha: clamp(0, calc((var(--z) - 11.7) / 1.2), 1);
 }
 
 .map-marker-wrap.is-image-broken .map-marker-pin {
@@ -1028,14 +1032,20 @@ body.context-open .filter-menu {
   border: 1px solid rgba(17, 54, 92, 0.45);
 }
 
+.map-marker-wrap.is-image-broken {
+  --dot-alpha: 1;
+  --icon-alpha: 0;
+  --caption-alpha: 1;
+}
+
 .map-marker-dot {
   width: 10px;
   height: 10px;
   border-radius: 999px;
   background: var(--marker-color, #3d5263);
   border: none;
-  opacity: 1;
-  transform: scale(1);
+  opacity: var(--dot-alpha);
+  transform: scale(calc(0.72 + var(--dot-alpha) * 0.28));
   transition: opacity 180ms ease, transform 180ms ease;
   pointer-events: none;
 }
@@ -1050,8 +1060,8 @@ body.context-open .filter-menu {
   box-shadow: none !important;
   display: grid;
   place-items: center;
-  opacity: 1;
-  transform: scale(1);
+  opacity: var(--icon-alpha);
+  transform: scale(calc(0.84 + var(--icon-alpha) * 0.16));
   transition: opacity 180ms ease, transform 180ms ease;
 }
 

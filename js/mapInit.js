@@ -83,31 +83,9 @@ const MARKER_FILES = [
   'укриття.svg',
 ];
 
-const MARKER_URL_BY_FILE = {
-  'адміністрація.svg': new URL('../assets/markers/адміністрація.svg', import.meta.url).href,
-  'азс.svg': new URL('../assets/markers/азс.svg', import.meta.url).href,
-  'аптека.svg': new URL('../assets/markers/аптека.svg', import.meta.url).href,
-  'банк.svg': new URL('../assets/markers/банк.svg', import.meta.url).href,
-  'вокзал.svg': new URL('../assets/markers/вокзал.svg', import.meta.url).href,
-  'готель.svg': new URL('../assets/markers/готель.svg', import.meta.url).href,
-  'житло.svg': new URL('../assets/markers/житло.svg', import.meta.url).href,
-  'зупинка А.svg': new URL('../assets/markers/зупинка А.svg', import.meta.url).href,
-  'зупинка П.svg': new URL('../assets/markers/зупинка П.svg', import.meta.url).href,
-  'зупинка Т.svg': new URL('../assets/markers/зупинка Т.svg', import.meta.url).href,
-  'кафе.svg': new URL('../assets/markers/кафе.svg', import.meta.url).href,
-  'культура.svg': new URL('../assets/markers/культура.svg', import.meta.url).href,
-  'майданчик.svg': new URL('../assets/markers/майданчик.svg', import.meta.url).href,
-  'мед заклад.svg': new URL('../assets/markers/мед заклад.svg', import.meta.url).href,
-  'навчал заклад.svg': new URL('../assets/markers/навчал заклад.svg', import.meta.url).href,
-  'парк.svg': new URL('../assets/markers/парк.svg', import.meta.url).href,
-  'перукарня.svg': new URL('../assets/markers/перукарня.svg', import.meta.url).href,
-  'пошта.svg': new URL('../assets/markers/пошта.svg', import.meta.url).href,
-  'пішохідний перехід.svg': new URL('../assets/markers/пішохідний перехід.svg', import.meta.url).href,
-  'ресторан.svg': new URL('../assets/markers/ресторан.svg', import.meta.url).href,
-  'соціальні послуги.svg': new URL('../assets/markers/соціальні послуги.svg', import.meta.url).href,
-  'спорт.svg': new URL('../assets/markers/спорт.svg', import.meta.url).href,
-  'укриття.svg': new URL('../assets/markers/укриття.svg', import.meta.url).href,
-};
+const MARKER_URL_BY_FILE = Object.fromEntries(
+  MARKER_FILES.map((fileName) => [fileName, `/markers/${encodeURIComponent(fileName)}`])
+);
 let fetchPointsFn = async (filter) => {
   const query = getQueryFromFilter(filter);
   const response = await fetch(`/api/points${query ? `?${query}` : ''}`);
@@ -1137,7 +1115,18 @@ export async function initMap(options = {}) {
   lineDraftLayer = L.layerGroup().addTo(map);
 
   const mapContainer = map.getContainer();
-  // Removed --map-zoom DOM thrashing event here
+  let zoomCssRaf = 0;
+  const applyZoomCss = () => {
+    zoomCssRaf = 0;
+    mapContainer.style.setProperty('--map-zoom', String(map.getZoom()));
+  };
+  const scheduleZoomCss = () => {
+    if (zoomCssRaf) return;
+    zoomCssRaf = requestAnimationFrame(applyZoomCss);
+  };
+  mapContainer.style.setProperty('--map-zoom', String(map.getZoom() ?? ODESA_BOUNDS.defaultZoom));
+  map.on('zoom', scheduleZoomCss);
+  map.on('zoomend', scheduleZoomCss);
 
   map.on('click', (e) => {
     if (pointDragSession?.active) return;
