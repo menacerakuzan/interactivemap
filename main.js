@@ -104,62 +104,11 @@ const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
 const DEFAULT_NEWS_IMAGE_FOCUS_Y = 50;
 const ODESA_START_FOCUS = { lat: 46.4825, lng: 30.7233, zoom: 12 };
-const MARKER_FILES = [
-  'administration.svg',
-  'fuel_station.svg',
-  'pharmacy.svg',
-  'bank.svg',
-  'station.svg',
-  'hotel.svg',
-  'housing.svg',
-  'stop_a.svg',
-  'stop_p.svg',
-  'stop_t.svg',
-  'cafe.svg',
-  'culture.svg',
-  'playground.svg',
-  'medical.svg',
-  'education.svg',
-  'park.svg',
-  'hairdresser.svg',
-  'post.svg',
-  'crossing.svg',
-  'restaurant.svg',
-  'social_services.svg',
-  'sport.svg',
-  'shelter.svg',
-];
-const MARKER_PUBLIC_FILE_BY_SOURCE = {
-  'administration.svg': 'administration.svg',
-  'fuel_station.svg': 'fuel_station.svg',
-  'pharmacy.svg': 'pharmacy.svg',
-  'bank.svg': 'bank.svg',
-  'station.svg': 'station.svg',
-  'hotel.svg': 'hotel.svg',
-  'housing.svg': 'housing.svg',
-  'stop_a.svg': 'stop_a.svg',
-  'stop_p.svg': 'stop_p.svg',
-  'stop_t.svg': 'stop_t.svg',
-  'cafe.svg': 'cafe.svg',
-  'culture.svg': 'culture.svg',
-  'playground.svg': 'playground.svg',
-  'medical.svg': 'medical.svg',
-  'education.svg': 'education.svg',
-  'park.svg': 'park.svg',
-  'hairdresser.svg': 'hairdresser.svg',
-  'post.svg': 'post.svg',
-  'crossing.svg': 'crossing.svg',
-  'restaurant.svg': 'restaurant.svg',
-  'social_services.svg': 'social_services.svg',
-  'sport.svg': 'sport.svg',
-  'shelter.svg': 'shelter.svg',
-};
+const MARKER_MODULES = import.meta.glob('./assets/markers/*.svg', { eager: true, import: 'default' });
 const MARKER_URL_BY_FILE = Object.fromEntries(
-  MARKER_FILES.map((fileName) => [
-    fileName,
-    `/markers/${encodeURIComponent(MARKER_PUBLIC_FILE_BY_SOURCE[fileName] || fileName)}`,
-  ])
+  Object.entries(MARKER_MODULES).map(([modulePath, url]) => [modulePath.split('/').pop(), url])
 );
+const MARKER_FILES = Object.keys(MARKER_URL_BY_FILE);
 const CANONICAL_POINT_TYPES = [
   { code: 'school', labelUk: 'Школа', labelEn: 'School', color: '#1D4ED8', markerFile: 'education.svg' },
   { code: 'housing', labelUk: 'Житло', labelEn: 'Housing', color: '#2B6CB0', markerFile: 'housing.svg' },
