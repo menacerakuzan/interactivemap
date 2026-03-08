@@ -1016,7 +1016,11 @@ body.context-open .filter-menu {
   align-items: center;
   gap: 4px;
   transform: translateZ(0);
-  --caption-alpha: 1;
+  --z: var(--map-zoom, 12);
+  /* Mid zoom: dots; Near zoom: SVG + captions */
+  --dot-alpha: clamp(0, calc((15.2 - var(--z)) / 1.2), 1);
+  --icon-alpha: clamp(0, calc((var(--z) - 14.8) / 1.2), 1);
+  --caption-alpha: clamp(0, calc((var(--z) - 15.2) / 0.8), 1);
 }
 
 .map-marker-wrap.is-image-broken .map-marker-pin {
@@ -1031,11 +1035,21 @@ body.context-open .filter-menu {
 }
 
 .map-marker-wrap.is-image-broken {
+  --dot-alpha: 1;
+  --icon-alpha: 0;
   --caption-alpha: 1;
 }
 
 .map-marker-dot {
-  display: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--marker-color, #3d5263);
+  border: none;
+  opacity: var(--dot-alpha);
+  transform: scale(calc(0.72 + var(--dot-alpha) * 0.28));
+  transition: opacity 160ms ease, transform 160ms ease;
+  pointer-events: none;
 }
 
 .map-marker-pin {
@@ -1048,9 +1062,9 @@ body.context-open .filter-menu {
   box-shadow: none !important;
   display: grid;
   place-items: center;
-  opacity: 1;
-  transform: scale(1);
-  transition: transform 140ms ease;
+  opacity: var(--icon-alpha);
+  transform: scale(calc(0.84 + var(--icon-alpha) * 0.16));
+  transition: opacity 160ms ease, transform 160ms ease;
 }
 
 .map-marker-pin img {
