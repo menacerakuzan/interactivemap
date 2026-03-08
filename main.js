@@ -99,11 +99,13 @@ let selectedCommunity = '';
 let currentSpecialistAction = 'menu';
 let legendPointsSyncBound = false;
 const hiddenPointTypeCodes = new Set();
+let communityCentersIndexPromise = null;
 const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
 const DEFAULT_NEWS_IMAGE_FOCUS_Y = 50;
 const ODESA_START_FOCUS = { lat: 46.4825, lng: 30.7233, zoom: 12 };
+const COMMUNITY_CENTERS_URL = '/data/community-centers.json';
 const EXPECTED_MARKER_FILES = [
   'administration.svg',
   'fuel_station.svg',
@@ -619,9 +621,48 @@ function escapeHtml(value) {
 function normalizeGeoText(value) {
   return String(value || '')
     .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[’'`]/g, "'")
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function buildCommunityCenterKey(district, community) {
+  return `${normalizeGeoText(district)}::${normalizeGeoText(community)}`;
+}
+
+async function loadCommunityCentersIndex() {
+  if (communityCentersIndexPromise) return communityCentersIndexPromise;
+
+  communityCentersIndexPromise = (async () => {
+    try {
+      const response = await fetch(COMMUNITY_CENTERS_URL, { cache: 'force-cache' });
+      if (!response.ok) return new Map();
+      const rows = await response.json();
+      if (!Array.isArray(rows)) return new Map();
+
+      const index = new Map();
+      rows.forEach((row) => {
+        const lat = Number(row?.lat);
+        const lng = Number(row?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        const key = buildCommunityCenterKey(row?.district, row?.community);
+        if (!key || index.has(key)) return;
+        index.set(key, {
+          lat,
+          lng,
+          zoom: Number(row?.zoom) > 0 ? Number(row.zoom) : 13,
+          source: row?.source || 'local_file',
+        });
+      });
+      return index;
+    } catch (_error) {
+      return new Map();
+    }
+  })();
+
+  return communityCentersIndexPromise;
 }
 
 function makePointSectionMarkup(section = {}, idx = 0) {
@@ -831,6 +872,20 @@ async function geocodeCommunity(district, community) {
     } catch (_e) {
       localStorage.removeItem(cacheKey);
     }
+  }
+
+  const centersIndex = await loadCommunityCentersIndex();
+  const centerFromFile = centersIndex.get(buildCommunityCenterKey(district, community));
+  if (centerFromFile) {
+    const localResult = {
+      lat: Number(centerFromFile.lat),
+      lng: Number(centerFromFile.lng),
+      zoom: Number(centerFromFile.zoom) > 0 ? Number(centerFromFile.zoom) : 13,
+      geojson: null,
+      source: centerFromFile.source || 'local_file',
+    };
+    localStorage.setItem(cacheKey, JSON.stringify(localResult));
+    return localResult;
   }
 
   try {
