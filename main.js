@@ -528,6 +528,10 @@ function updateLanguage(lang) {
   document.body.setAttribute('lang', lang);
 }
 
+function hasValidSupabaseSession(session) {
+  return Boolean(session && session.access_token && session.refresh_token);
+}
+
 async function apiRequest(path, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
@@ -538,7 +542,16 @@ async function apiRequest(path, options = {}) {
     headers.Authorization = `Bearer ${authToken}`;
   }
 
-  return dataService.request(path, { ...options, headers });
+  try {
+    return await dataService.request(path, { ...options, headers });
+  } catch (error) {
+    const isMissingSession = String(error?.message || '').includes('Auth session missing');
+    if (!isMissingSession || dataService.mode !== 'supabase' || !hasValidSupabaseSession(authSession)) {
+      throw error;
+    }
+    await dataService.restoreAuthSession?.(authSession);
+    return dataService.request(path, { ...options, headers });
+  }
 }
 
 function setSpecialistMessage(text, isError = false, variant = 'info') {
@@ -585,6 +598,30 @@ async function runWithButtonState(button, pendingText, action) {
     button.disabled = false;
     button.innerText = prev;
   }
+}
+
+function buildValidatedRoutePoints(points = []) {
+  if (!Array.isArray(points)) {
+    return { ok: false, message: 'Маршрут має містити мінімум 2 точки', points: [] };
+  }
+  const normalized = [];
+  const seen = new Set();
+  points.forEach((entry) => {
+    const pointId = Number(entry?.pointId);
+    if (!Number.isFinite(pointId)) return;
+    if (seen.has(pointId)) return;
+    seen.add(pointId);
+    normalized.push({ pointId });
+  });
+  if (normalized.length < 2) {
+    return {
+      ok: false,
+      message:
+        'Маршрут не можна зберегти: додайте мінімум 2 привʼязані точки (через "Додати точку" або "Застосувати лінію").',
+      points: normalized,
+    };
+  }
+  return { ok: true, points: normalized };
 }
 
 function formatIsoDate(isoString) {
@@ -1686,15 +1723,16 @@ function bindLegendPointsSync() {
   });
 }
 
-function setAuthState(token, user, session = null) {
+function setAuthState(token, user, session = undefined) {
   authToken = token;
   authUser = user;
-  authSession = session || null;
+  const nextSession = session === undefined ? authSession : session;
+  authSession = hasValidSupabaseSession(nextSession) ? nextSession : null;
 
   if (token && user) {
     localStorage.setItem('odesaAuthToken', token);
     localStorage.setItem('odesaAuthUser', JSON.stringify(user));
-    if (authSession && authSession.access_token && authSession.refresh_token) {
+    if (hasValidSupabaseSession(authSession)) {
       localStorage.setItem('odesaAuthSession', JSON.stringify(authSession));
       dataService.setAuthSession?.(authSession);
     } else {
@@ -2875,6 +2913,11 @@ function bindSpecialistTools() {
         setSpecialistMessage('Потрібно увійти як спеціаліст', true);
         return;
       }
+      const validatedPoints = buildValidatedRoutePoints(routeEditorPoints);
+      if (!validatedPoints.ok) {
+        setSpecialistMessage(validatedPoints.message, true);
+        return;
+      }
 
       const payload = {
         name: document.getElementById('route-name').value.trim(),
@@ -2882,7 +2925,7 @@ function bindSpecialistTools() {
         status: 'published',
         routeColor: document.getElementById('route-color')?.value || DEFAULT_ROUTE_COLOR,
         transportModes: collectSelectedRouteTransportModes(),
-        points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
+        points: validatedPoints.points,
       };
       if (!payload.name) {
         setSpecialistMessage('Вкажіть назву маршруту', true);
@@ -2912,6 +2955,11 @@ function bindSpecialistTools() {
         setSpecialistMessage('Спочатку виберіть маршрут для редагування', true);
         return;
       }
+      const validatedPoints = buildValidatedRoutePoints(routeEditorPoints);
+      if (!validatedPoints.ok) {
+        setSpecialistMessage(validatedPoints.message, true);
+        return;
+      }
 
       const payload = {
         name: document.getElementById('route-name').value.trim(),
@@ -2919,7 +2967,7 @@ function bindSpecialistTools() {
         status: 'published',
         routeColor: document.getElementById('route-color')?.value || getRouteColor(editingRouteId),
         transportModes: collectSelectedRouteTransportModes(),
-        points: routeEditorPoints.map((p) => ({ pointId: p.pointId })),
+        points: validatedPoints.points,
       };
       if (!payload.name) {
         setSpecialistMessage('Вкажіть назву маршруту', true);
@@ -3731,14 +3779,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   updateLanguage(currentLang);
-  if (authUser && authToken && (!authSession || !authSession.access_token || !authSession.refresh_token)) {
-    setAuthState('', null);
-  }
-  if (authSession && authSession.access_token && authSession.refresh_token) {
+  if (dataService.mode === 'supabase' && hasValidSupabaseSession(authSession)) {
     try {
       await dataService.restoreAuthSession?.(authSession);
     } catch (_e) {
-      setAuthState('', null);
+      localStorage.removeItem('odesaAuthSession');
+      authSession = null;
+      dataService.setAuthSession?.(null);
     }
   }
   bindAuthFlow();
