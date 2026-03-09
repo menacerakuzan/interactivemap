@@ -70,6 +70,21 @@ function normalizeNewsImageFocusY(value) {
   return Math.max(0, Math.min(100, parsed));
 }
 
+function resolvePointTypeForWrite(pointTypeCode) {
+  const requested = String(pointTypeCode || '').trim();
+  if (!requested) return null;
+  const direct = db.prepare('SELECT id FROM point_types WHERE code = ?').get(requested);
+  if (direct?.id) return direct;
+  const fallbackByCode = {
+    stop_a: 'transport_stop',
+    stop_p: 'transport_stop',
+    stop_t: 'transport_stop',
+  };
+  const fallbackCode = fallbackByCode[requested];
+  if (!fallbackCode) return null;
+  return db.prepare('SELECT id FROM point_types WHERE code = ?').get(fallbackCode) || null;
+}
+
 async function resolveSourceImage(link) {
   if (!link) return null;
   let normalizedLink = null;
@@ -259,7 +274,7 @@ app.post('/api/points', authenticate, requireRole('admin', 'specialist'), (req, 
     return res.status(400).json({ error: 'Point coordinates must be inside Odesa region bounds' });
   }
 
-  const pointType = db.prepare('SELECT id FROM point_types WHERE code = ?').get(pointTypeCode);
+  const pointType = resolvePointTypeForWrite(pointTypeCode);
   if (!pointType) {
     return res.status(400).json({ error: 'Invalid pointTypeCode' });
   }
@@ -323,9 +338,7 @@ app.put('/api/points/:id', authenticate, requireRole('admin', 'specialist'), (re
 
   const { title, description, lat, lng, pointTypeCode, isCertified, district, photoUrl, sections } = req.body;
 
-  const pointType = pointTypeCode
-    ? db.prepare('SELECT id FROM point_types WHERE code = ?').get(pointTypeCode)
-    : null;
+  const pointType = pointTypeCode ? resolvePointTypeForWrite(pointTypeCode) : null;
 
   if (pointTypeCode && !pointType) {
     return res.status(400).json({ error: 'Invalid pointTypeCode' });

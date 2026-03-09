@@ -302,6 +302,9 @@ async function supabaseGetPointTypeIdByCode(code) {
   const requested = String(code || '').trim();
   const fallbackByCode = {
     school: 'education',
+    stop_a: 'transport_stop',
+    stop_p: 'transport_stop',
+    stop_t: 'transport_stop',
     transport_stop: 'stop_t',
     street: 'park',
     square: 'park',

@@ -1,3 +1,5 @@
+import '@luomus/leaflet-smooth-wheel-zoom';
+
 let map;
 let markerLayer;
 let routeLayer;
@@ -28,6 +30,9 @@ const POINT_TYPE_MARKER_FILE = {
   bank: 'bank.svg',
   station: 'station.svg',
   housing: 'housing.svg',
+  stop_a: 'stop_a.svg',
+  stop_p: 'stop_p.svg',
+  stop_t: 'stop_t.svg',
   transport_stop: 'stop_t.svg',
   cafe: 'cafe.svg',
   culture: 'culture.svg',
@@ -46,8 +51,8 @@ const POINT_TYPE_MARKER_FILE = {
   sport: 'sport.svg',
   shelter: 'shelter.svg',
   // Legacy aliases.
-  stop_a: 'stop_t.svg',
-  stop_p: 'stop_t.svg',
+  stop_a: 'stop_a.svg',
+  stop_p: 'stop_p.svg',
   stop_t: 'stop_t.svg',
   ramp: 'social_services.svg',
   elevator: 'social_services.svg',
@@ -809,13 +814,26 @@ function addLineDraftVertex(latlng, originalEvent = null) {
     };
 
   const prev = lineDraftVertices[lineDraftVertices.length - 1];
-  if (prev && Math.abs(prev.lat - nextVertex.lat) < 1e-7 && Math.abs(prev.lng - nextVertex.lng) < 1e-7) {
-    return false;
-  }
+  if (prev && Math.abs(prev.lat - nextVertex.lat) < 1e-7 && Math.abs(prev.lng - nextVertex.lng) < 1e-7) return false;
+  const first = lineDraftVertices[0];
+  if (first && Math.abs(first.lat - nextVertex.lat) < 1e-7 && Math.abs(first.lng - nextVertex.lng) < 1e-7) return false;
 
   lineDraftVertices.push(nextVertex);
   renderLineDraft();
   return true;
+}
+
+function getDraftInsertSide(latlng) {
+  if (!map || lineDraftVertices.length < 2) return 'end';
+  const first = lineDraftVertices[0];
+  const last = lineDraftVertices[lineDraftVertices.length - 1];
+  if (!first || !last) return 'end';
+  const target = map.latLngToContainerPoint(latlng);
+  const firstPx = map.latLngToContainerPoint([first.lat, first.lng]);
+  const lastPx = map.latLngToContainerPoint([last.lat, last.lng]);
+  const firstDistance = target.distanceTo(firstPx);
+  const lastDistance = target.distanceTo(lastPx);
+  return firstDistance < lastDistance ? 'start' : 'end';
 }
 
 function addLineDraftFromPoint(point) {
@@ -824,12 +842,12 @@ function addLineDraftFromPoint(point) {
   const pointId = Number(point?.id);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(pointId)) return false;
 
+  const first = lineDraftVertices[0];
   const prev = lineDraftVertices[lineDraftVertices.length - 1];
-  if (prev && Number(prev.pointId) === pointId) {
-    return false;
-  }
+  if ((prev && Number(prev.pointId) === pointId) || (first && Number(first.pointId) === pointId)) return false;
 
-  lineDraftVertices.push({
+  const side = getDraftInsertSide({ lat, lng });
+  const nextVertex = {
     lat,
     lng,
     pointId,
@@ -838,7 +856,10 @@ function addLineDraftFromPoint(point) {
     edgeStyle: lineToolStyle,
     edgeColor: lineToolColor,
     edgeCurve: lineToolMode === 'curve',
-  });
+  };
+
+  if (side === 'start') lineDraftVertices.unshift(nextVertex);
+  else lineDraftVertices.push(nextVertex);
   renderLineDraft();
   return true;
 }
@@ -923,8 +944,52 @@ function getLineDraftSnapshot() {
 }
 
 function applyLineDraftToRoute() {
+  if (!lineDraftVertices.length) {
+    return {
+      ok: true,
+      pointIds: [],
+      skippedVertices: 0,
+      color: lineToolColor,
+      style: lineToolStyle,
+      message: 'Лінія порожня',
+    };
+  }
+
+  const normalizedVertices = lineDraftVertices.map((vertex) => {
+    if (Number.isFinite(Number(vertex?.pointId))) return vertex;
+    const fallbackSnap = resolveNearestSnap({ lat: Number(vertex?.lat), lng: Number(vertex?.lng) }, 40);
+    if (!fallbackSnap) return vertex;
+    return {
+      ...vertex,
+      pointId: Number(fallbackSnap.point.id),
+      title: fallbackSnap.point?.title || vertex?.title || '',
+      snapped: true,
+      lat: Number(fallbackSnap.lat),
+      lng: Number(fallbackSnap.lng),
+    };
+  });
+
+  // Start/end can be free-hand: try stronger snap for endpoints automatically.
+  if (normalizedVertices.length >= 2) {
+    const endpointIndexes = [0, normalizedVertices.length - 1];
+    endpointIndexes.forEach((idx) => {
+      const current = normalizedVertices[idx];
+      if (Number.isFinite(Number(current?.pointId))) return;
+      const endpointSnap = resolveNearestSnap({ lat: Number(current?.lat), lng: Number(current?.lng) }, 120);
+      if (!endpointSnap) return;
+      normalizedVertices[idx] = {
+        ...current,
+        pointId: Number(endpointSnap.point.id),
+        title: endpointSnap.point?.title || current?.title || '',
+        snapped: true,
+        lat: Number(endpointSnap.lat),
+        lng: Number(endpointSnap.lng),
+      };
+    });
+  }
+
   const snappedIds = [];
-  for (const vertex of lineDraftVertices) {
+  for (const vertex of normalizedVertices) {
     if (!Number.isFinite(Number(vertex.pointId))) continue;
     const pointId = Number(vertex.pointId);
     if (!snappedIds.length || snappedIds[snappedIds.length - 1] !== pointId) {
@@ -932,16 +997,10 @@ function applyLineDraftToRoute() {
     }
   }
 
-  if (snappedIds.length < 2) {
-    return {
-      ok: false,
-      message: 'Для маршруту потрібно мінімум 2 прив’язані точки.',
-      pointIds: [],
-      skippedVertices: lineDraftVertices.length,
-    };
-  }
+  lineDraftVertices = normalizedVertices;
+  renderLineDraft();
 
-  const skippedVertices = lineDraftVertices.length - snappedIds.length;
+  const skippedVertices = normalizedVertices.filter((vertex) => !Number.isFinite(Number(vertex?.pointId))).length;
   return {
     ok: true,
     pointIds: snappedIds,
@@ -1131,6 +1190,7 @@ export async function initMap(options = {}) {
     };
   }
 
+  const hasSmoothWheelZoomPlugin = Boolean(L?.Map?.SmoothWheelZoom);
   map = L.map('map', {
     zoomControl: false,
     attributionControl: false,
@@ -1139,7 +1199,9 @@ export async function initMap(options = {}) {
     fadeAnimation: true,
     zoomSnap: 0.1,
     zoomDelta: 0.25,
-    scrollWheelZoom: 'center',
+    scrollWheelZoom: hasSmoothWheelZoomPlugin ? false : 'center',
+    smoothWheelZoom: hasSmoothWheelZoomPlugin ? 'center' : false,
+    smoothSensitivity: 0.9,
     touchZoom: 'center',
     wheelPxPerZoomLevel: 120,
     wheelDebounceTime: 16,

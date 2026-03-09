@@ -225,9 +225,23 @@ const CANONICAL_POINT_TYPES = [
   },
   { code: 'station', labelUk: 'Вокзал', labelEn: 'Station', color: '#2C7A7B', markerFile: 'station.svg' },
   {
-    code: 'transport_stop',
-    labelUk: 'Транспортна зупинка',
-    labelEn: 'Transport Stop',
+    code: 'stop_a',
+    labelUk: 'Зупинка А',
+    labelEn: 'Stop A',
+    color: '#7C2D12',
+    markerFile: 'stop_a.svg',
+  },
+  {
+    code: 'stop_p',
+    labelUk: 'Зупинка П',
+    labelEn: 'Stop P',
+    color: '#7C2D12',
+    markerFile: 'stop_p.svg',
+  },
+  {
+    code: 'stop_t',
+    labelUk: 'Зупинка Т',
+    labelEn: 'Stop T',
     color: '#7C2D12',
     markerFile: 'stop_t.svg',
   },
@@ -249,10 +263,7 @@ const LEGACY_POINT_TYPE_ALIAS = {
   parking: 'fuel_station',
   entrance: 'administration',
   crossing: 'street',
-  stop_a: 'transport_stop',
-  stop_p: 'transport_stop',
-  stop_t: 'transport_stop',
-  transport_stop: 'transport_stop',
+  transport_stop: 'stop_t',
 };
 const POINT_TYPE_MARKER_FILE = {
   ...Object.fromEntries(CANONICAL_POINT_TYPES.map((pt) => [pt.code, pt.markerFile])),
@@ -385,7 +396,7 @@ function inferPointTypeCodeFromText(textValue) {
   if (/(ресторан|їдальн|food|foodcourt)/i.test(text)) return 'restaurant';
   if (/(перукар|barber|салон)/i.test(text)) return 'hairdresser';
   if (/(вокзал|станц|автостанц|порт|аеропорт)/i.test(text)) return 'station';
-  if (/(зупинк|трамва|тролейб|автобус|маршрутк|метро)/i.test(text)) return 'transport_stop';
+  if (/(зупинк|трамва|тролейб|автобус|маршрутк|метро)/i.test(text)) return 'stop_t';
   if (/(банк|банкомат|atm)/i.test(text)) return 'bank';
   if (/(пошт|укрпошт|nova ?poshta|нова пошта)/i.test(text)) return 'post';
   if (/(азс|заправ|палив|fuel|gas station)/i.test(text)) return 'fuel_station';
@@ -601,9 +612,7 @@ async function runWithButtonState(button, pendingText, action) {
 }
 
 function buildValidatedRoutePoints(points = []) {
-  if (!Array.isArray(points)) {
-    return { ok: false, message: 'Маршрут має містити мінімум 2 точки', points: [] };
-  }
+  if (!Array.isArray(points)) return { ok: true, points: [] };
   const normalized = [];
   const seen = new Set();
   points.forEach((entry) => {
@@ -613,14 +622,6 @@ function buildValidatedRoutePoints(points = []) {
     seen.add(pointId);
     normalized.push({ pointId });
   });
-  if (normalized.length < 2) {
-    return {
-      ok: false,
-      message:
-        'Маршрут не можна зберегти: додайте мінімум 2 привʼязані точки (через "Додати точку" або "Застосувати лінію").',
-      points: normalized,
-    };
-  }
   return { ok: true, points: normalized };
 }
 
@@ -1443,7 +1444,6 @@ function renderDashboard(points, routes) {
               <span class="route-status ${r.status}">${r.status}</span>
             </div>
             <div class="t-data text-muted">${r.points.length} точок • ${formatIsoDate(r.updatedAt || r.createdAt)}</div>
-            <div class="t-data text-muted">${formatRouteTransportModes(r.transportModes)}</div>
             <div class="route-actions">
               <button class="btn-flat" data-action="edit-route" data-route-id="${r.id}">Edit</button>
               <button class="btn-flat" data-action="advance-route" data-route-id="${r.id}">Next status</button>
@@ -2781,9 +2781,8 @@ function bindSpecialistTools() {
         })
         .filter(Boolean);
 
-      if (mappedPoints.length < 2) {
-        setSpecialistMessage('У маршруті має бути мінімум 2 валідні точки', true);
-        return;
+      if (!mappedPoints.length) {
+        setSpecialistMessage('Лінія застосована, але привʼязаних точок не знайдено', true);
       }
 
       routeOrderHistory.push(routeEditorPoints.map((point) => ({ ...point })));
@@ -2914,17 +2913,12 @@ function bindSpecialistTools() {
         return;
       }
       const validatedPoints = buildValidatedRoutePoints(routeEditorPoints);
-      if (!validatedPoints.ok) {
-        setSpecialistMessage(validatedPoints.message, true);
-        return;
-      }
 
       const payload = {
         name: document.getElementById('route-name').value.trim(),
         description: document.getElementById('route-description').value.trim(),
         status: 'published',
         routeColor: document.getElementById('route-color')?.value || DEFAULT_ROUTE_COLOR,
-        transportModes: collectSelectedRouteTransportModes(),
         points: validatedPoints.points,
       };
       if (!payload.name) {
@@ -2956,17 +2950,12 @@ function bindSpecialistTools() {
         return;
       }
       const validatedPoints = buildValidatedRoutePoints(routeEditorPoints);
-      if (!validatedPoints.ok) {
-        setSpecialistMessage(validatedPoints.message, true);
-        return;
-      }
 
       const payload = {
         name: document.getElementById('route-name').value.trim(),
         description: document.getElementById('route-description').value.trim(),
         status: 'published',
         routeColor: document.getElementById('route-color')?.value || getRouteColor(editingRouteId),
-        transportModes: collectSelectedRouteTransportModes(),
         points: validatedPoints.points,
       };
       if (!payload.name) {
