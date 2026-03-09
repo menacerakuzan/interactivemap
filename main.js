@@ -625,6 +625,36 @@ function buildValidatedRoutePoints(points = []) {
   return { ok: true, points: normalized };
 }
 
+function buildValidatedRoutePath(path = []) {
+  if (!Array.isArray(path)) return [];
+  return path
+    .map((vertex) => {
+      if (!vertex || typeof vertex !== 'object') return null;
+      const lat = Number(vertex.lat);
+      const lng = Number(vertex.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      const pointIdRaw = Number(vertex.pointId);
+      const pointId = Number.isFinite(pointIdRaw) ? pointIdRaw : null;
+      const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed';
+      const edgeColor =
+        typeof vertex.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(vertex.edgeColor)
+          ? vertex.edgeColor
+          : '#E7C769';
+      return {
+        lat,
+        lng,
+        pointId,
+        title: typeof vertex.title === 'string' ? vertex.title : '',
+        snapped: Boolean(vertex.snapped),
+        edgeStyle,
+        edgeColor,
+        edgeCurve: Boolean(vertex.edgeCurve),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 4000);
+}
+
 function formatIsoDate(isoString) {
   if (!isoString) return '-';
   const date = new Date(isoString);
@@ -1875,15 +1905,19 @@ function openRouteInEditor(routeId, options = {}) {
   setSelectedRouteTransportModes(route.transportModes || []);
   routeEditorPoints = route.points.map((p) => ({ pointId: p.id, title: p.title }));
   routeOrderHistory = [];
-  mapController?.setLineDraftFromPoints?.(
-    route.points.map((p) => ({
+  const routeDraftPath = Array.isArray(route.pathJson) && route.pathJson.length
+    ? route.pathJson
+    : route.points.map((p) => ({
       lat: p.lat,
       lng: p.lng,
       pointId: p.id,
       title: p.title || '',
       snapped: true,
-    }))
-  );
+      edgeStyle: 'dashed',
+      edgeColor: route.routeColor || getRouteColor(route.id),
+      edgeCurve: false,
+    }));
+  mapController?.setLineDraftFromPoints?.(routeDraftPath);
   mapController?.setLineToolMode?.('draw');
   mapController?.setLineToolVisible?.(false);
   renderRoutePointOrder();
@@ -2444,15 +2478,20 @@ function bindFilterMenu() {
         await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: selectedCommunity });
         const districtNeedle = normalizeGeoText(district);
         const communityNeedle = normalizeGeoText(community);
-        const points = dashboardPoints.filter((p) => {
+        const strictCommunityPoints = dashboardPoints.filter((p) => {
           const districtValue = normalizeGeoText(p.district);
           const communityValue = normalizeGeoText(p.community);
           return (
             districtValue.includes(districtNeedle) &&
-            (communityValue ? communityValue.includes(communityNeedle) : true)
+            communityValue &&
+            communityValue.includes(communityNeedle)
           );
         });
-        const focusedByPoints = mapController.focusPoints?.(points, { maxZoom: 13, singleZoom: 13 });
+        const districtOnlyPoints = dashboardPoints.filter((p) =>
+          normalizeGeoText(p.district).includes(districtNeedle)
+        );
+        const pointsForFocus = strictCommunityPoints.length ? strictCommunityPoints : districtOnlyPoints;
+        const focusedByPoints = mapController.focusPoints?.(pointsForFocus, { maxZoom: 13, singleZoom: 13 });
 
         const geo = await geocodeCommunity(district, community);
         if (requestId !== locationFocusRequestId) return;
@@ -2782,7 +2821,8 @@ function bindSpecialistTools() {
         .filter(Boolean);
 
       if (!mappedPoints.length) {
-        setSpecialistMessage('Лінія застосована, але привʼязаних точок не знайдено', true);
+        setSpecialistMessage('Лінія не містить жодної привʼязаної точки. Додайте точки або увімкніть Snap.', true);
+        return;
       }
 
       routeOrderHistory.push(routeEditorPoints.map((point) => ({ ...point })));
@@ -2920,6 +2960,7 @@ function bindSpecialistTools() {
         status: 'published',
         routeColor: document.getElementById('route-color')?.value || DEFAULT_ROUTE_COLOR,
         points: validatedPoints.points,
+        pathJson: buildValidatedRoutePath(mapController?.getLineDraftSnapshot?.() || []),
       };
       if (!payload.name) {
         setSpecialistMessage('Вкажіть назву маршруту', true);
@@ -2957,6 +2998,7 @@ function bindSpecialistTools() {
         status: 'published',
         routeColor: document.getElementById('route-color')?.value || getRouteColor(editingRouteId),
         points: validatedPoints.points,
+        pathJson: buildValidatedRoutePath(mapController?.getLineDraftSnapshot?.() || []),
       };
       if (!payload.name) {
         setSpecialistMessage('Вкажіть назву маршруту', true);

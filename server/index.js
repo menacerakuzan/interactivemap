@@ -63,6 +63,45 @@ function parseRouteTransportModes(value) {
   }
 }
 
+function normalizeRoutePathJson(value) {
+  if (!Array.isArray(value)) return [];
+  const normalized = [];
+  value.forEach((vertex) => {
+    if (!vertex || typeof vertex !== 'object') return;
+    const lat = Number(vertex.lat);
+    const lng = Number(vertex.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const pointIdRaw = Number(vertex.pointId);
+    const pointId = Number.isFinite(pointIdRaw) ? pointIdRaw : null;
+    const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed';
+    const edgeColor =
+      typeof vertex.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(vertex.edgeColor)
+        ? vertex.edgeColor
+        : '#E7C769';
+    normalized.push({
+      lat,
+      lng,
+      pointId,
+      title: normalizeOptionalText(vertex.title, 180) || '',
+      snapped: Boolean(vertex.snapped),
+      edgeStyle,
+      edgeColor,
+      edgeCurve: Boolean(vertex.edgeCurve),
+    });
+  });
+  return normalized.slice(0, 4000);
+}
+
+function parseRoutePathJson(value) {
+  if (!value) return [];
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return normalizeRoutePathJson(parsed);
+  } catch (_e) {
+    return [];
+  }
+}
+
 function normalizeNewsImageFocusY(value) {
   if (value === undefined || value === null || value === '') return 50;
   const parsed = Number(value);
@@ -477,6 +516,7 @@ app.get('/api/routes', optionalAuthenticate, (req, res) => {
       description: r.description,
       routeColor: r.route_color || null,
       transportModes: parseRouteTransportModes(r.transport_modes),
+      pathJson: parseRoutePathJson(r.path_json),
       status: r.status,
       createdBy: r.created_by,
       authorName: r.author_name,
@@ -495,7 +535,7 @@ app.get('/api/routes', optionalAuthenticate, (req, res) => {
 });
 
 app.post('/api/routes', authenticate, requireRole('admin', 'specialist'), (req, res) => {
-  const { name, description, routeColor, transportModes, status = 'draft', points = [] } = req.body;
+  const { name, description, routeColor, transportModes, pathJson = [], status = 'draft', points = [] } = req.body;
   if (!isNonEmptyText(name, 180)) {
     return res.status(400).json({ error: 'name is required' });
   }
@@ -505,17 +545,19 @@ app.post('/api/routes', authenticate, requireRole('admin', 'specialist'), (req, 
   }
 
   const normalizedTransportModes = normalizeRouteTransportModes(transportModes);
+  const normalizedPathJson = normalizeRoutePathJson(pathJson);
 
   const tx = db.transaction(() => {
     const routeResult = db
       .prepare(
-        'INSERT INTO routes (name, description, route_color, transport_modes, status, created_by) VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT INTO routes (name, description, route_color, transport_modes, path_json, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)'
       )
       .run(
         name.trim(),
         normalizeOptionalText(description, 3000),
         normalizeOptionalText(routeColor, 16),
         JSON.stringify(normalizedTransportModes),
+        JSON.stringify(normalizedPathJson),
         status,
         req.user.id
       );
@@ -553,7 +595,7 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
     return res.status(404).json({ error: 'Route not found' });
   }
 
-  const { name, description, routeColor, transportModes, status, points } = req.body;
+  const { name, description, routeColor, transportModes, pathJson, status, points } = req.body;
   if (status && !ROUTE_STATUSES.has(status)) {
     return res.status(400).json({ error: 'Invalid route status' });
   }
@@ -562,6 +604,7 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
   }
 
   const normalizedTransportModes = normalizeRouteTransportModes(transportModes);
+  const normalizedPathJson = normalizeRoutePathJson(pathJson);
 
   const tx = db.transaction(() => {
     db.prepare(`
@@ -571,6 +614,7 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
         description = COALESCE(?, description),
         route_color = COALESCE(?, route_color),
         transport_modes = COALESCE(?, transport_modes),
+        path_json = COALESCE(?, path_json),
         status = COALESCE(?, status),
         updated_by = ?,
         updated_at = datetime('now')
@@ -580,6 +624,7 @@ app.put('/api/routes/:id', authenticate, requireRole('admin', 'specialist'), (re
       description !== undefined ? normalizeOptionalText(description, 3000) : null,
       routeColor !== undefined ? normalizeOptionalText(routeColor, 16) : null,
       transportModes !== undefined ? JSON.stringify(normalizedTransportModes) : null,
+      pathJson !== undefined ? JSON.stringify(normalizedPathJson) : null,
       status ?? null,
       req.user.id,
       routeId

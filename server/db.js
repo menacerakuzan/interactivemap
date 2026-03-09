@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS routes (
   name TEXT NOT NULL,
   description TEXT,
   route_color TEXT,
+  path_json TEXT,
   status TEXT NOT NULL CHECK(status IN ('draft', 'review', 'published')) DEFAULT 'draft',
   created_by INTEGER NOT NULL,
   updated_by INTEGER,
@@ -124,6 +125,9 @@ if (!routeColumns.some((c) => c.name === 'route_color')) {
 }
 if (!routeColumns.some((c) => c.name === 'transport_modes')) {
   db.exec('ALTER TABLE routes ADD COLUMN transport_modes TEXT');
+}
+if (!routeColumns.some((c) => c.name === 'path_json')) {
+  db.exec('ALTER TABLE routes ADD COLUMN path_json TEXT');
 }
 
 const seedPointTypes = [

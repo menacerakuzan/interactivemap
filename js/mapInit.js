@@ -1055,30 +1055,82 @@ function setPublishedRoutes(routes = []) {
   publishedRouteLayer.clearLayers();
   if (!Array.isArray(routes) || !routes.length) return;
 
+  const resolveRoutePathVertices = (route) => {
+    const fromPath = Array.isArray(route?.pathJson)
+      ? route.pathJson
+          .map((vertex) => {
+            if (!vertex || typeof vertex !== 'object') return null;
+            const lat = Number(vertex.lat);
+            const lng = Number(vertex.lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            return {
+              lat,
+              lng,
+              edgeStyle: ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed',
+              edgeColor:
+                typeof vertex.edgeColor === 'string' && vertex.edgeColor.startsWith('#')
+                  ? vertex.edgeColor
+                  : route?.routeColor || '#E7C769',
+            };
+          })
+          .filter(Boolean)
+      : [];
+
+    if (fromPath.length) return fromPath;
+
+    if (!Array.isArray(route?.points)) return [];
+    return route.points
+      .map((p) => {
+        const lat = Number(p?.lat);
+        const lng = Number(p?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return {
+          lat,
+          lng,
+          edgeStyle: 'solid',
+          edgeColor: route?.routeColor || '#E7C769',
+        };
+      })
+      .filter(Boolean);
+  };
+
   routes.forEach((route) => {
-    if (!route || route.status !== 'published' || !Array.isArray(route.points) || route.points.length < 2) return;
-    const latLngs = route.points
-      .map((p) => [Number(p.lat), Number(p.lng)])
-      .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
-    if (latLngs.length < 2) return;
+    if (!route || route.status !== 'published') return;
+    const pathVertices = resolveRoutePathVertices(route);
+    if (!pathVertices.length) return;
 
     const color = route.routeColor || '#E7C769';
-    const polyline = L.polyline(latLngs, {
-      color,
-      weight: 4,
-      opacity: 0.75,
-      lineCap: 'round',
-      lineJoin: 'round',
-    }).addTo(publishedRouteLayer);
+    if (pathVertices.length >= 2) {
+      for (let index = 1; index < pathVertices.length; index += 1) {
+        const prev = pathVertices[index - 1];
+        const next = pathVertices[index];
+        const dashArray = next.edgeStyle === 'solid' ? null : next.edgeStyle === 'dashdot' ? '12 7 2 7' : '12 7';
+        const segment = L.polyline(
+          [
+            [prev.lat, prev.lng],
+            [next.lat, next.lng],
+          ],
+          {
+            color: next.edgeColor || color,
+            weight: 4,
+            opacity: 0.78,
+            lineCap: 'round',
+            lineJoin: 'round',
+            dashArray,
+          }
+        ).addTo(publishedRouteLayer);
+        if (index === 1) {
+          segment.bindTooltip(route.name || 'Маршрут', {
+            sticky: true,
+            direction: 'top',
+            className: 'route-order-label',
+          });
+        }
+      }
+    }
 
-    polyline.bindTooltip(route.name || 'Маршрут', {
-      sticky: true,
-      direction: 'top',
-      className: 'route-order-label',
-    });
-
-    // Render route point markers without numeric labels.
-    route.points.forEach((p, idx) => {
+    if (!Array.isArray(route.points)) return;
+    route.points.forEach((p) => {
       const lat = Number(p?.lat);
       const lng = Number(p?.lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
@@ -1097,13 +1149,37 @@ function highlightRoute(route) {
   if (!map || !routeLayer) return;
   clearRouteHighlight();
 
-  if (!route || !Array.isArray(route.points) || route.points.length === 0) {
-    return;
-  }
+  if (!route) return;
+  const pathVertices = Array.isArray(route.pathJson) && route.pathJson.length
+    ? route.pathJson
+        .map((vertex) => {
+          const lat = Number(vertex?.lat);
+          const lng = Number(vertex?.lng);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          return {
+            lat,
+            lng,
+            edgeStyle: ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed',
+            edgeColor:
+              typeof vertex.edgeColor === 'string' && vertex.edgeColor.startsWith('#')
+                ? vertex.edgeColor
+                : route?.routeColor || '#E7C769',
+          };
+        })
+        .filter(Boolean)
+    : (route.points || [])
+        .map((p) => {
+          const lat = Number(p?.lat);
+          const lng = Number(p?.lng);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          return { lat, lng, edgeStyle: 'dashed', edgeColor: route?.routeColor || '#E7C769' };
+        })
+        .filter(Boolean);
+  if (!pathVertices.length) return;
 
-  const latLngs = route.points.map((p) => [p.lat, p.lng]);
+  const latLngs = pathVertices.map((vertex) => [vertex.lat, vertex.lng]);
   const color = route?.routeColor || '#E7C769';
-  const baseLine = L.polyline(latLngs, {
+  let boundsSource = L.polyline(latLngs, {
     color: '#1E3A5F',
     weight: 8,
     opacity: 0.55,
@@ -1111,16 +1187,29 @@ function highlightRoute(route) {
     lineJoin: 'round',
   }).addTo(routeLayer);
 
-  L.polyline(latLngs, {
-    color,
-    weight: 5,
-    opacity: 1,
-    dashArray: '10,7',
-    lineCap: 'round',
-    lineJoin: 'round',
-  }).addTo(routeLayer);
+  if (pathVertices.length >= 2) {
+    for (let index = 1; index < pathVertices.length; index += 1) {
+      const prev = pathVertices[index - 1];
+      const next = pathVertices[index];
+      const dashArray = next.edgeStyle === 'solid' ? null : next.edgeStyle === 'dashdot' ? '10 7 2 7' : '10 7';
+      L.polyline(
+        [
+          [prev.lat, prev.lng],
+          [next.lat, next.lng],
+        ],
+        {
+          color: next.edgeColor || color,
+          weight: 5,
+          opacity: 1,
+          dashArray,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }
+      ).addTo(routeLayer);
+    }
+  }
 
-  route.points.forEach((p) => {
+  (route.points || []).forEach((p) => {
     const marker = L.circleMarker([p.lat, p.lng], {
       radius: 9,
       color: '#1E3A5F',
@@ -1130,7 +1219,7 @@ function highlightRoute(route) {
     }).addTo(routeLayer);
   });
 
-  map.fitBounds(baseLine.getBounds(), { padding: [60, 60], maxZoom: ODESA_BOUNDS.cityZoom });
+  map.fitBounds(boundsSource.getBounds(), { padding: [60, 60], maxZoom: ODESA_BOUNDS.cityZoom });
 }
 
 function focusLocation(lat, lng, zoom = ODESA_BOUNDS.cityZoom) {

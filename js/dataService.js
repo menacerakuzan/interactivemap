@@ -72,6 +72,11 @@ function isMissingRouteTransportModesError(error) {
   return message.includes('transport_modes') && message.includes('routes');
 }
 
+function isMissingRoutePathJsonError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('path_json') && message.includes('routes');
+}
+
 function normalizeTransportModes(value) {
   const allowed = new Set(['bus', 'tram', 'car']);
   let arrayValue = [];
@@ -92,6 +97,35 @@ function normalizeTransportModes(value) {
     if (!normalized.includes(next)) normalized.push(next);
   });
   return normalized;
+}
+
+function normalizeRoutePathJson(value) {
+  if (!Array.isArray(value)) return [];
+  const normalized = [];
+  value.forEach((vertex) => {
+    if (!vertex || typeof vertex !== 'object') return;
+    const lat = Number(vertex.lat);
+    const lng = Number(vertex.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const pointIdRaw = Number(vertex.pointId);
+    const pointId = Number.isFinite(pointIdRaw) ? pointIdRaw : null;
+    const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed';
+    const edgeColor =
+      typeof vertex.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(vertex.edgeColor)
+        ? vertex.edgeColor
+        : '#E7C769';
+    normalized.push({
+      lat,
+      lng,
+      pointId,
+      title: typeof vertex.title === 'string' ? vertex.title : '',
+      snapped: Boolean(vertex.snapped),
+      edgeStyle,
+      edgeColor,
+      edgeCurve: Boolean(vertex.edgeCurve),
+    });
+  });
+  return normalized.slice(0, 4000);
 }
 
 function parsePath(path) {
@@ -235,6 +269,14 @@ function mapRoute(row, authorName = null) {
   } catch (_e) {
     transportModes = [];
   }
+  let pathJson = [];
+  try {
+    const rawPath = row.path_json !== undefined ? row.path_json : row.pathJson;
+    const source = typeof rawPath === 'string' ? JSON.parse(rawPath) : rawPath;
+    pathJson = normalizeRoutePathJson(source);
+  } catch (_e) {
+    pathJson = [];
+  }
   return {
     id: row.id,
     name: row.name,
@@ -244,6 +286,7 @@ function mapRoute(row, authorName = null) {
     authorName,
     routeColor: row.route_color || null,
     transportModes,
+    pathJson,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     points: (row.route_points || [])
@@ -371,34 +414,40 @@ async function supabaseGetRoutes() {
   const isPublic = !sessionData?.session?.access_token;
   let includeRouteColor = true;
   let includeTransportModes = true;
+  let includePathJson = true;
   const buildRouteSelect = (opts = {}) => {
     const fields = ['id', 'name', 'description', 'status'];
     if (opts.includeRouteColor !== false) fields.push('route_color');
     if (opts.includeTransportModes !== false) fields.push('transport_modes');
+    if (opts.includePathJson !== false) fields.push('path_json');
     fields.push('created_by', 'created_at', 'updated_at', 'route_points(position,note,point:points(id,title,lat,lng))');
     return fields.join(',');
   };
 
   let { data, error } = await supabase
     .from('routes')
-    .select(buildRouteSelect({ includeRouteColor, includeTransportModes }))
+    .select(buildRouteSelect({ includeRouteColor, includeTransportModes, includePathJson }))
     .order('updated_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
   if (isPublic) {
     ({ data, error } = await supabase
       .from('routes')
-      .select(buildRouteSelect({ includeRouteColor, includeTransportModes }))
+      .select(buildRouteSelect({ includeRouteColor, includeTransportModes, includePathJson }))
       .eq('status', 'published')
       .order('updated_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false }));
   }
-  if (error && (isMissingRouteColorError(error) || isMissingRouteTransportModesError(error))) {
+  if (
+    error &&
+    (isMissingRouteColorError(error) || isMissingRouteTransportModesError(error) || isMissingRoutePathJsonError(error))
+  ) {
     if (isMissingRouteColorError(error)) includeRouteColor = false;
     if (isMissingRouteTransportModesError(error)) includeTransportModes = false;
+    if (isMissingRoutePathJsonError(error)) includePathJson = false;
 
     let fallback = supabase
       .from('routes')
-      .select(buildRouteSelect({ includeRouteColor, includeTransportModes }))
+      .select(buildRouteSelect({ includeRouteColor, includeTransportModes, includePathJson }))
       .order('updated_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
     if (isPublic) fallback = fallback.eq('status', 'published');
@@ -559,6 +608,7 @@ async function supabaseDeletePoint(pointId) {
 async function supabaseCreateRoute(payload) {
   const user = await supabaseGetCurrentUser();
   const transportModes = normalizeTransportModes(payload.transportModes);
+  const pathJson = normalizeRoutePathJson(payload.pathJson);
 
   let { data: route, error: routeError } = await supabase
     .from('routes')
@@ -567,6 +617,7 @@ async function supabaseCreateRoute(payload) {
       description: payload.description || null,
       route_color: payload.routeColor || null,
       transport_modes: transportModes,
+      path_json: pathJson,
       status: payload.status || 'draft',
       created_by: user.id,
     })
@@ -574,7 +625,9 @@ async function supabaseCreateRoute(payload) {
     .single();
   if (
     routeError &&
-    (isMissingRouteColorError(routeError) || isMissingRouteTransportModesError(routeError))
+    (isMissingRouteColorError(routeError) ||
+      isMissingRouteTransportModesError(routeError) ||
+      isMissingRoutePathJsonError(routeError))
   ) {
     const fallback = await supabase
       .from('routes')
@@ -582,6 +635,7 @@ async function supabaseCreateRoute(payload) {
         name: payload.name,
         description: payload.description || null,
         ...(isMissingRouteTransportModesError(routeError) ? {} : { transport_modes: transportModes }),
+        ...(isMissingRoutePathJsonError(routeError) ? {} : { path_json: pathJson }),
         ...(isMissingRouteColorError(routeError) ? {} : { route_color: payload.routeColor || null }),
         status: payload.status || 'draft',
         created_by: user.id,
@@ -623,15 +677,21 @@ async function supabaseUpdateRoute(routeId, payload) {
   if (payload.transportModes !== undefined) {
     updateData.transport_modes = normalizeTransportModes(payload.transportModes);
   }
+  if (payload.pathJson !== undefined) {
+    updateData.path_json = normalizeRoutePathJson(payload.pathJson);
+  }
 
   let { error: routeError } = await supabase.from('routes').update(updateData).eq('id', routeId);
   if (
     routeError &&
-    (isMissingRouteColorError(routeError) || isMissingRouteTransportModesError(routeError))
+    (isMissingRouteColorError(routeError) ||
+      isMissingRouteTransportModesError(routeError) ||
+      isMissingRoutePathJsonError(routeError))
   ) {
     const fallbackData = { ...updateData };
     if (isMissingRouteColorError(routeError)) delete fallbackData.route_color;
     if (isMissingRouteTransportModesError(routeError)) delete fallbackData.transport_modes;
+    if (isMissingRoutePathJsonError(routeError)) delete fallbackData.path_json;
     const fallback = await supabase.from('routes').update(fallbackData).eq('id', routeId);
     routeError = fallback.error;
   }
