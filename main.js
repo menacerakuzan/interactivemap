@@ -108,6 +108,8 @@ const ODESA_START_FOCUS = { lat: 46.4825, lng: 30.7233, zoom: 12 };
 const COMMUNITY_CENTERS_URL = '/data/community-centers.json';
 const EXPECTED_MARKER_FILES = [
   'administration.svg',
+  'trade_objects.svg',
+  'cnap.svg',
   'fuel_station.svg',
   'pharmacy.svg',
   'bank.svg',
@@ -133,6 +135,8 @@ const EXPECTED_MARKER_FILES = [
 ];
 const MARKER_LOCALIZED_CANDIDATES = {
   'administration.svg': ['адміністрація.svg'],
+  'trade_objects.svg': ["об'єкти торгівлі 01.svg", 'обєкти торгівлі 01.svg', "об'єкти торгівлі.svg"],
+  'cnap.svg': ['цнап.svg'],
   'fuel_station.svg': ['азс.svg'],
   'pharmacy.svg': ['аптека.svg'],
   'bank.svg': ['банк.svg'],
@@ -202,6 +206,20 @@ const CANONICAL_POINT_TYPES = [
     labelEn: 'Administration',
     color: '#13315C',
     markerFile: 'administration.svg',
+  },
+  {
+    code: 'trade_objects',
+    labelUk: "Об'єкти торгівлі",
+    labelEn: 'Trade objects',
+    color: '#8B5E34',
+    markerFile: 'trade_objects.svg',
+  },
+  {
+    code: 'cnap',
+    labelUk: 'ЦНАП',
+    labelEn: 'CNAP',
+    color: '#1E5AA8',
+    markerFile: 'cnap.svg',
   },
   {
     code: 'social_services',
@@ -393,6 +411,7 @@ function inferPointTypeCodeFromText(textValue) {
   if (/(аптек)/i.test(text)) return 'pharmacy';
   if (/(лікар|мед(заклад|центр|пункт|ична)?|поліклін|амбулатор|клінік)/i.test(text)) return 'medical';
   if (/(кафе|coffee|кав[’'` ]?яр)/i.test(text)) return 'cafe';
+  if (/(торг|магаз|супермаркет|ринок|market|shop|mall|трц)/i.test(text)) return 'trade_objects';
   if (/(ресторан|їдальн|food|foodcourt)/i.test(text)) return 'restaurant';
   if (/(перукар|barber|салон)/i.test(text)) return 'hairdresser';
   if (/(вокзал|станц|автостанц|порт|аеропорт)/i.test(text)) return 'station';
@@ -407,7 +426,8 @@ function inferPointTypeCodeFromText(textValue) {
   if (/(готел|hotel|хостел)/i.test(text)) return 'hotel';
   if (/(спорт|стадіон|зал|фітнес|басейн)/i.test(text)) return 'sport';
   if (/(театр|музей|культур|бібліот|опера)/i.test(text)) return 'culture';
-  if (/(адмін|цнап|рада|держ|муніцип)/i.test(text)) return 'administration';
+  if (/(цнап|cnap)/i.test(text)) return 'cnap';
+  if (/(адмін|рада|держ|муніцип)/i.test(text)) return 'administration';
   if (/(укрит|сховище|бомбосхов)/i.test(text)) return 'shelter';
   if (/(соц|послуг|реаб|інклюз)/i.test(text)) return 'social_services';
   if (/(житл|будин|жк|квартир|osbb|осбб)/i.test(text)) return 'housing';

@@ -25,6 +25,8 @@ let pointLayerMap = new Map();
 const POINT_TYPE_MARKER_FILE = {
   school: 'education.svg',
   administration: 'administration.svg',
+  trade_objects: 'trade_objects.svg',
+  cnap: 'cnap.svg',
   fuel_station: 'fuel_station.svg',
   pharmacy: 'pharmacy.svg',
   bank: 'bank.svg',
@@ -64,6 +66,8 @@ const POINT_TYPE_MARKER_FILE = {
 
 const EXPECTED_MARKER_FILES = [
   'administration.svg',
+  'trade_objects.svg',
+  'cnap.svg',
   'fuel_station.svg',
   'pharmacy.svg',
   'bank.svg',
@@ -89,6 +93,8 @@ const EXPECTED_MARKER_FILES = [
 ];
 const MARKER_LOCALIZED_CANDIDATES = {
   'administration.svg': ['адміністрація.svg'],
+  'trade_objects.svg': ["об'єкти торгівлі 01.svg", 'обєкти торгівлі 01.svg', "об'єкти торгівлі.svg"],
+  'cnap.svg': ['цнап.svg'],
   'fuel_station.svg': ['азс.svg'],
   'pharmacy.svg': ['аптека.svg'],
   'bank.svg': ['банк.svg'],
