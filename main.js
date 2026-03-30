@@ -72,7 +72,7 @@ const translations = {
   },
 };
 
-let currentLang = 'en';
+let currentLang = 'uk';
 let authToken = localStorage.getItem('odesaAuthToken') || '';
 let authUser = JSON.parse(localStorage.getItem('odesaAuthUser') || 'null');
 let authSession = (() => {
@@ -573,6 +573,7 @@ function updateLanguage(lang) {
     }
   });
   document.body.setAttribute('lang', lang);
+  populateCommunitiesSelect();
 }
 
 function hasValidSupabaseSession(session) {
@@ -1124,20 +1125,27 @@ function populateCommunitiesSelect() {
 
   const locale = currentLang === 'uk' ? 'uk' : 'en';
   const allLabel = translations[currentLang]?.community_all || 'All communities';
-  const rows = [];
+  const districtRows = [];
+  const communityRows = [];
   Object.entries(COMMUNITIES_BY_DISTRICT).forEach(([district, communities]) => {
+    districtRows.push({ district });
     communities.forEach((community) => {
-      rows.push({ district, community });
+      communityRows.push({ district, community });
     });
   });
-  rows.sort((a, b) => {
+  districtRows.sort((a, b) => a.district.localeCompare(b.district, locale));
+  communityRows.sort((a, b) => {
     const byCommunity = a.community.localeCompare(b.community, locale);
     if (byCommunity !== 0) return byCommunity;
     return a.district.localeCompare(b.district, locale);
   });
 
   const options = [`<option value="">${allLabel}</option>`];
-  rows.forEach(({ district, community }) => {
+  districtRows.forEach(({ district }) => {
+    const districtPrefix = currentLang === 'uk' ? 'Район' : 'District';
+    options.push(`<option value="district::${district}">${districtPrefix}: ${district}</option>`);
+  });
+  communityRows.forEach(({ district, community }) => {
     const value = `community::${district}::${community}`;
     options.push(`<option value="${value}">${community} — ${district}</option>`);
   });
@@ -1148,6 +1156,13 @@ function populateCommunitiesSelect() {
     const target = `community::${selectedDistrict}::${selectedCommunity}`;
     if (select.querySelector(`option[value="${CSS.escape(target)}"]`)) {
       select.value = target;
+      return;
+    }
+  }
+  if (selectedDistrict) {
+    const districtTarget = `district::${selectedDistrict}`;
+    if (select.querySelector(`option[value="${CSS.escape(districtTarget)}"]`)) {
+      select.value = districtTarget;
       return;
     }
   }
@@ -2556,68 +2571,9 @@ function bindFilterMenu() {
   const filterMenu = document.getElementById('filter-menu');
   const btnToggleFilters = document.getElementById('btn-toggle-filters');
   const communitySelect = document.getElementById('community-select');
-  const quickSearchInput = document.getElementById('location-quick-search');
-  const quickSearchDatalist = document.getElementById('location-quick-options');
-  const btnQuickGo = document.getElementById('btn-location-quick-go');
   let locationFocusRequestId = 0;
 
   populateCommunitiesSelect();
-
-  const quickValueByKey = new Map();
-  const quickDisplayLabelByKey = new Map();
-  const addQuickAlias = (label, value) => {
-    const key = normalizeGeoText(label);
-    if (!key || quickValueByKey.has(key)) return;
-    quickValueByKey.set(key, value);
-    quickDisplayLabelByKey.set(key, String(label));
-  };
-
-  addQuickAlias('Одеса', 'community::Одеський район::Одеська міська');
-  addQuickAlias('місто Одеса', 'community::Одеський район::Одеська міська');
-  addQuickAlias('Одеська міська', 'community::Одеський район::Одеська міська');
-  addQuickAlias('Odesa', 'community::Одеський район::Одеська міська');
-  addQuickAlias('Odeska city', 'community::Одеський район::Одеська міська');
-
-  Object.entries(COMMUNITIES_BY_DISTRICT).forEach(([district, communities]) => {
-    communities.forEach((community) => {
-      addQuickAlias(community, `community::${district}::${community}`);
-    });
-  });
-
-  if (quickSearchDatalist) {
-    const locale = currentLang === 'uk' ? 'uk' : 'en';
-    const labels = Array.from(quickDisplayLabelByKey.values())
-      .sort((a, b) => a.localeCompare(b, locale));
-    quickSearchDatalist.innerHTML = labels
-      .map((label) => `<option value="${label}"></option>`)
-      .join('');
-  }
-
-  const applyQuickLocation = async () => {
-    if (!quickSearchInput || !communitySelect) return;
-    const needle = normalizeGeoText(quickSearchInput.value);
-    if (!needle) return;
-
-    let resolved = quickValueByKey.get(needle) || '';
-    if (!resolved) {
-      const fallback = Array.from(quickValueByKey.entries()).find(([key]) => key.includes(needle));
-      resolved = fallback?.[1] || '';
-    }
-    if (!resolved) {
-      setSpecialistMessage(
-        currentLang === 'uk'
-          ? 'Локацію не знайдено. Спробуйте назву громади.'
-          : 'Location not found. Try a community name.',
-        true
-      );
-      return;
-    }
-
-    communitySelect.value = resolved;
-    communitySelect.dispatchEvent(new Event('change', { bubbles: true }));
-    filterMenu?.classList.remove('active');
-    quickSearchInput.blur();
-  };
 
   if (filterMenu && btnToggleFilters) {
     ['pointerdown', 'mousedown', 'touchstart', 'wheel'].forEach((eventName) => {
@@ -2658,32 +2614,6 @@ function bindFilterMenu() {
     });
   }
 
-  if (btnQuickGo) {
-    ['pointerdown', 'mousedown', 'touchstart'].forEach((eventName) => {
-      btnQuickGo.addEventListener(
-        eventName,
-        (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        },
-        { passive: false }
-      );
-    });
-    btnQuickGo.addEventListener('click', async () => {
-      await applyQuickLocation();
-    });
-  }
-  if (quickSearchInput) {
-    ['pointerdown', 'mousedown', 'touchstart'].forEach((eventName) => {
-      quickSearchInput.addEventListener(eventName, (event) => event.stopPropagation(), { passive: true });
-    });
-    quickSearchInput.addEventListener('keydown', async (event) => {
-      if (event.key !== 'Enter') return;
-      event.preventDefault();
-      await applyQuickLocation();
-    });
-  }
-
   if (communitySelect) {
     communitySelect.addEventListener('change', async () => {
       const requestId = ++locationFocusRequestId;
@@ -2700,6 +2630,32 @@ function bindFilterMenu() {
         setSpecialistMessage(currentLang === 'uk' ? 'Фокус на Одесі' : 'Focus set to Odesa');
         saveUiState();
         return;
+      }
+
+      if (value.startsWith('district::')) {
+        const district = value.split('::')[1];
+        selectedDistrict = district;
+        await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: '' });
+        const districtGeo = await geocodeDistrict(district);
+        if (requestId !== locationFocusRequestId) return;
+        const hasBoundary = districtGeo?.geojson ? mapController.setFocusBoundary?.(districtGeo.geojson) : false;
+        if (!hasBoundary) mapController.clearFocusBoundary?.();
+        const districtNeedle = normalizeGeoText(district);
+        const points = dashboardPoints.filter((p) =>
+          normalizeGeoText(p.district).includes(districtNeedle)
+        );
+        const focusedByPoints = mapController.focusPoints?.(points, { maxZoom: 11, singleZoom: 11 });
+        if (districtGeo && hasBoundary) {
+          mapController.focusBoundary?.({ maxZoom: 11 });
+        } else if (districtGeo) {
+          mapController.focusLocation?.(districtGeo.lat, districtGeo.lng, districtGeo.zoom || 11);
+        } else if (!focusedByPoints) {
+          const center = DISTRICT_CENTERS[district];
+          if (center) mapController.focusLocation?.(center.lat, center.lng, center.zoom || 11);
+        }
+        setSpecialistMessage(
+          currentLang === 'uk' ? `Фокус на: ${district}` : `Focused on district: ${district}`
+        );
       }
 
       if (value.startsWith('community::')) {
