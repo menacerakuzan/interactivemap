@@ -30,6 +30,12 @@ const translations = {
     submit_btn: 'УВІЙТИ ДО СИСТЕМИ',
     forgot_pw: 'Забули пароль?',
     access_problem: 'Проблеми з доступом?',
+    quick_jump_label: 'ШВИДКИЙ ПЕРЕХІД',
+    quick_jump_placeholder: 'Напр.: Одеса, Одеська міська...',
+    community_label: 'ГРОМАДА',
+    go_btn: 'Перейти',
+    hide_partners: 'ПРИХОВАТИ',
+    community_all: 'Усі громади',
   },
   en: {
     page_title: 'Odesa Region',
@@ -57,10 +63,16 @@ const translations = {
     submit_btn: 'LOG IN TO SYSTEM',
     forgot_pw: 'Forgot password?',
     access_problem: 'Access issues?',
+    quick_jump_label: 'Quick Jump',
+    quick_jump_placeholder: 'E.g. Odesa, Odeska city...',
+    community_label: 'Community',
+    go_btn: 'Go',
+    hide_partners: 'HIDE',
+    community_all: 'All communities',
   },
 };
 
-let currentLang = 'uk';
+let currentLang = 'en';
 let authToken = localStorage.getItem('odesaAuthToken') || '';
 let authUser = JSON.parse(localStorage.getItem('odesaAuthUser') || 'null');
 let authSession = (() => {
@@ -100,12 +112,16 @@ let currentSpecialistAction = 'menu';
 let legendPointsSyncBound = false;
 const hiddenPointTypeCodes = new Set();
 let communityCentersIndexPromise = null;
+let boundaryGeoIndexPromise = null;
 const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
 const DEFAULT_NEWS_IMAGE_FOCUS_Y = 50;
 const ODESA_START_FOCUS = { lat: 46.4825, lng: 30.7233, zoom: 12 };
 const COMMUNITY_CENTERS_URL = '/data/community-centers.json';
+const COMMUNITIES_GEOJSON_URL = '/data/gromadi.geojson';
+const DISTRICTS_GEOJSON_URL = '/data/districts.geojson';
+const ODESSA_OBLAST_GEOJSON_URL = '/data/odessa_oblas.json';
 const EXPECTED_MARKER_FILES = [
   'administration.svg',
   'trade_objects.svg',
@@ -753,6 +769,190 @@ async function loadCommunityCentersIndex() {
   return communityCentersIndexPromise;
 }
 
+function getFeatureName(props = {}) {
+  return String(props?.['name:uk'] || props?.name || props?.['name:en'] || '').trim();
+}
+
+function normalizeCommunityBoundaryName(value) {
+  return normalizeGeoText(value).replace(/\s+громада$/u, '').trim();
+}
+
+function collectGeometryCoords(geometry, acc = []) {
+  if (!geometry || typeof geometry !== 'object') return acc;
+  const type = String(geometry.type || '');
+  if (type === 'Point' && Array.isArray(geometry.coordinates) && geometry.coordinates.length >= 2) {
+    const [lng, lat] = geometry.coordinates;
+    if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) acc.push([Number(lat), Number(lng)]);
+    return acc;
+  }
+  const scan = (node) => {
+    if (!Array.isArray(node)) return;
+    if (node.length >= 2 && Number.isFinite(Number(node[0])) && Number.isFinite(Number(node[1]))) {
+      acc.push([Number(node[1]), Number(node[0])]);
+      return;
+    }
+    node.forEach(scan);
+  };
+  scan(geometry.coordinates);
+  return acc;
+}
+
+function buildBoundaryCenter(geometry, fallbackZoom = 12) {
+  const coords = collectGeometryCoords(geometry, []);
+  if (!coords.length) return null;
+  let minLat = Number.POSITIVE_INFINITY;
+  let maxLat = Number.NEGATIVE_INFINITY;
+  let minLng = Number.POSITIVE_INFINITY;
+  let maxLng = Number.NEGATIVE_INFINITY;
+  coords.forEach(([lat, lng]) => {
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+  });
+  const latSpan = Math.max(0.000001, maxLat - minLat);
+  const lngSpan = Math.max(0.000001, maxLng - minLng);
+  const maxSpan = Math.max(latSpan, lngSpan);
+  let zoom = fallbackZoom;
+  if (maxSpan > 3) zoom = 8;
+  else if (maxSpan > 1.5) zoom = 9;
+  else if (maxSpan > 0.9) zoom = 10;
+  else if (maxSpan > 0.5) zoom = 11;
+  else if (maxSpan > 0.25) zoom = 12;
+  else zoom = 13;
+  return {
+    lat: (minLat + maxLat) / 2,
+    lng: (minLng + maxLng) / 2,
+    zoom,
+  };
+}
+
+function isPointInRing(lat, lng, ring = []) {
+  if (!Array.isArray(ring) || ring.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const pi = ring[i];
+    const pj = ring[j];
+    if (!Array.isArray(pi) || !Array.isArray(pj) || pi.length < 2 || pj.length < 2) continue;
+    const xi = Number(pi[0]);
+    const yi = Number(pi[1]);
+    const xj = Number(pj[0]);
+    const yj = Number(pj[1]);
+    const intersects = yi > lat !== yj > lat
+      && lng < ((xj - xi) * (lat - yi)) / ((yj - yi) || 1e-12) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function isPointInPolygonGeometry(lat, lng, geometry) {
+  if (!geometry || typeof geometry !== 'object') return false;
+  const type = String(geometry.type || '');
+  if (type === 'Polygon') {
+    const rings = Array.isArray(geometry.coordinates) ? geometry.coordinates : [];
+    if (!rings.length) return false;
+    if (!isPointInRing(lat, lng, rings[0])) return false;
+    for (let i = 1; i < rings.length; i += 1) {
+      if (isPointInRing(lat, lng, rings[i])) return false;
+    }
+    return true;
+  }
+  if (type === 'MultiPolygon') {
+    const polygons = Array.isArray(geometry.coordinates) ? geometry.coordinates : [];
+    return polygons.some((rings) => isPointInPolygonGeometry(lat, lng, { type: 'Polygon', coordinates: rings }));
+  }
+  return false;
+}
+
+async function loadBoundaryGeoIndex() {
+  if (boundaryGeoIndexPromise) return boundaryGeoIndexPromise;
+  boundaryGeoIndexPromise = (async () => {
+    try {
+      const [communitiesResp, districtsResp, oblastResp] = await Promise.all([
+        fetch(COMMUNITIES_GEOJSON_URL, { cache: 'force-cache' }),
+        fetch(DISTRICTS_GEOJSON_URL, { cache: 'force-cache' }),
+        fetch(ODESSA_OBLAST_GEOJSON_URL, { cache: 'force-cache' }).catch(() => null),
+      ]);
+      if (!communitiesResp.ok || !districtsResp.ok) {
+        return {
+          communityByName: new Map(),
+          communityByDistrictAndName: new Map(),
+          districtByName: new Map(),
+          oblastGeojson: null,
+        };
+      }
+      const communitiesGeo = await communitiesResp.json();
+      const districtsGeo = await districtsResp.json();
+      const oblastGeo = oblastResp && oblastResp.ok ? await oblastResp.json() : null;
+
+      const districtByName = new Map();
+      const districtRows = [];
+      (districtsGeo?.features || []).forEach((feature) => {
+        const props = feature?.properties || {};
+        const name = getFeatureName(props);
+        const key = normalizeGeoText(name);
+        if (!key || districtByName.has(key)) return;
+        const center = buildBoundaryCenter(feature?.geometry, 10);
+        if (!center) return;
+        const districtRow = {
+          name,
+          geojson: feature?.geometry || null,
+          lat: center.lat,
+          lng: center.lng,
+          zoom: center.zoom,
+        };
+        districtByName.set(key, districtRow);
+        districtRows.push({ key, ...districtRow });
+      });
+
+      const communityByName = new Map();
+      const communityByDistrictAndName = new Map();
+      (communitiesGeo?.features || []).forEach((feature) => {
+        const props = feature?.properties || {};
+        const originalName = getFeatureName(props);
+        const trimmed = originalName.replace(/\s+громада$/u, '').trim();
+        const key = normalizeCommunityBoundaryName(trimmed);
+        if (!key) return;
+        const center = buildBoundaryCenter(feature?.geometry, 12);
+        if (!center) return;
+        const record = {
+          name: trimmed,
+          geojson: feature?.geometry || null,
+          lat: center.lat,
+          lng: center.lng,
+          zoom: center.zoom,
+        };
+        if (!communityByName.has(key)) {
+          communityByName.set(key, record);
+        }
+
+        const districtRow = districtRows.find((row) => isPointInPolygonGeometry(center.lat, center.lng, row.geojson));
+        if (!districtRow) return;
+        const keyWithDistrict = `${districtRow.key}::${key}`;
+        if (!communityByDistrictAndName.has(keyWithDistrict)) {
+          communityByDistrictAndName.set(keyWithDistrict, record);
+        }
+      });
+
+      return {
+        communityByName,
+        communityByDistrictAndName,
+        districtByName,
+        oblastGeojson: oblastGeo || null,
+      };
+    } catch (_e) {
+      return {
+        communityByName: new Map(),
+        communityByDistrictAndName: new Map(),
+        districtByName: new Map(),
+        oblastGeojson: null,
+      };
+    }
+  })();
+
+  return boundaryGeoIndexPromise;
+}
+
 function makePointSectionMarkup(section = {}, idx = 0) {
   const title = escapeHtml(section.title || '');
   const description = escapeHtml(section.description || '');
@@ -922,16 +1122,24 @@ function populateCommunitiesSelect() {
   const select = document.getElementById('community-select');
   if (!select) return;
 
-  const options = ['<option value="">Усі громади / райони</option>'];
+  const locale = currentLang === 'uk' ? 'uk' : 'en';
+  const allLabel = translations[currentLang]?.community_all || 'All communities';
+  const rows = [];
   Object.entries(COMMUNITIES_BY_DISTRICT).forEach(([district, communities]) => {
-    options.push(`<optgroup label="${district}">`);
-    options.push(`<option value="district::${district}">• ${district}</option>`);
     communities.forEach((community) => {
-      options.push(
-        `<option value="community::${district}::${community}">${community}</option>`
-      );
+      rows.push({ district, community });
     });
-    options.push('</optgroup>');
+  });
+  rows.sort((a, b) => {
+    const byCommunity = a.community.localeCompare(b.community, locale);
+    if (byCommunity !== 0) return byCommunity;
+    return a.district.localeCompare(b.district, locale);
+  });
+
+  const options = [`<option value="">${allLabel}</option>`];
+  rows.forEach(({ district, community }) => {
+    const value = `community::${district}::${community}`;
+    options.push(`<option value="${value}">${community} — ${district}</option>`);
   });
 
   select.innerHTML = options.join('');
@@ -943,15 +1151,24 @@ function populateCommunitiesSelect() {
       return;
     }
   }
-  if (selectedDistrict) {
-    const target = `district::${selectedDistrict}`;
-    if (select.querySelector(`option[value="${CSS.escape(target)}"]`)) {
-      select.value = target;
-    }
-  }
 }
 
 async function geocodeCommunity(district, community) {
+  const boundaryIndex = await loadBoundaryGeoIndex();
+  const districtKey = normalizeGeoText(district);
+  const boundaryKey = normalizeCommunityBoundaryName(community);
+  const boundaryMatchByDistrict = boundaryIndex?.communityByDistrictAndName?.get(`${districtKey}::${boundaryKey}`);
+  const boundaryMatch = boundaryMatchByDistrict || boundaryIndex?.communityByName?.get(boundaryKey);
+  if (boundaryMatch) {
+    return {
+      lat: boundaryMatch.lat,
+      lng: boundaryMatch.lng,
+      zoom: Number(boundaryMatch.zoom) > 0 ? Number(boundaryMatch.zoom) : 12,
+      geojson: boundaryMatch.geojson || null,
+      source: 'boundary_geojson',
+    };
+  }
+
   const cacheKey = `geo::v2::${district}::${community}`;
   const cached = localStorage.getItem(cacheKey);
   if (cached) {
@@ -997,6 +1214,19 @@ async function geocodeCommunity(district, community) {
 }
 
 async function geocodeDistrict(district) {
+  const boundaryIndex = await loadBoundaryGeoIndex();
+  const districtKey = normalizeGeoText(district);
+  const districtMatch = boundaryIndex?.districtByName?.get(districtKey);
+  if (districtMatch) {
+    return {
+      lat: districtMatch.lat,
+      lng: districtMatch.lng,
+      zoom: Number(districtMatch.zoom) > 0 ? Number(districtMatch.zoom) : 10,
+      geojson: districtMatch.geojson || null,
+      source: 'boundary_geojson',
+    };
+  }
+
   const cacheKey = `geo::district::${district}`;
   const cached = localStorage.getItem(cacheKey);
   if (cached) {
@@ -2345,17 +2575,19 @@ function bindFilterMenu() {
   addQuickAlias('Одеса', 'community::Одеський район::Одеська міська');
   addQuickAlias('місто Одеса', 'community::Одеський район::Одеська міська');
   addQuickAlias('Одеська міська', 'community::Одеський район::Одеська міська');
+  addQuickAlias('Odesa', 'community::Одеський район::Одеська міська');
+  addQuickAlias('Odeska city', 'community::Одеський район::Одеська міська');
 
   Object.entries(COMMUNITIES_BY_DISTRICT).forEach(([district, communities]) => {
-    addQuickAlias(district, `district::${district}`);
     communities.forEach((community) => {
       addQuickAlias(community, `community::${district}::${community}`);
     });
   });
 
   if (quickSearchDatalist) {
+    const locale = currentLang === 'uk' ? 'uk' : 'en';
     const labels = Array.from(quickDisplayLabelByKey.values())
-      .sort((a, b) => a.localeCompare(b, 'uk'));
+      .sort((a, b) => a.localeCompare(b, locale));
     quickSearchDatalist.innerHTML = labels
       .map((label) => `<option value="${label}"></option>`)
       .join('');
@@ -2372,7 +2604,12 @@ function bindFilterMenu() {
       resolved = fallback?.[1] || '';
     }
     if (!resolved) {
-      setSpecialistMessage('Локацію не знайдено. Спробуйте назву громади/району.', true);
+      setSpecialistMessage(
+        currentLang === 'uk'
+          ? 'Локацію не знайдено. Спробуйте назву громади.'
+          : 'Location not found. Try a community name.',
+        true
+      );
       return;
     }
 
@@ -2460,35 +2697,9 @@ function bindFilterMenu() {
         mapController.clearFocusBoundary?.();
         mapController.focusLocation?.(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
         await mapController.setFilter({ type: 'all', certified: false, district: '', community: '' });
-        setSpecialistMessage('Фокус на Одесі');
+        setSpecialistMessage(currentLang === 'uk' ? 'Фокус на Одесі' : 'Focus set to Odesa');
         saveUiState();
         return;
-      }
-
-      if (value.startsWith('district::')) {
-        const district = value.split('::')[1];
-        selectedDistrict = district;
-        await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: '' });
-        const districtGeo = await geocodeDistrict(district);
-        if (requestId !== locationFocusRequestId) return;
-        const hasBoundary = districtGeo?.geojson ? mapController.setFocusBoundary?.(districtGeo.geojson) : false;
-        if (!hasBoundary) mapController.clearFocusBoundary?.();
-        const districtNeedle = normalizeGeoText(district);
-        const points = dashboardPoints.filter((p) =>
-          normalizeGeoText(p.district).includes(districtNeedle)
-        );
-        const focusedByPoints = mapController.focusPoints?.(points, { maxZoom: 11, singleZoom: 11 });
-        if (districtGeo && hasBoundary) {
-          mapController.focusBoundary?.({ maxZoom: 11 });
-        } else if (districtGeo) {
-          mapController.focusLocation?.(districtGeo.lat, districtGeo.lng, districtGeo.zoom || 11);
-        } else if (!focusedByPoints) {
-          const center = DISTRICT_CENTERS[district];
-          if (center) {
-            mapController.focusLocation?.(center.lat, center.lng, center.zoom || 11);
-          }
-        }
-        setSpecialistMessage(`Фокус на: ${district}`);
       }
 
       if (value.startsWith('community::')) {
@@ -2530,8 +2741,12 @@ function bindFilterMenu() {
         }
         setSpecialistMessage(
           hasBoundary
-            ? `Фокус на громаді: ${community} (межі показано)`
-            : `Фокус на громаді: ${community} (межі недоступні у джерелі даних)`
+            ? (currentLang === 'uk'
+                ? `Фокус на громаді: ${community} (межі показано)`
+                : `Focused on community: ${community} (boundary shown)`)
+            : (currentLang === 'uk'
+                ? `Фокус на громаді: ${community} (межі недоступні у джерелі даних)`
+                : `Focused on community: ${community} (boundary not available)`)
         );
       }
       saveUiState();

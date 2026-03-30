@@ -389,7 +389,7 @@ body::before {
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-float);
-  transition: width var(--t-smooth) var(--ease-smooth), transform var(--t-fast) var(--ease-smooth);
+  transition: transform var(--t-fast) var(--ease-smooth);
 }
 
 .map-legend {
@@ -410,12 +410,12 @@ body::before {
   width: min(300px, calc(100vw - 32px));
   box-shadow: 0 12px 30px rgba(11, 37, 69, 0.14);
   transform-origin: top right;
-  transition: opacity 220ms var(--ease-smooth), transform 260ms var(--ease-smooth), box-shadow 220ms var(--ease-smooth);
+  transition: opacity 200ms var(--ease-smooth), transform 200ms var(--ease-smooth), box-shadow 200ms var(--ease-smooth);
 }
 
 .map-legend.collapsed {
-  opacity: 0.94;
-  transform: translateY(-2px);
+  opacity: 0.98;
+  transform: none;
   min-width: 0;
   width: 44px;
   height: 44px;
@@ -433,7 +433,7 @@ body::before {
   overflow-y: auto;
   opacity: 1;
   transform: translateY(0);
-  transition: max-height 260ms var(--ease-smooth), opacity 220ms var(--ease-smooth), transform 220ms var(--ease-smooth);
+  transition: max-height 200ms var(--ease-smooth), opacity 180ms var(--ease-smooth), transform 180ms var(--ease-smooth);
 }
 
 .map-legend.collapsed #map-legend {
@@ -619,13 +619,12 @@ body::before {
   font-size: 12px;
   text-align: left;
   cursor: pointer;
-  transition: background-color 180ms var(--ease-smooth), border-color 180ms var(--ease-smooth), opacity 180ms var(--ease-smooth), transform 180ms var(--ease-smooth);
+  transition: background-color 180ms var(--ease-smooth), border-color 180ms var(--ease-smooth), opacity 180ms var(--ease-smooth);
 }
 
 .legend-item:hover {
   background: rgba(247, 250, 252, 0.98);
   border-color: rgba(11, 37, 69, 0.22);
-  transform: translateY(-1px);
 }
 
 .legend-item.is-hidden {
@@ -730,12 +729,16 @@ body::before {
 }
 
 .map-view.panel-open {
-  width: 65%;
+  width: 100%;
 }
 
 .context-panel {
-  width: 35%;
-  height: 100%;
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  bottom: 24px;
+  width: min(430px, calc(100vw - 48px));
+  height: auto;
   background: var(--c-surface);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -747,6 +750,7 @@ body::before {
   display: none;
   opacity: 0;
   transform: translateX(40px);
+  z-index: 1050;
 }
 
 .context-panel.active {
@@ -763,9 +767,18 @@ body::before {
 }
 
 body.context-open .filter-menu {
+  opacity: 0.02;
+  pointer-events: none;
+  transform: translate(-50%, 12px);
+}
+
+body.context-open .map-legend,
+body.context-open .map-fullscreen-btn,
+body.context-open #partner-panel,
+body.context-open #btn-show-partners {
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, 18px);
+  transform: translateY(6px);
 }
 
 .status-bar {

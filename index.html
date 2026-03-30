@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8" />
@@ -106,14 +106,14 @@
                 <button class="btn-flat active" data-filter="all" data-i18n="filter_all" data-magnetic>Всі
                     об'єкти</button>
                 <div class="community-filter">
-                    <label class="t-data text-muted" for="location-quick-search">ШВИДКИЙ ПЕРЕХІД</label>
+                    <label class="t-data text-muted" for="location-quick-search" data-i18n="quick_jump_label">Quick Jump</label>
                     <div class="community-quick-row">
                         <input id="location-quick-search" type="text" list="location-quick-options"
-                            placeholder="Напр.: Одеса, Одеська міська..." />
-                        <button id="btn-location-quick-go" class="btn-flat" type="button">Перейти</button>
+                            placeholder="E.g. Odesa, Odeska city..." data-i18n-placeholder="quick_jump_placeholder" />
+                        <button id="btn-location-quick-go" class="btn-flat" type="button" data-i18n="go_btn">Go</button>
                     </div>
                     <datalist id="location-quick-options"></datalist>
-                    <label class="t-data text-muted" for="community-select">ГРОМАДА / РАЙОН</label>
+                    <label class="t-data text-muted" for="community-select" data-i18n="community_label">Community</label>
                     <select id="community-select"></select>
                 </div>
             </div>
@@ -297,7 +297,7 @@
                 <button id="btn-map-fullscreen" class="map-fullscreen-btn">На весь екран</button>
                 <div class="partner-logos" id="partner-panel"
                     style="position: absolute; bottom: 16px; left: 16px; background: #FFFFFF; border-radius: 8px; padding: 10px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid var(--c-divider); display: flex; align-items: center; gap: 20px; transition: all 0.5s ease; width: fit-content; max-width: 80vw;">
-                    <button id="btn-hide-partners"
+                    <button id="btn-hide-partners" data-i18n="hide_partners"
                         style="position: absolute; top: -8px; right: -8px; padding: 4px 10px; border-radius: 100px; background: var(--c-admiralty); color: white; border: none; font-size: 9px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); z-index: 11; text-transform: uppercase;">ПРИХОВАТИ</button>
                     <div id="partner-logos-inner"
                         style="display: flex; align-items: center; gap: 20px; overflow: hidden;">
@@ -310,7 +310,7 @@
                             onerror="this.style.display='none'" />
                     </div>
                 </div>
-                <button id="btn-show-partners"
+                <button id="btn-show-partners" data-i18n="show_partners"
                     style="display: none; position: absolute; bottom: 24px; left: 24px; background: var(--c-surface); backdrop-filter: blur(8px); border-radius: var(--radius-md); padding: 10px 16px; border: 1px solid rgba(255,255,255,0.4); box-shadow: var(--shadow-float); color: var(--c-admiralty); font-size: 12px; font-weight: 600;">ПОКАЗАТИ
                     ПАРТНЕРІВ</button>
                 <div id="route-line-toolbar" class="route-line-toolbar" style="display:none;">
@@ -341,7 +341,7 @@
             <div class="context-panel hidden" id="context-panel">
                 <!-- Information Card will be injected via JS -->
                 <div class="card card-3d" style="padding: 24px;">
-                    <p class="t-body text-muted">Оберіть об'єкт на карті для детальної інформації.</p>
+                    <p class="t-body text-muted">Select a map object to view detailed information.</p>
                 </div>
             </div>
         </div>

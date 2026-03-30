@@ -344,7 +344,7 @@ function showInfoCard(data) {
     ? `
       <hr style="border: 0; border-top: 1px solid var(--c-divider);">
       <div style="display:flex; flex-direction:column; gap:10px;">
-        <div class="t-label text-muted">Детальні пункти</div>
+        <div class="t-label text-muted">Detailed sections</div>
         ${sections
       .map((section, idx) => {
         const sectionPhoto = section.photoUrl
@@ -352,7 +352,7 @@ function showInfoCard(data) {
           : '';
         return `
               <article style="border:1px solid var(--c-divider); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px;">
-                <div class="t-data text-muted">Пункт ${idx + 1}</div>
+                <div class="t-data text-muted">Section ${idx + 1}</div>
                 ${section.title ? `<div class="t-body"><strong>${escapeHtml(section.title)}</strong></div>` : ''}
                 ${section.description ? `<div class="t-body">${escapeHtml(section.description)}</div>` : ''}
                 ${sectionPhoto}
@@ -366,30 +366,30 @@ function showInfoCard(data) {
 
   panel.innerHTML = `
     <div class="card card-3d" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; position: relative;">
-      <button id="btn-close-context-panel" class="btn-flat context-close-btn" type="button">Закрити</button>
+      <button id="btn-close-context-panel" class="btn-flat context-close-btn" type="button">Close</button>
       <div style="height: 160px; background: ${data.photoUrl
       ? `url('${data.photoUrl}') center/cover`
       : 'linear-gradient(130deg, #dbeafe 0%, #f8fafc 100%)'
     }; border-radius: var(--radius-md);"></div>
       <div>
         <h2 class="t-h2" style="display: flex; align-items: center;">${data.title}</h2>
-        <div class="t-label text-muted" style="margin-top: 4px;">${data.district || 'Одеська область'}</div>
+        <div class="t-label text-muted" style="margin-top: 4px;">${data.district || 'Odesa Region'}</div>
       </div>
       <hr style="border: 0; border-top: 1px solid var(--c-divider);">
       <div>
-        <div class="t-data text-muted" style="margin-bottom: 8px;">ТИП ТОЧКИ:</div>
-        <div class="t-body">${data.pointType.labelUk}</div>
+        <div class="t-data text-muted" style="margin-bottom: 8px;">POINT TYPE:</div>
+        <div class="t-body">${data.pointType.labelEn || data.pointType.labelUk || '-'}</div>
       </div>
       <hr style="border: 0; border-top: 1px solid var(--c-divider);">
       <div>
-        <div class="t-label text-muted" style="margin-bottom: 4px;">Коментар:</div>
-        <div class="t-body">${data.description || 'Без коментаря'}</div>
+        <div class="t-label text-muted" style="margin-bottom: 4px;">Comment:</div>
+        <div class="t-body">${data.description || 'No comment'}</div>
       </div>
       ${sectionsMarkup}
       <hr style="border: 0; border-top: 1px solid var(--c-divider);">
       <div style="display:flex; flex-direction: column; gap: 4px;">
-        <div class="t-data">Координати: ${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}</div>
-        <div class="t-data text-muted">Додано: ${data.createdAt ? data.createdAt.slice(0, 10) : '-'}</div>
+        <div class="t-data">Coordinates: ${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}</div>
+        <div class="t-data text-muted">Created: ${data.createdAt ? data.createdAt.slice(0, 10) : '-'}</div>
       </div>
     </div>
   `;
@@ -1322,12 +1322,16 @@ export async function initMap(options = {}) {
 
   if (L.markerClusterGroup) {
     markerLayer = L.markerClusterGroup({
-      spiderfyOnMaxZoom: true,
+      spiderfyOnMaxZoom: false,
       showCoverageOnHover: false,
-      zoomToBoundsOnClick: true,
+      zoomToBoundsOnClick: false,
       maxClusterRadius: 50,
       disableClusteringAtZoom: 13
     }).addTo(map);
+    markerLayer.on('clusterclick', (event) => {
+      event?.originalEvent?.preventDefault?.();
+      event?.originalEvent?.stopPropagation?.();
+    });
   } else {
     markerLayer = L.layerGroup().addTo(map);
   }
