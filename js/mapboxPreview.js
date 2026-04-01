@@ -131,73 +131,81 @@ async function ensurePointsLayer() {
   }
   const pointCollection = buildPointFeatureCollection();
 
-  map.addSource('preview-points', {
-    type: 'geojson',
-    data: pointCollection,
-    cluster: true,
-    clusterRadius: 55,
-    clusterMaxZoom: 11,
-  });
+  if (!map.getSource('preview-points')) {
+    map.addSource('preview-points', {
+      type: 'geojson',
+      data: pointCollection,
+      cluster: true,
+      clusterRadius: 55,
+      clusterMaxZoom: 11,
+    });
+  }
 
-  map.addLayer({
-    id: 'preview-clusters',
-    type: 'circle',
-    source: 'preview-points',
-    filter: ['has', 'point_count'],
-    paint: {
-      'circle-color': '#13315C',
-      'circle-stroke-color': '#FFFFFF',
-      'circle-stroke-width': 2,
-      'circle-opacity': 0.88,
-      'circle-radius': [
-        'step',
-        ['get', 'point_count'],
-        16,
-        30,
-        20,
-        100,
-        24,
-      ],
-    },
-  });
+  if (!map.getLayer('preview-clusters')) {
+    map.addLayer({
+      id: 'preview-clusters',
+      type: 'circle',
+      source: 'preview-points',
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': '#13315C',
+        'circle-stroke-color': '#FFFFFF',
+        'circle-stroke-width': 2,
+        'circle-opacity': 0.88,
+        'circle-radius': [
+          'step',
+          ['get', 'point_count'],
+          16,
+          30,
+          20,
+          100,
+          24,
+        ],
+      },
+    });
+  }
 
-  map.addLayer({
-    id: 'preview-cluster-count',
-    type: 'symbol',
-    source: 'preview-points',
-    filter: ['has', 'point_count'],
-    layout: {
-      'text-field': ['to-string', ['get', 'point_count']],
-      'text-size': 12,
-      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-    },
-    paint: {
-      'text-color': '#FFFFFF',
-    },
-  });
+  if (!map.getLayer('preview-cluster-count')) {
+    map.addLayer({
+      id: 'preview-cluster-count',
+      type: 'symbol',
+      source: 'preview-points',
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': ['to-string', ['get', 'point_count']],
+        'text-size': 12,
+        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+      },
+      paint: {
+        'text-color': '#FFFFFF',
+      },
+    });
+  }
 
-  map.addLayer({
-    id: 'preview-unclustered',
-    type: 'circle',
-    source: 'preview-points',
-    filter: ['!', ['has', 'point_count']],
-    paint: {
-      'circle-color': '#E7C769',
-      'circle-stroke-color': '#13315C',
-      'circle-stroke-width': 1,
-      'circle-radius': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        6,
-        3,
-        11,
-        5,
-        14,
-        7,
-      ],
-    },
-  });
+  if (!map.getLayer('preview-unclustered')) {
+    map.addLayer({
+      id: 'preview-unclustered',
+      type: 'circle',
+      source: 'preview-points',
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-color': '#E7C769',
+        'circle-stroke-color': '#13315C',
+        'circle-stroke-width': 1,
+        'circle-radius': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          6,
+          3,
+          11,
+          5,
+          14,
+          7,
+        ],
+      },
+    });
+  }
 
   pointsLoaded = true;
   setStatus(`Mapbox points: ${pointCollection.features.length}`);
@@ -216,6 +224,7 @@ function ensure3DBuildingsLayer() {
   if (!map || !map.isStyleLoaded()) return;
   const layerId = 'preview-3d-buildings';
   if (map.getLayer(layerId)) return;
+  if (!map.getSource('composite')) return;
   const styleLayers = map.getStyle()?.layers || [];
   const labelLayerId = styleLayers.find((l) => l.type === 'symbol' && l.layout?.['text-field'])?.id;
   map.addLayer(
@@ -369,13 +378,35 @@ export function setMapboxPoints(points = []) {
 async function handleStyleReady() {
   if (!map || !map.isStyleLoaded()) return;
   setStatus('Mapbox: style loaded');
-  applyTimePreset();
-  ensure3DBuildingsLayer();
-  ensureFocusBoundaryLayers();
-  updateFocusBoundarySource();
-  await ensurePointsLayer();
-  updatePointsSource();
-  if (is3DMode) setMapboxPerspective(true);
+  try {
+    applyTimePreset();
+  } catch (_e) {
+    // noop
+  }
+  try {
+    ensureFocusBoundaryLayers();
+    updateFocusBoundarySource();
+  } catch (_e) {
+    // noop
+  }
+  try {
+    ensure3DBuildingsLayer();
+  } catch (_e) {
+    // do not block points render
+  }
+  try {
+    await ensurePointsLayer();
+    updatePointsSource();
+  } catch (_e) {
+    setStatus('Mapbox: points layer error');
+  }
+  if (is3DMode) {
+    try {
+      setMapboxPerspective(true);
+    } catch (_e) {
+      // noop
+    }
+  }
 }
 
 export async function setMapboxStyle(styleKey = 'standard') {
