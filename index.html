@@ -87,6 +87,8 @@
                         style="text-decoration: none; color: var(--c-text-primary);">ЗАПРОПОНУВАТИ ТОЧКУ</a>
                     <a href="#" class="t-nav" id="btn-lang-toggle" data-magnetic
                         style="text-decoration: none; color: var(--c-text-primary);">UA / EN</a>
+                    <a href="#" class="t-nav" id="btn-map-engine-toggle" data-magnetic
+                        style="text-decoration: none; color: var(--c-text-primary);">MAPBOX PREVIEW</a>
                 </nav>
                 <div id="auth-state-badge" class="auth-state-badge t-data text-muted">НЕ АВТОРИЗОВАНО</div>
                 <button id="btn-auth" class="btn-primary" data-i18n="login_btn" data-magnetic>УВІЙТИ &rarr;</button>
@@ -336,6 +338,10 @@
                 <div class="card card-3d" style="padding: 24px;">
                     <p class="t-body text-muted">Оберіть об'єкт на карті для детальної інформації.</p>
                 </div>
+            </div>
+            <div class="mapbox-preview-wrap" id="mapbox-preview-wrap" style="display:none;">
+                <div id="mapbox-map"></div>
+                <div id="mapbox-status" class="mapbox-status" style="display:none;"></div>
             </div>
         </div>
 

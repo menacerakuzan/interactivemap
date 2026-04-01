@@ -392,6 +392,47 @@ body::before {
   transition: transform var(--t-fast) var(--ease-smooth);
 }
 
+.mapbox-preview-wrap {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  z-index: 1;
+  background: #f6f8fb;
+}
+
+#mapbox-map {
+  position: absolute;
+  inset: 0;
+}
+
+.mapbox-status {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(19, 49, 92, 0.92);
+  color: #fff;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  white-space: nowrap;
+}
+
+body.mapbox-preview-active .filter-menu,
+body.mapbox-preview-active .specialist-panel,
+body.mapbox-preview-active .map-legend,
+body.mapbox-preview-active .map-fullscreen-btn,
+body.mapbox-preview-active .route-line-toolbar,
+body.mapbox-preview-active #partner-panel,
+body.mapbox-preview-active #btn-show-partners {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .map-legend {
   position: absolute;
   top: 88px;

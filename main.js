@@ -1,5 +1,6 @@
 import { initLenis, initInteractions } from './js/globalEffects.js';
 import { initMap } from './js/mapInit.js';
+import { ensureMapboxPreview, resizeMapboxPreview } from './js/mapboxPreview.js';
 import { dataService } from './js/dataService.js';
 import { COMMUNITIES_BY_DISTRICT, DISTRICT_CENTERS } from './js/communities.js';
 
@@ -36,6 +37,8 @@ const translations = {
     go_btn: 'Перейти',
     hide_partners: 'ПРИХОВАТИ',
     community_all: 'Усі громади',
+    mapbox_preview_btn: 'MAPBOX PREVIEW',
+    leaflet_mode_btn: 'LEAFLET MODE',
   },
   en: {
     page_title: 'Odesa Region',
@@ -69,6 +72,8 @@ const translations = {
     go_btn: 'Go',
     hide_partners: 'HIDE',
     community_all: 'All communities',
+    mapbox_preview_btn: 'MAPBOX PREVIEW',
+    leaflet_mode_btn: 'LEAFLET MODE',
   },
 };
 
@@ -113,6 +118,7 @@ let legendPointsSyncBound = false;
 const hiddenPointTypeCodes = new Set();
 let communityCentersIndexPromise = null;
 let boundaryGeoIndexPromise = null;
+let currentMapEngine = 'leaflet';
 const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
@@ -195,6 +201,14 @@ function normalizeMarkerFileKey(value) {
 const RAW_MARKER_URL_BY_NORMALIZED_FILE = Object.fromEntries(
   Object.entries(RAW_MARKER_URL_BY_FILE).map(([fileName, url]) => [normalizeMarkerFileKey(fileName), url])
 );
+
+const COMMUNITY_NAME_ALIAS_BY_KEY = {
+  'бессарабська селищна': 'тарутинська селищна',
+  'криниченська сільська': 'криничненська сільська',
+  'южненська міська': 'південнівська міська',
+  'таірівська селищна': 'таіровська селищна',
+  'нерубаиська сільська': 'нерубаиська сільська',
+};
 
 const MARKER_URL_BY_FILE = EXPECTED_MARKER_FILES.reduce((acc, expectedFileName) => {
   const expectedNormalized = normalizeMarkerFileKey(expectedFileName);
@@ -574,6 +588,14 @@ function updateLanguage(lang) {
   });
   document.body.setAttribute('lang', lang);
   populateCommunitiesSelect();
+  syncMapEngineButton();
+}
+
+function syncMapEngineButton() {
+  const button = document.getElementById('btn-map-engine-toggle');
+  if (!button) return;
+  const key = currentMapEngine === 'mapbox' ? 'leaflet_mode_btn' : 'mapbox_preview_btn';
+  button.textContent = translations[currentLang]?.[key] || 'MAPBOX PREVIEW';
 }
 
 function hasValidSupabaseSession(session) {
@@ -775,7 +797,9 @@ function getFeatureName(props = {}) {
 }
 
 function normalizeCommunityBoundaryName(value) {
-  return normalizeGeoText(value).replace(/\s+громада$/u, '').trim();
+  const rawKey = normalizeGeoText(value).replace(/\s+громада$/u, '').trim();
+  const alias = COMMUNITY_NAME_ALIAS_BY_KEY[rawKey] || rawKey;
+  return normalizeGeoText(alias).replace(/\s+громада$/u, '').trim();
 }
 
 function collectGeometryCoords(geometry, acc = []) {
@@ -1184,48 +1208,18 @@ async function geocodeCommunity(district, community) {
     };
   }
 
-  const cacheKey = `geo::v2::${district}::${community}`;
-  const cached = localStorage.getItem(cacheKey);
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch (_e) {
-      localStorage.removeItem(cacheKey);
-    }
-  }
-
   const centersIndex = await loadCommunityCentersIndex();
   const centerFromFile = centersIndex.get(buildCommunityCenterKey(district, community));
   if (centerFromFile) {
-    const localResult = {
+    return {
       lat: Number(centerFromFile.lat),
       lng: Number(centerFromFile.lng),
       zoom: Number(centerFromFile.zoom) > 0 ? Number(centerFromFile.zoom) : 13,
       geojson: null,
       source: centerFromFile.source || 'local_file',
     };
-    localStorage.setItem(cacheKey, JSON.stringify(localResult));
-    return localResult;
   }
-
-  try {
-    const query = encodeURIComponent(`${community}, ${district}, Odesa Oblast, Ukraine`);
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&limit=1&q=${query}`;
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (!Array.isArray(data) || !data.length) return null;
-    const result = {
-      lat: Number(data[0].lat),
-      lng: Number(data[0].lon),
-      zoom: 12,
-      geojson: data[0].geojson || null,
-    };
-    localStorage.setItem(cacheKey, JSON.stringify(result));
-    return result;
-  } catch (_e) {
-    return null;
-  }
+  return null;
 }
 
 async function geocodeDistrict(district) {
@@ -1241,35 +1235,7 @@ async function geocodeDistrict(district) {
       source: 'boundary_geojson',
     };
   }
-
-  const cacheKey = `geo::district::${district}`;
-  const cached = localStorage.getItem(cacheKey);
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch (_e) {
-      localStorage.removeItem(cacheKey);
-    }
-  }
-
-  try {
-    const query = encodeURIComponent(`${district}, Odesa Oblast, Ukraine`);
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&limit=1&q=${query}`;
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (!Array.isArray(data) || !data.length) return null;
-    const result = {
-      lat: Number(data[0].lat),
-      lng: Number(data[0].lon),
-      zoom: 11,
-      geojson: data[0].geojson || null,
-    };
-    localStorage.setItem(cacheKey, JSON.stringify(result));
-    return result;
-  } catch (_e) {
-    return null;
-  }
+  return null;
 }
 
 function setActiveSpecialistTab(tabName) {
@@ -3970,8 +3936,42 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const btnLangToggle = document.getElementById('btn-lang-toggle');
+  const btnMapEngineToggle = document.getElementById('btn-map-engine-toggle');
   const btnNewsScroll = document.getElementById('btn-news-scroll');
   const btnProposalScroll = document.getElementById('btn-proposal-scroll');
+  const leafletMapView = document.getElementById('map');
+  const mapboxPreviewWrap = document.getElementById('mapbox-preview-wrap');
+  const contextPanel = document.getElementById('context-panel');
+
+  const setMapEngine = async (engine) => {
+    currentMapEngine = engine === 'mapbox' ? 'mapbox' : 'leaflet';
+    const isMapbox = currentMapEngine === 'mapbox';
+    document.body.classList.toggle('mapbox-preview-active', isMapbox);
+
+    if (leafletMapView) leafletMapView.style.display = isMapbox ? 'none' : 'block';
+    if (mapboxPreviewWrap) mapboxPreviewWrap.style.display = isMapbox ? 'block' : 'none';
+    if (contextPanel) contextPanel.style.display = isMapbox ? 'none' : '';
+
+    if (isMapbox) {
+      await ensureMapboxPreview();
+      setTimeout(() => {
+        resizeMapboxPreview();
+      }, 60);
+    } else {
+      mapController?.refresh?.().catch(() => null);
+      window.dispatchEvent(new Event('resize'));
+    }
+
+    syncMapEngineButton();
+  };
+
+  if (btnMapEngineToggle) {
+    btnMapEngineToggle.addEventListener('click', async (event) => {
+      event.preventDefault();
+      const next = currentMapEngine === 'leaflet' ? 'mapbox' : 'leaflet';
+      await setMapEngine(next);
+    });
+  }
   if (btnLangToggle) {
     btnLangToggle.addEventListener('click', (e) => {
       e.preventDefault();
@@ -4001,6 +4001,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   updateLanguage(currentLang);
+  syncMapEngineButton();
+  await setMapEngine('leaflet');
   if (dataService.mode === 'supabase' && hasValidSupabaseSession(authSession)) {
     try {
       await dataService.restoreAuthSession?.(authSession);
