@@ -4033,7 +4033,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (isMapbox) {
       mapController?.refresh?.().catch(() => null);
-      setMapboxPoints(dashboardPoints);
+      let pointsForMapbox = Array.isArray(dashboardPoints) ? dashboardPoints : [];
+      if (!pointsForMapbox.length) {
+        try {
+          const rows = await apiRequest('/api/points');
+          pointsForMapbox = (rows || []).map((point) => normalizePointRecord(point));
+          dashboardPoints = pointsForMapbox;
+        } catch (_e) {
+          // keep current in-memory points if request fails
+        }
+      }
+      setMapboxPoints(pointsForMapbox);
       const preview = await ensureMapboxPreview();
       if (!preview?.ok) {
         currentMapEngine = 'leaflet';
@@ -4049,6 +4059,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
         return;
       }
+      setMapboxPoints(pointsForMapbox);
       setTimeout(() => {
         resizeMapboxPreview();
       }, 60);

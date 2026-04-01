@@ -18,6 +18,18 @@ let focusBoundaryData = {
   features: [],
 };
 
+function ensureStatusNode() {
+  let node = document.getElementById('mapbox-status');
+  if (node) return node;
+  const wrap = document.getElementById('mapbox-preview-wrap');
+  if (!wrap) return null;
+  node = document.createElement('div');
+  node.id = 'mapbox-status';
+  node.className = 'mapbox-status';
+  wrap.appendChild(node);
+  return node;
+}
+
 function getToken() {
   return (
     import.meta.env.VITE_MAPBOX_TOKEN
@@ -28,15 +40,11 @@ function getToken() {
 }
 
 function setStatus(message = '') {
-  const node = document.getElementById('mapbox-status');
+  const node = ensureStatusNode();
   if (!node) return;
-  if (!message) {
-    node.style.display = 'none';
-    node.textContent = '';
-    return;
-  }
+  const finalMessage = String(message || 'Mapbox active');
   node.style.display = 'block';
-  node.textContent = message;
+  node.textContent = finalMessage;
 }
 
 function normalizeApiPoint(point) {
@@ -360,7 +368,7 @@ export function setMapboxPoints(points = []) {
 
 async function handleStyleReady() {
   if (!map || !map.isStyleLoaded()) return;
-  setStatus('');
+  setStatus('Mapbox: style loaded');
   applyTimePreset();
   ensure3DBuildingsLayer();
   ensureFocusBoundaryLayers();
@@ -391,6 +399,7 @@ export async function ensureMapboxPreview() {
   }
 
   mapboxgl.accessToken = token;
+  setStatus('Mapbox: initializing...');
 
   if (!map) {
     map = new mapboxgl.Map({
