@@ -424,27 +424,71 @@ body::before {
 }
 
 .mapbox-dom-point {
-  width: 13px;
-  height: 13px;
+  width: var(--mapbox-point-size, 11px);
+  height: var(--mapbox-point-size, 11px);
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  opacity: var(--mapbox-point-opacity, 1);
+  will-change: width, height, opacity, transform;
+  transition: width 120ms ease, height 120ms ease, opacity 140ms ease, transform 120ms ease;
+  cursor: pointer;
+  transform: translateZ(0);
+}
+
+.mapbox-dom-point.is-hidden {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+.mapbox-dom-point .dot {
+  position: absolute;
+  inset: 0;
   border-radius: 999px;
   background: var(--point-color, #E7C769);
   border: 2px solid rgba(255, 255, 255, 0.95);
   box-shadow: 0 0 0 1px rgba(11, 37, 69, 0.25);
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.mapbox-dom-point img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 160ms ease, transform 160ms ease;
+  pointer-events: none;
+}
+
+.mapbox-dom-point.is-svg .dot {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+.mapbox-dom-point.is-svg img {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.mapbox-dom-point.is-dot .dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.mapbox-dom-point.is-dot img {
+  opacity: 0;
+  transform: scale(0.9);
 }
 
 body.mapbox-preview-active .filter-menu {
   opacity: 1 !important;
   pointer-events: auto !important;
-}
-
-body.mapbox-preview-active .specialist-panel,
-body.mapbox-preview-active .map-legend,
-body.mapbox-preview-active .map-fullscreen-btn,
-body.mapbox-preview-active .route-line-toolbar,
-body.mapbox-preview-active #partner-panel,
-body.mapbox-preview-active #btn-show-partners {
-  opacity: 0 !important;
-  pointer-events: none !important;
 }
 
 .map-legend {

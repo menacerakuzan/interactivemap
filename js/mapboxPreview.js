@@ -8,17 +8,60 @@ const MAPBOX_STYLES = {
   streets: 'mapbox://styles/mapbox/streets-v12',
   dark: 'mapbox://styles/mapbox/dark-v11',
 };
+const POINT_TYPE_MARKER_FILE = {
+  school: 'education.svg',
+  administration: 'administration.svg',
+  trade_objects: 'trade_objects.svg',
+  cnap: 'cnap.svg',
+  fuel_station: 'fuel_station.svg',
+  pharmacy: 'pharmacy.svg',
+  bank: 'bank.svg',
+  station: 'station.svg',
+  housing: 'housing.svg',
+  stop_a: 'stop_a.svg',
+  stop_p: 'stop_p.svg',
+  stop_t: 'stop_t.svg',
+  transport_stop: 'stop_t.svg',
+  cafe: 'cafe.svg',
+  culture: 'culture.svg',
+  playground: 'playground.svg',
+  medical: 'medical.svg',
+  education: 'education.svg',
+  street: 'crossing.svg',
+  square: 'crossing.svg',
+  hotel: 'hotel.svg',
+  park: 'park.svg',
+  hairdresser: 'hairdresser.svg',
+  post: 'post.svg',
+  restaurant: 'restaurant.svg',
+  social_services: 'social_services.svg',
+  sport: 'sport.svg',
+  shelter: 'shelter.svg',
+  other: 'social_services.svg',
+};
+const ZOOM_SWITCH = {
+  clusterMax: 10.8,
+  svgMin: 13.0,
+};
 let map = null;
 let pointsLoaded = false;
 let is3DMode = false;
 let allPoints = [];
 let currentStyleKey = 'standard';
 let pointsBridgeBound = false;
-let domPointMarkers = [];
+const domPointMarkers = new Map();
+let markerVisualBound = false;
+let markerVisualRaf = 0;
+let markerVisualMode = 'cluster';
+let unclusteredClickBound = false;
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
 };
+const MARKER_MODULES = import.meta.glob('../assets/markers/*.svg', { eager: true, import: 'default' });
+const MARKER_URL_BY_FILE = Object.fromEntries(
+  Object.entries(MARKER_MODULES).map(([modulePath, url]) => [modulePath.split('/').pop(), url])
+);
 
 function ensureStatusNode() {
   let node = document.getElementById('mapbox-status');
@@ -70,31 +113,124 @@ function normalizeApiPoint(point) {
   };
 }
 
+function resolvePointMarkerUrl(point) {
+  const code = String(point?.pointType?.code || '').trim();
+  const fileName = POINT_TYPE_MARKER_FILE[code] || POINT_TYPE_MARKER_FILE.other;
+  return MARKER_URL_BY_FILE[fileName] || '';
+}
+
 function clearDomPointMarkers() {
-  if (!domPointMarkers.length) return;
-  domPointMarkers.forEach((marker) => {
+  if (!domPointMarkers.size) return;
+  domPointMarkers.forEach(({ marker }) => {
     try {
       marker.remove();
     } catch (_e) {
       // noop
     }
   });
-  domPointMarkers = [];
+  domPointMarkers.clear();
+}
+
+function buildPointMarkerKey(point, index = 0) {
+  const id = Number(point?.id);
+  if (Number.isFinite(id) && id > 0) return `id:${id}`;
+  const lat = Number(point?.lat);
+  const lng = Number(point?.lng);
+  return `idx:${index}:${lat.toFixed(6)}:${lng.toFixed(6)}`;
+}
+
+function updateDomMarkerVisualScale() {
+  markerVisualRaf = 0;
+  if (!map) return;
+  const z = Number(map.getZoom() || 10);
+  const isClusterMode = z < ZOOM_SWITCH.clusterMax;
+  const isSvgMode = z >= ZOOM_SWITCH.svgMin;
+  markerVisualMode = isClusterMode ? 'cluster' : isSvgMode ? 'svg' : 'dot';
+  const size = isSvgMode ? Math.max(18, Math.min(30, 18 + (z - ZOOM_SWITCH.svgMin) * 2.1)) : Math.max(7, Math.min(14, 7 + (z - 9) * 1.2));
+  const opacity = isClusterMode ? 0 : 1;
+  const container = map.getContainer?.();
+  if (!container) return;
+  container.style.setProperty('--mapbox-point-size', `${size.toFixed(2)}px`);
+  container.style.setProperty('--mapbox-point-opacity', `${opacity}`);
+  container.dataset.pointMode = markerVisualMode;
+
+  const clusterVisibility = isClusterMode ? 'visible' : 'none';
+  const circleVisibility = isClusterMode ? 'visible' : 'none';
+  ['preview-clusters', 'preview-cluster-count'].forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, 'visibility', clusterVisibility);
+    }
+  });
+  if (map.getLayer('preview-unclustered')) {
+    map.setLayoutProperty('preview-unclustered', 'visibility', circleVisibility);
+  }
+
+  domPointMarkers.forEach(({ element, point }) => {
+    if (!element) return;
+    element.classList.toggle('is-hidden', isClusterMode);
+    element.classList.toggle('is-svg', !isClusterMode && isSvgMode);
+    element.classList.toggle('is-dot', !isClusterMode && !isSvgMode);
+    if (!isClusterMode && isSvgMode) {
+      const markerUrl = resolvePointMarkerUrl(point);
+      const img = element.querySelector('img');
+      if (img && markerUrl && img.getAttribute('src') !== markerUrl) {
+        img.setAttribute('src', markerUrl);
+      }
+    }
+  });
+}
+
+function scheduleDomMarkerVisualScale() {
+  if (markerVisualRaf) return;
+  markerVisualRaf = requestAnimationFrame(updateDomMarkerVisualScale);
+}
+
+function bindMarkerVisualScale() {
+  if (!map || markerVisualBound) return;
+  markerVisualBound = true;
+  map.on('zoom', scheduleDomMarkerVisualScale);
+  map.on('zoomend', scheduleDomMarkerVisualScale);
+  map.on('moveend', scheduleDomMarkerVisualScale);
+  scheduleDomMarkerVisualScale();
 }
 
 function syncDomPointMarkers() {
   if (!map) return;
-  clearDomPointMarkers();
+  bindMarkerVisualScale();
+
+  const nextKeys = new Set();
   const points = Array.isArray(allPoints) ? allPoints : [];
-  points.forEach((point) => {
+  points.forEach((point, index) => {
     const lat = Number(point?.lat);
     const lng = Number(point?.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const key = buildPointMarkerKey(point, index);
+    nextKeys.add(key);
+    const existing = domPointMarkers.get(key);
+    if (existing?.marker) {
+      existing.marker.setLngLat([lng, lat]);
+      if (existing.element) {
+        existing.element.style.setProperty('--point-color', point?.color || '#E7C769');
+        existing.element.setAttribute('title', String(point?.title || 'Point'));
+      }
+      existing.point = point;
+      return;
+    }
 
     const markerEl = document.createElement('div');
     markerEl.className = 'mapbox-dom-point';
     markerEl.style.setProperty('--point-color', point?.color || '#E7C769');
     markerEl.setAttribute('title', String(point?.title || 'Point'));
+    markerEl.innerHTML = '<span class="dot"></span><img alt="" loading="lazy" decoding="async" />';
+    markerEl.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      window.dispatchEvent(
+        new CustomEvent('mapbox:point-click', {
+          detail: { pointId: Number(point?.id) || null },
+        })
+      );
+    });
 
     const marker = new mapboxgl.Marker({
       element: markerEl,
@@ -103,8 +239,19 @@ function syncDomPointMarkers() {
       .setLngLat([lng, lat])
       .addTo(map);
 
-    domPointMarkers.push(marker);
+    domPointMarkers.set(key, { marker, element: markerEl, point });
   });
+
+  Array.from(domPointMarkers.entries()).forEach(([key, value]) => {
+    if (nextKeys.has(key)) return;
+    try {
+      value.marker?.remove?.();
+    } catch (_e) {
+      // noop
+    }
+    domPointMarkers.delete(key);
+  });
+  scheduleDomMarkerVisualScale();
 }
 
 function collectGeometryCoords(geometry, acc = []) {
@@ -272,6 +419,18 @@ async function ensurePointsLayer() {
 
   pointsLoaded = true;
   setStatus(`Mapbox points: ${pointCollection.features.length}`);
+  if (!unclusteredClickBound && map.getLayer('preview-unclustered')) {
+    unclusteredClickBound = true;
+    map.on('click', 'preview-unclustered', (event) => {
+      const feature = event?.features?.[0];
+      const pointId = Number(feature?.properties?.id);
+      window.dispatchEvent(
+        new CustomEvent('mapbox:point-click', {
+          detail: { pointId: Number.isFinite(pointId) ? pointId : null },
+        })
+      );
+    });
+  }
 }
 
 function updatePointsSource() {

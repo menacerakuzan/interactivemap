@@ -50,7 +50,7 @@ const translations = {
     go_btn: 'Перейти',
     hide_partners: 'ПРИХОВАТИ',
     community_all: 'Усі громади',
-    mapbox_preview_btn: 'MAPBOX PREVIEW',
+    mapbox_preview_btn: 'MAPBOX MODE',
     leaflet_mode_btn: 'LEAFLET MODE',
     mapbox_3d_btn: '3D',
     mapbox_2d_btn: '2D',
@@ -87,7 +87,7 @@ const translations = {
     go_btn: 'Go',
     hide_partners: 'HIDE',
     community_all: 'All communities',
-    mapbox_preview_btn: 'MAPBOX PREVIEW',
+    mapbox_preview_btn: 'MAPBOX MODE',
     leaflet_mode_btn: 'LEAFLET MODE',
     mapbox_3d_btn: '3D',
     mapbox_2d_btn: '2D',
@@ -4034,7 +4034,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (leafletMapView) leafletMapView.style.display = isMapbox ? 'none' : 'block';
     if (mapboxPreviewWrap) mapboxPreviewWrap.style.display = isMapbox ? 'block' : 'none';
-    if (contextPanel) contextPanel.style.display = isMapbox ? 'none' : '';
+    if (contextPanel) contextPanel.style.display = '';
     if (btnMapbox3DToggle) btnMapbox3DToggle.style.display = isMapbox ? 'inline-flex' : 'none';
     if (btnMapboxStyleLight) btnMapboxStyleLight.style.display = isMapbox ? 'inline-flex' : 'none';
     if (btnMapboxStyleStreets) btnMapboxStyleStreets.style.display = isMapbox ? 'inline-flex' : 'none';
@@ -4102,6 +4102,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       await setMapEngine(next);
     });
   }
+  window.addEventListener('mapbox:point-click', (event) => {
+    const pointId = Number(event?.detail?.pointId);
+    if (!Number.isFinite(pointId)) return;
+    const point = (dashboardPoints || []).find((row) => Number(row?.id) === pointId);
+    if (!point) return;
+    mapController?.showPointDetails?.(point, { pan: false });
+  });
   if (btnMapbox3DToggle) {
     btnMapbox3DToggle.addEventListener('click', (event) => {
       event.preventDefault();

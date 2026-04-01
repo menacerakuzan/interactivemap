@@ -296,6 +296,21 @@ function bindPointInteraction(layer, point, lat, lng) {
   });
 }
 
+function showPointDetails(point, { pan = true } = {}) {
+  if (!point) return false;
+  const lat = Number(point?.lat);
+  const lng = Number(point?.lng);
+  if (pan && map && Number.isFinite(lat) && Number.isFinite(lng)) {
+    map.panTo([lat, lng], {
+      animate: true,
+      duration: 0.35,
+      easeLinearity: 0.25,
+    });
+  }
+  showInfoCard(point);
+  return true;
+}
+
 function renderPoints(points = [], { emitUpdateEvent = true } = {}) {
   if (!markerLayer) return;
   markerLayer.clearLayers();
@@ -1282,6 +1297,7 @@ export async function initMap(options = {}) {
       setLineDraftFromPoints,
       getLineDraftSnapshot,
       applyLineDraftToRoute,
+      showPointDetails,
     };
   }
 
@@ -1411,5 +1427,6 @@ export async function initMap(options = {}) {
     setLineDraftFromPoints,
     getLineDraftSnapshot,
     applyLineDraftToRoute,
+    showPointDetails,
   };
 }
