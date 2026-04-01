@@ -8,6 +8,8 @@ import {
   focusMapboxBoundary,
   focusMapboxLocation,
   resetMapboxView,
+  setMapboxPerspective,
+  getMapboxPerspective,
 } from './js/mapboxPreview.js';
 import { dataService } from './js/dataService.js';
 import { COMMUNITIES_BY_DISTRICT, DISTRICT_CENTERS } from './js/communities.js';
@@ -47,6 +49,8 @@ const translations = {
     community_all: 'Усі громади',
     mapbox_preview_btn: 'MAPBOX PREVIEW',
     leaflet_mode_btn: 'LEAFLET MODE',
+    mapbox_3d_btn: '3D',
+    mapbox_2d_btn: '2D',
   },
   en: {
     page_title: 'Odesa Region',
@@ -82,6 +86,8 @@ const translations = {
     community_all: 'All communities',
     mapbox_preview_btn: 'MAPBOX PREVIEW',
     leaflet_mode_btn: 'LEAFLET MODE',
+    mapbox_3d_btn: '3D',
+    mapbox_2d_btn: '2D',
   },
 };
 
@@ -604,6 +610,11 @@ function syncMapEngineButton() {
   if (!button) return;
   const key = currentMapEngine === 'mapbox' ? 'leaflet_mode_btn' : 'mapbox_preview_btn';
   button.textContent = translations[currentLang]?.[key] || 'MAPBOX PREVIEW';
+  const btn3D = document.getElementById('btn-mapbox-3d-toggle');
+  if (btn3D) {
+    const key3d = getMapboxPerspective?.() ? 'mapbox_2d_btn' : 'mapbox_3d_btn';
+    btn3D.textContent = translations[currentLang]?.[key3d] || '3D';
+  }
 }
 
 function hasValidSupabaseSession(session) {
@@ -2617,7 +2628,10 @@ function bindFilterMenu() {
         if (currentMapEngine !== 'mapbox') {
           await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: '' });
         }
-        const districtGeo = await geocodeDistrict(district);
+        const boundaryIndex = await loadBoundaryGeoIndex();
+        const districtGeo =
+          boundaryIndex?.districtByName?.get(normalizeGeoText(district))
+          || (await geocodeDistrict(district));
         if (requestId !== locationFocusRequestId) return;
         if (currentMapEngine === 'mapbox') {
           const hasBoundary = districtGeo?.geojson ? setMapboxFocusBoundary(districtGeo.geojson) : false;
@@ -2660,7 +2674,13 @@ function bindFilterMenu() {
           await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: selectedCommunity });
         }
 
-        const geo = await geocodeCommunity(district, community);
+        const boundaryIndex = await loadBoundaryGeoIndex();
+        const districtKey = normalizeGeoText(district);
+        const communityKey = normalizeCommunityBoundaryName(community);
+        const boundaryGeo =
+          boundaryIndex?.communityByDistrictAndName?.get(`${districtKey}::${communityKey}`)
+          || boundaryIndex?.communityByName?.get(communityKey);
+        const geo = boundaryGeo || (await geocodeCommunity(district, community));
         if (requestId !== locationFocusRequestId) return;
         let hasBoundary = false;
         if (currentMapEngine === 'mapbox') {
@@ -3982,6 +4002,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const btnLangToggle = document.getElementById('btn-lang-toggle');
   const btnMapEngineToggle = document.getElementById('btn-map-engine-toggle');
+  const btnMapbox3DToggle = document.getElementById('btn-mapbox-3d-toggle');
   const btnNewsScroll = document.getElementById('btn-news-scroll');
   const btnProposalScroll = document.getElementById('btn-proposal-scroll');
   const leafletMapView = document.getElementById('map');
@@ -3996,6 +4017,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (leafletMapView) leafletMapView.style.display = isMapbox ? 'none' : 'block';
     if (mapboxPreviewWrap) mapboxPreviewWrap.style.display = isMapbox ? 'block' : 'none';
     if (contextPanel) contextPanel.style.display = isMapbox ? 'none' : '';
+    if (btnMapbox3DToggle) btnMapbox3DToggle.style.display = isMapbox ? 'inline-flex' : 'none';
 
     if (isMapbox) {
       const preview = await ensureMapboxPreview();
@@ -4029,6 +4051,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       event.preventDefault();
       const next = currentMapEngine === 'leaflet' ? 'mapbox' : 'leaflet';
       await setMapEngine(next);
+    });
+  }
+  if (btnMapbox3DToggle) {
+    btnMapbox3DToggle.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (currentMapEngine !== 'mapbox') return;
+      const next = !getMapboxPerspective();
+      setMapboxPerspective(next);
+      syncMapEngineButton();
     });
   }
   if (btnLangToggle) {

@@ -4,6 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 const ODESA_START = { lng: 30.7233, lat: 46.4825, zoom: 10.8 };
 let map = null;
 let pointsLoaded = false;
+let is3DMode = false;
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -165,6 +166,31 @@ async function ensurePointsLayer() {
   pointsLoaded = true;
 }
 
+function ensure3DBuildingsLayer() {
+  if (!map || !map.isStyleLoaded()) return;
+  const layerId = 'preview-3d-buildings';
+  if (map.getLayer(layerId)) return;
+  const styleLayers = map.getStyle()?.layers || [];
+  const labelLayerId = styleLayers.find((l) => l.type === 'symbol' && l.layout?.['text-field'])?.id;
+  map.addLayer(
+    {
+      id: layerId,
+      source: 'composite',
+      'source-layer': 'building',
+      filter: ['==', ['get', 'extrude'], 'true'],
+      type: 'fill-extrusion',
+      minzoom: 13,
+      paint: {
+        'fill-extrusion-color': '#c9d5e5',
+        'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 13, 0, 15.5, ['get', 'height']],
+        'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 13, 0, 15.5, ['get', 'min_height']],
+        'fill-extrusion-opacity': 0.78,
+      },
+    },
+    labelLayerId
+  );
+}
+
 function ensureFocusBoundaryLayers() {
   if (!map || !map.isStyleLoaded()) return;
 
@@ -248,6 +274,23 @@ export function resetMapboxView() {
   return true;
 }
 
+export function setMapboxPerspective(enabled) {
+  is3DMode = Boolean(enabled);
+  if (!map) return false;
+  if (map.isStyleLoaded()) ensure3DBuildingsLayer();
+  map.easeTo({
+    pitch: is3DMode ? 58 : 0,
+    bearing: is3DMode ? -18 : 0,
+    duration: 420,
+    essential: true,
+  });
+  return true;
+}
+
+export function getMapboxPerspective() {
+  return is3DMode;
+}
+
 export async function ensureMapboxPreview() {
   const container = document.getElementById('mapbox-map');
   if (!container) return { ok: false, reason: 'no_container' };
@@ -263,7 +306,7 @@ export async function ensureMapboxPreview() {
   if (!map) {
     map = new mapboxgl.Map({
       container,
-      style: 'mapbox://styles/mapbox/light-v11',
+      style: 'mapbox://styles/mapbox/streets-v12',
       center: [ODESA_START.lng, ODESA_START.lat],
       zoom: ODESA_START.zoom,
       pitchWithRotate: false,
@@ -274,17 +317,21 @@ export async function ensureMapboxPreview() {
 
     map.on('load', async () => {
       setStatus('');
+      ensure3DBuildingsLayer();
       ensureFocusBoundaryLayers();
       updateFocusBoundarySource();
       await ensurePointsLayer();
+      if (is3DMode) setMapboxPerspective(true);
     });
   } else {
     map.resize();
     if (map.isStyleLoaded()) {
       setStatus('');
+      ensure3DBuildingsLayer();
       ensureFocusBoundaryLayers();
       updateFocusBoundarySource();
       await ensurePointsLayer();
+      if (is3DMode) setMapboxPerspective(true);
     }
   }
 
