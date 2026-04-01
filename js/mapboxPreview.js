@@ -233,7 +233,11 @@ async function ensurePointsLayer() {
 function updatePointsSource() {
   if (!map || !map.isStyleLoaded()) return;
   const source = map.getSource('preview-points');
-  if (!source?.setData) return;
+  if (!source?.setData) {
+    pointsLoaded = false;
+    ensurePointsLayer().catch(() => null);
+    return;
+  }
   const collection = buildPointFeatureCollection();
   source.setData(collection);
   setStatus(`Mapbox points: ${collection.features.length}`);

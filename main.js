@@ -4041,8 +4041,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (btnMapboxStyleDark) btnMapboxStyleDark.style.display = isMapbox ? 'inline-flex' : 'none';
 
     if (isMapbox) {
-      mapController?.refresh?.().catch(() => null);
-      let pointsForMapbox = Array.isArray(dashboardPoints) ? dashboardPoints : [];
+      let pointsForMapbox = [];
+      try {
+        const refreshed = await mapController?.refresh?.();
+        if (Array.isArray(refreshed) && refreshed.length) {
+          pointsForMapbox = refreshed.map((point) => normalizePointRecord(point));
+        }
+      } catch (_e) {
+        // keep fallback path below
+      }
+
+      if (!pointsForMapbox.length) {
+        pointsForMapbox = Array.isArray(dashboardPoints) ? dashboardPoints : [];
+      }
       if (!pointsForMapbox.length) {
         try {
           const rows = await apiRequest('/api/points');
@@ -4051,6 +4062,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (_e) {
           // keep current in-memory points if request fails
         }
+      }
+      if (typeof window !== 'undefined') {
+        window.__ODESA_POINTS_CACHE = pointsForMapbox;
       }
       setMapboxPoints(pointsForMapbox);
       const preview = await ensureMapboxPreview();
