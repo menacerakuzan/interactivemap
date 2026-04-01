@@ -2,9 +2,11 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const ODESA_START = { lng: 30.7233, lat: 46.4825, zoom: 10.8 };
+const MAPBOX_STYLE_URL = 'mapbox://styles/mapbox/standard';
 let map = null;
 let pointsLoaded = false;
 let is3DMode = false;
+let allPoints = [];
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -61,43 +63,35 @@ function computeBoundsFromGeometry(geometry) {
   return new mapboxgl.LngLatBounds([minLng, minLat], [maxLng, maxLat]);
 }
 
-async function loadPublicPoints() {
-  try {
-    const response = await fetch('/api/points');
-    if (!response.ok) return [];
-    const rows = await response.json();
-    return Array.isArray(rows) ? rows : [];
-  } catch (_e) {
-    return [];
-  }
+function toPointFeature(point) {
+  const lng = Number(point?.lng);
+  const lat = Number(point?.lat);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return {
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [lng, lat] },
+    properties: {
+      id: Number(point?.id) || null,
+      title: String(point?.title || ''),
+      pointType: String(point?.pointType?.code || point?.pointTypeCode || ''),
+    },
+  };
+}
+
+function buildPointFeatureCollection() {
+  return {
+    type: 'FeatureCollection',
+    features: allPoints.map(toPointFeature).filter(Boolean),
+  };
 }
 
 async function ensurePointsLayer() {
   if (!map || pointsLoaded || !map.isStyleLoaded()) return;
-
-  const points = await loadPublicPoints();
-  const features = points
-    .map((point) => {
-      const lng = Number(point?.lng);
-      const lat = Number(point?.lat);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-      return {
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [lng, lat] },
-        properties: {
-          title: String(point?.title || ''),
-          pointType: String(point?.pointType?.code || ''),
-        },
-      };
-    })
-    .filter(Boolean);
+  const pointCollection = buildPointFeatureCollection();
 
   map.addSource('preview-points', {
     type: 'geojson',
-    data: {
-      type: 'FeatureCollection',
-      features,
-    },
+    data: pointCollection,
     cluster: true,
     clusterRadius: 55,
     clusterMaxZoom: 11,
@@ -164,6 +158,13 @@ async function ensurePointsLayer() {
   });
 
   pointsLoaded = true;
+}
+
+function updatePointsSource() {
+  if (!map || !map.isStyleLoaded()) return;
+  const source = map.getSource('preview-points');
+  if (!source?.setData) return;
+  source.setData(buildPointFeatureCollection());
 }
 
 function ensure3DBuildingsLayer() {
@@ -291,6 +292,31 @@ export function getMapboxPerspective() {
   return is3DMode;
 }
 
+function getTimePreset() {
+  const hour = new Date().getHours();
+  if (hour >= 7 && hour < 18) return 'day';
+  if (hour >= 18 && hour < 22) return 'dusk';
+  return 'night';
+}
+
+function applyTimePreset() {
+  if (!map || !map.isStyleLoaded() || typeof map.setConfigProperty !== 'function') return;
+  try {
+    map.setConfigProperty('basemap', 'lightPreset', getTimePreset());
+    map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
+    map.setConfigProperty('basemap', 'showRoadLabels', true);
+  } catch (_e) {
+    // ignore on unsupported style/runtime
+  }
+}
+
+export function setMapboxPoints(points = []) {
+  allPoints = Array.isArray(points) ? points : [];
+  if (!map) return;
+  if (!pointsLoaded) return;
+  updatePointsSource();
+}
+
 export async function ensureMapboxPreview() {
   const container = document.getElementById('mapbox-map');
   if (!container) return { ok: false, reason: 'no_container' };
@@ -306,7 +332,7 @@ export async function ensureMapboxPreview() {
   if (!map) {
     map = new mapboxgl.Map({
       container,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: MAPBOX_STYLE_URL,
       center: [ODESA_START.lng, ODESA_START.lat],
       zoom: ODESA_START.zoom,
       pitchWithRotate: false,
@@ -317,20 +343,24 @@ export async function ensureMapboxPreview() {
 
     map.on('load', async () => {
       setStatus('');
+      applyTimePreset();
       ensure3DBuildingsLayer();
       ensureFocusBoundaryLayers();
       updateFocusBoundarySource();
       await ensurePointsLayer();
+      updatePointsSource();
       if (is3DMode) setMapboxPerspective(true);
     });
   } else {
     map.resize();
     if (map.isStyleLoaded()) {
       setStatus('');
+      applyTimePreset();
       ensure3DBuildingsLayer();
       ensureFocusBoundaryLayers();
       updateFocusBoundarySource();
       await ensurePointsLayer();
+      updatePointsSource();
       if (is3DMode) setMapboxPerspective(true);
     }
   }

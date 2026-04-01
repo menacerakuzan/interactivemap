@@ -10,6 +10,7 @@ import {
   resetMapboxView,
   setMapboxPerspective,
   getMapboxPerspective,
+  setMapboxPoints,
 } from './js/mapboxPreview.js';
 import { dataService } from './js/dataService.js';
 import { COMMUNITIES_BY_DISTRICT, DISTRICT_CENTERS } from './js/communities.js';
@@ -1872,6 +1873,7 @@ async function refreshDashboardData() {
     if (!knownTypeCodes.has(code)) hiddenPointTypeCodes.delete(code);
   });
   dashboardPoints = (pointRows || []).map((point) => normalizePointRecord(point));
+  setMapboxPoints(dashboardPoints);
   dashboardRoutes = (routeRows || []).map((r) => ({
     ...r,
     routeColor: r.routeColor || getRouteColor(r.id),
@@ -1906,6 +1908,7 @@ async function refreshPublicData() {
       if (!knownTypeCodes.has(code)) hiddenPointTypeCodes.delete(code);
     });
     dashboardPoints = (pointRows || []).map((point) => normalizePointRecord(point));
+    setMapboxPoints(dashboardPoints);
     dashboardRoutes = (routeRows || []).map((r) => ({
       ...r,
       routeColor: r.routeColor || getRouteColor(r.id),
@@ -4020,6 +4023,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (btnMapbox3DToggle) btnMapbox3DToggle.style.display = isMapbox ? 'inline-flex' : 'none';
 
     if (isMapbox) {
+      setMapboxPoints(dashboardPoints);
       const preview = await ensureMapboxPreview();
       if (!preview?.ok) {
         currentMapEngine = 'leaflet';
