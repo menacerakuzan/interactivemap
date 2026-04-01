@@ -3998,7 +3998,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (contextPanel) contextPanel.style.display = isMapbox ? 'none' : '';
 
     if (isMapbox) {
-      await ensureMapboxPreview();
+      const preview = await ensureMapboxPreview();
+      if (!preview?.ok) {
+        currentMapEngine = 'leaflet';
+        document.body.classList.remove('mapbox-preview-active');
+        if (leafletMapView) leafletMapView.style.display = 'block';
+        if (mapboxPreviewWrap) mapboxPreviewWrap.style.display = 'none';
+        syncMapEngineButton();
+        setSpecialistMessage(
+          currentLang === 'uk'
+            ? 'Mapbox Preview не запущено: додайте VITE_MAPBOX_TOKEN (або localStorage mapbox_token).'
+            : 'Mapbox Preview not started: set VITE_MAPBOX_TOKEN (or localStorage mapbox_token).',
+          true
+        );
+        return;
+      }
       setTimeout(() => {
         resizeMapboxPreview();
       }, 60);
