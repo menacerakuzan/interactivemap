@@ -39,6 +39,19 @@ function setStatus(message = '') {
   node.textContent = message;
 }
 
+function normalizeApiPoint(point) {
+  const pointType = point?.pointType || point?.point_type || null;
+  return {
+    id: point?.id ?? null,
+    title: point?.title || '',
+    lat: Number(point?.lat),
+    lng: Number(point?.lng),
+    pointType: pointType
+      ? { code: pointType.code || pointType?.id || '' }
+      : { code: '' },
+  };
+}
+
 function collectGeometryCoords(geometry, acc = []) {
   if (!geometry || typeof geometry !== 'object') return acc;
   const scan = (node) => {
@@ -84,6 +97,18 @@ function toPointFeature(point) {
   };
 }
 
+async function fetchPointsFallback() {
+  try {
+    const response = await fetch('/api/points');
+    if (!response.ok) return [];
+    const rows = await response.json();
+    if (!Array.isArray(rows)) return [];
+    return rows.map(normalizeApiPoint);
+  } catch (_e) {
+    return [];
+  }
+}
+
 function buildPointFeatureCollection() {
   return {
     type: 'FeatureCollection',
@@ -93,6 +118,9 @@ function buildPointFeatureCollection() {
 
 async function ensurePointsLayer() {
   if (!map || pointsLoaded || !map.isStyleLoaded()) return;
+  if (!allPoints.length) {
+    allPoints = await fetchPointsFallback();
+  }
   const pointCollection = buildPointFeatureCollection();
 
   map.addSource('preview-points', {
@@ -164,13 +192,16 @@ async function ensurePointsLayer() {
   });
 
   pointsLoaded = true;
+  setStatus(`Mapbox points: ${pointCollection.features.length}`);
 }
 
 function updatePointsSource() {
   if (!map || !map.isStyleLoaded()) return;
   const source = map.getSource('preview-points');
   if (!source?.setData) return;
-  source.setData(buildPointFeatureCollection());
+  const collection = buildPointFeatureCollection();
+  source.setData(collection);
+  setStatus(`Mapbox points: ${collection.features.length}`);
 }
 
 function ensure3DBuildingsLayer() {
