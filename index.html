@@ -317,17 +317,29 @@
                     style="display: none; position: absolute; bottom: 24px; left: 24px; background: var(--c-surface); backdrop-filter: blur(8px); border-radius: var(--radius-md); padding: 10px 16px; border: 1px solid rgba(255,255,255,0.4); box-shadow: var(--shadow-float); color: var(--c-admiralty); font-size: 12px; font-weight: 600;">ПОКАЗАТИ
                     ПАРТНЕРІВ</button>
                 <div id="route-line-toolbar" class="route-line-toolbar" style="display:none;">
-                    <button id="btn-line-toolbar-toggle" class="toolbar-collapse-btn" type="button" aria-label="Згорнути панель">⌄</button>
+                    <button id="btn-line-toolbar-toggle" class="toolbar-collapse-btn" type="button" aria-label="Згорнути панель">˄</button>
                     <div class="tool-group">
-                        <button id="btn-line-cursor" class="btn-flat" type="button">Курсор</button>
-                        <button id="btn-line-draw" class="btn-flat active" type="button">Перо</button>
-                        <button id="btn-line-curve" class="btn-flat" type="button">Крива</button>
-                        <button id="btn-line-edit" class="btn-flat" type="button">Редагувати</button>
-                        <button id="btn-line-erase" class="btn-flat" type="button">Стирач</button>
+                        <button id="btn-line-cursor" class="btn-flat" type="button" title="Курсор">
+                            <span class="tool-glyph">⤢</span><span class="tool-label">Курсор</span>
+                        </button>
+                        <button id="btn-line-draw" class="btn-flat active" type="button" title="Перо">
+                            <span class="tool-glyph">✎</span><span class="tool-label">Перо</span>
+                        </button>
+                        <button id="btn-line-curve" class="btn-flat" type="button" title="Крива лінія">
+                            <span class="tool-glyph">∿</span><span class="tool-label">Крива</span>
+                        </button>
+                        <button id="btn-line-edit" class="btn-flat" type="button" title="Редагувати вузли">
+                            <span class="tool-glyph">◌</span><span class="tool-label">Редаг.</span>
+                        </button>
+                        <button id="btn-line-erase" class="btn-flat" type="button" title="Стерти вузол">
+                            <span class="tool-glyph">⌫</span><span class="tool-label">Стерти</span>
+                        </button>
                     </div>
                     <div class="tool-group">
-                        <button id="btn-line-snap" class="btn-flat active" type="button">Snap ON</button>
-                        <select id="line-style-select">
+                        <button id="btn-line-snap" class="btn-flat active" type="button" title="Прив'язка до точок">
+                            <span class="tool-glyph">◈</span><span class="tool-label">Snap ON</span>
+                        </button>
+                        <select id="line-style-select" title="Стиль лінії">
                             <option value="dashed">Пунктир</option>
                             <option value="dashdot">Штрих-пунктир</option>
                             <option value="solid">Суцільна</option>
@@ -335,9 +347,18 @@
                         <input id="line-color-input" type="color" value="#E7C769" title="Колір лінії" />
                     </div>
                     <div class="tool-group">
-                        <button id="btn-line-undo" class="btn-flat" type="button">Undo</button>
-                        <button id="btn-line-clear" class="btn-flat" type="button">Очистити</button>
-                        <button id="btn-line-apply-route" class="btn-primary" type="button">В маршрут</button>
+                        <button id="btn-line-undo" class="btn-flat" type="button" title="Скасувати">
+                            <span class="tool-glyph">↶</span><span class="tool-label">Undo</span>
+                        </button>
+                        <button id="btn-line-clear" class="btn-flat" type="button" title="Очистити">
+                            <span class="tool-glyph">✕</span><span class="tool-label">Очист.</span>
+                        </button>
+                        <button id="btn-line-apply-route" class="btn-primary" type="button" title="Застосувати в маршрут">
+                            <span class="tool-glyph">↪</span><span class="tool-label">В маршрут</span>
+                        </button>
+                        <button id="btn-line-density" class="btn-flat" type="button" title="Щільність інтерфейсу">
+                            <span class="tool-glyph">▣</span><span class="tool-label">Compact</span>
+                        </button>
                     </div>
                 </div>
             </div>

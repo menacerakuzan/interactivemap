@@ -151,6 +151,7 @@ if (typeof window !== 'undefined' && !Array.isArray(window.__ODESA_POINTS_CACHE)
 }
 const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
+const LINE_TOOLBAR_DENSITY_KEY = 'odesaLineToolbarDensity';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
 const DEFAULT_NEWS_IMAGE_FOCUS_Y = 50;
 const ODESA_START_FOCUS = { lat: 46.4825, lng: 30.7233, zoom: 12 };
@@ -2916,6 +2917,7 @@ function bindSpecialistTools() {
   const btnLineUndo = document.getElementById('btn-line-undo');
   const btnLineClear = document.getElementById('btn-line-clear');
   const btnLineApplyRoute = document.getElementById('btn-line-apply-route');
+  const btnLineDensity = document.getElementById('btn-line-density');
   const btnLineToolbarToggle = document.getElementById('btn-line-toolbar-toggle');
   const lineStyleSelect = document.getElementById('line-style-select');
   const lineColorInput = document.getElementById('line-color-input');
@@ -2989,12 +2991,19 @@ function bindSpecialistTools() {
     if (btnLineEdit) btnLineEdit.classList.toggle('active', mode === 'edit');
     if (btnLineErase) btnLineErase.classList.toggle('active', mode === 'erase');
   };
+  const setSnapButtonState = (enabled) => {
+    if (!btnLineSnap) return;
+    btnLineSnap.classList.toggle('active', enabled);
+    const label = btnLineSnap.querySelector('.tool-label');
+    if (label) label.textContent = enabled ? 'Snap ON' : 'Snap OFF';
+    else btnLineSnap.textContent = enabled ? 'Snap ON' : 'Snap OFF';
+  };
 
   setLineToolButtonState('cursor');
   lineSetVisible(false);
   lineSetMode('draw');
   lineSetSnap(lineSnapEnabled);
-  if (btnLineSnap) btnLineSnap.classList.toggle('active', lineSnapEnabled);
+  setSnapButtonState(lineSnapEnabled);
 
   if (routeLineToolbar) {
     ['pointerdown', 'mousedown', 'click', 'dblclick', 'touchstart', 'wheel'].forEach((eventName) => {
@@ -3012,8 +3021,30 @@ function bindSpecialistTools() {
     btnLineToolbarToggle.addEventListener('click', (event) => {
       event.stopPropagation();
       const collapsed = routeLineToolbar.classList.toggle('collapsed');
-      btnLineToolbarToggle.textContent = collapsed ? '⌃' : '⌄';
+      btnLineToolbarToggle.textContent = collapsed ? '˅' : '˄';
       btnLineToolbarToggle.setAttribute('aria-label', collapsed ? 'Розгорнути панель' : 'Згорнути панель');
+    });
+  }
+
+  if (routeLineToolbar) {
+    const compactByDefault = (localStorage.getItem(LINE_TOOLBAR_DENSITY_KEY) || 'compact') === 'compact';
+    routeLineToolbar.classList.toggle('compact', compactByDefault);
+    if (btnLineDensity) {
+      btnLineDensity.classList.toggle('active', compactByDefault);
+      const densityLabel = btnLineDensity.querySelector('.tool-label');
+      if (densityLabel) densityLabel.textContent = compactByDefault ? 'Pro' : 'Compact';
+    }
+  }
+
+  if (btnLineDensity && routeLineToolbar) {
+    btnLineDensity.addEventListener('click', () => {
+      const compact = !routeLineToolbar.classList.contains('compact');
+      routeLineToolbar.classList.toggle('compact', compact);
+      btnLineDensity.classList.toggle('active', compact);
+      const densityLabel = btnLineDensity.querySelector('.tool-label');
+      if (densityLabel) densityLabel.textContent = compact ? 'Pro' : 'Compact';
+      localStorage.setItem(LINE_TOOLBAR_DENSITY_KEY, compact ? 'compact' : 'pro');
+      setSpecialistMessage(compact ? 'Тулбар: compact режим' : 'Тулбар: pro режим');
     });
   }
 
@@ -3080,8 +3111,7 @@ function bindSpecialistTools() {
     btnLineSnap.addEventListener('click', () => {
       lineSnapEnabled = !lineSnapEnabled;
       lineSetSnap(lineSnapEnabled);
-      btnLineSnap.classList.toggle('active', lineSnapEnabled);
-      btnLineSnap.textContent = lineSnapEnabled ? 'Snap ON' : 'Snap OFF';
+      setSnapButtonState(lineSnapEnabled);
       setSpecialistMessage(lineSnapEnabled ? 'Snap увімкнено' : 'Snap вимкнено');
     });
   }

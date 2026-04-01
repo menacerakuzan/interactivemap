@@ -65,6 +65,7 @@ let drawLineStyle = 'dashed';
 let drawLineColor = '#E7C769';
 let drawHistory = [];
 let drawMutating = false;
+let curvePreviewData = { type: 'FeatureCollection', features: [] };
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -160,6 +161,43 @@ const MARKER_URL_BY_FILE = EXPECTED_MARKER_FILES.reduce((acc, expectedFileName) 
 const DRAW_SOURCE_COLD = 'mapbox-gl-draw-cold';
 const DRAW_SOURCE_HOT = 'mapbox-gl-draw-hot';
 const DRAW_LINE_LAYER_IDS = ['gl-draw-line-inactive', 'gl-draw-line-active', 'gl-draw-line-static'];
+
+function catmullRomSpline(coords = [], segments = 14) {
+  if (!Array.isArray(coords) || coords.length < 3) return coords;
+  const pts = coords
+    .map((pair) => [Number(pair[0]), Number(pair[1])])
+    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat));
+  if (pts.length < 3) return pts;
+
+  const result = [];
+  for (let i = 0; i < pts.length - 1; i += 1) {
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+
+    for (let j = 0; j < segments; j += 1) {
+      const t = j / segments;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const lng = 0.5 * (
+        (2 * p1[0]) +
+        (-p0[0] + p2[0]) * t +
+        (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
+        (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3
+      );
+      const lat = 0.5 * (
+        (2 * p1[1]) +
+        (-p0[1] + p2[1]) * t +
+        (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
+        (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3
+      );
+      result.push([lng, lat]);
+    }
+  }
+  result.push(pts[pts.length - 1]);
+  return result;
+}
 
 function ensureStatusNode() {
   let node = document.getElementById('mapbox-status');
@@ -260,6 +298,23 @@ function snapLineCoordinates(coords = []) {
     .filter((pair) => Array.isArray(pair) && Number.isFinite(Number(pair[0])) && Number.isFinite(Number(pair[1])));
 }
 
+function buildCurveControlCoords(coords = []) {
+  const clean = (Array.isArray(coords) ? coords : [])
+    .map((pair) => [Number(pair?.[0]), Number(pair?.[1])])
+    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat));
+  if (clean.length < 2) return clean;
+  if (clean.length >= 3 && clean.length % 2 === 1) return clean;
+  const out = [];
+  for (let i = 0; i < clean.length - 1; i += 1) {
+    const a = clean[i];
+    const b = clean[i + 1];
+    out.push(a);
+    out.push([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+  }
+  out.push(clean[clean.length - 1]);
+  return out;
+}
+
 function upsertDrawFeature(feature) {
   if (!draw || !feature) return;
   drawMutating = true;
@@ -270,11 +325,14 @@ function upsertDrawFeature(feature) {
   }
 }
 
-function applyDrawStyleToFeature(featureId) {
+function applyDrawStyleToFeature(featureId, curve = null) {
   if (!draw || !featureId) return;
   try {
     draw.setFeatureProperty(featureId, 'edgeStyle', drawLineStyle);
     draw.setFeatureProperty(featureId, 'edgeColor', drawLineColor);
+    if (curve !== null) {
+      draw.setFeatureProperty(featureId, 'edgeCurve', Boolean(curve));
+    }
   } catch (_e) {
     // noop
   }
@@ -286,12 +344,65 @@ function getDrawLineFeatures() {
   return (collection?.features || []).filter((feature) => feature?.geometry?.type === 'LineString');
 }
 
+function eraseNearestVertexAt(point, pixelThreshold = 16) {
+  if (!map || !draw || !point || !drawVisible || drawMode !== 'erase') return false;
+  const lines = getDrawLineFeatures();
+  if (!lines.length) return false;
+
+  const clickPoint = map.project(point);
+  let best = null;
+
+  lines.forEach((feature) => {
+    const featureId = feature?.id;
+    const coords = Array.isArray(feature?.geometry?.coordinates) ? feature.geometry.coordinates : [];
+    if (!featureId || coords.length < 2) return;
+
+    coords.forEach((coord, coordIndex) => {
+      const lng = Number(coord?.[0]);
+      const lat = Number(coord?.[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const vertexPoint = map.project([lng, lat]);
+      const distance = Math.hypot(vertexPoint.x - clickPoint.x, vertexPoint.y - clickPoint.y);
+      if (distance > pixelThreshold) return;
+      if (!best || distance < best.distance) {
+        best = { featureId, coordIndex, distance, coords };
+      }
+    });
+  });
+
+  if (!best) return false;
+  const nextCoords = best.coords.filter((_, index) => index !== best.coordIndex);
+  if (nextCoords.length < 2) {
+    draw.delete(best.featureId);
+    pushDrawHistory();
+    syncDrawLinePaint();
+    updateCurvePreviewFromDraw();
+    return true;
+  }
+
+  const edgeStyle = drawLineStyle;
+  const edgeColor = drawLineColor;
+  const edgeCurve = Boolean(draw.get(best.featureId)?.properties?.edgeCurve);
+  upsertDrawFeature({
+    type: 'Feature',
+    id: best.featureId,
+    properties: { edgeStyle, edgeColor, edgeCurve },
+    geometry: { type: 'LineString', coordinates: snapLineCoordinates(nextCoords) },
+  });
+  applyDrawStyleToFeature(best.featureId, edgeCurve);
+  pushDrawHistory();
+  syncDrawLinePaint();
+  updateCurvePreviewFromDraw();
+  return true;
+}
+
 function captureDrawSnapshot() {
   const lines = getDrawLineFeatures();
   const snapshots = lines.map((feature) => {
     const coords = Array.isArray(feature?.geometry?.coordinates) ? feature.geometry.coordinates : [];
     const edgeStyle = feature?.properties?.edgeStyle || drawLineStyle;
     const edgeColor = feature?.properties?.edgeColor || drawLineColor;
+    const edgeCurve = Boolean(feature?.properties?.edgeCurve);
     return coords
       .map((pair) => {
         const lng = Number(pair?.[0]);
@@ -305,7 +416,7 @@ function captureDrawSnapshot() {
           snapped: Boolean(snap),
           edgeStyle,
           edgeColor,
-          edgeCurve: false,
+          edgeCurve,
         };
       })
       .filter(Boolean);
@@ -336,6 +447,12 @@ function syncDrawLinePaint() {
       ['literal', [2, 1, 0.3, 1]],
       ['literal', [2, 1.4]],
     ]);
+    map.setPaintProperty(layerId, 'line-opacity', [
+      'case',
+      ['==', ['get', 'edgeCurve'], true],
+      0.22,
+      1,
+    ]);
     map.setPaintProperty(layerId, 'line-width', [
       'interpolate',
       ['linear'],
@@ -348,6 +465,133 @@ function syncDrawLinePaint() {
       4.8,
     ]);
   });
+}
+
+function ensureCurvePreviewLayer() {
+  if (!map || !map.isStyleLoaded()) return;
+  if (!map.getSource('preview-draw-curves')) {
+    map.addSource('preview-draw-curves', {
+      type: 'geojson',
+      data: curvePreviewData,
+    });
+  }
+  if (!map.getLayer('preview-draw-curves')) {
+    map.addLayer({
+      id: 'preview-draw-curves',
+      type: 'line',
+      source: 'preview-draw-curves',
+      paint: {
+        'line-color': ['coalesce', ['get', 'edgeColor'], drawLineColor],
+        'line-dasharray': [
+          'case',
+          ['==', ['get', 'edgeStyle'], 'solid'],
+          ['literal', [1, 0]],
+          ['==', ['get', 'edgeStyle'], 'dashdot'],
+          ['literal', [2, 1, 0.3, 1]],
+          ['literal', [2, 1.4]],
+        ],
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          8,
+          2.4,
+          12,
+          3.5,
+          15,
+          5.3,
+        ],
+        'line-opacity': 0.96,
+      },
+    });
+  }
+}
+
+function ensureCurveHandlesLayer() {
+  if (!map || !map.isStyleLoaded()) return;
+  if (!map.getSource('preview-curve-handles')) {
+    map.addSource('preview-curve-handles', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+  }
+  if (!map.getLayer('preview-curve-handles')) {
+    map.addLayer({
+      id: 'preview-curve-handles',
+      type: 'circle',
+      source: 'preview-curve-handles',
+      paint: {
+        'circle-radius': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          10,
+          3.5,
+          15,
+          6.5,
+        ],
+        'circle-color': '#FFFFFF',
+        'circle-stroke-color': '#0EA5E9',
+        'circle-stroke-width': 2,
+        'circle-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'active'], false],
+          1,
+          0.88,
+        ],
+      },
+      layout: {
+        visibility: drawMode === 'edit' || drawMode === 'curve' ? 'visible' : 'none',
+      },
+    });
+  }
+}
+
+function updateCurvePreviewFromDraw() {
+  if (!map) return;
+  const handleFeatures = [];
+  const features = getDrawLineFeatures()
+    .filter((feature) => Boolean(feature?.properties?.edgeCurve))
+    .map((feature) => {
+      const coords = Array.isArray(feature?.geometry?.coordinates) ? feature.geometry.coordinates : [];
+      for (let i = 1; i < coords.length - 1; i += 2) {
+        const lng = Number(coords[i]?.[0]);
+        const lat = Number(coords[i]?.[1]);
+        if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+        handleFeatures.push({
+          type: 'Feature',
+          properties: { featureId: String(feature?.id || ''), idx: i },
+          geometry: { type: 'Point', coordinates: [lng, lat] },
+        });
+      }
+      const smoothed = catmullRomSpline(coords, 14);
+      if (smoothed.length < 2) return null;
+      return {
+        type: 'Feature',
+        properties: {
+          edgeStyle: feature?.properties?.edgeStyle || drawLineStyle,
+          edgeColor: feature?.properties?.edgeColor || drawLineColor,
+        },
+        geometry: { type: 'LineString', coordinates: smoothed },
+      };
+    })
+    .filter(Boolean);
+  curvePreviewData = { type: 'FeatureCollection', features };
+  ensureCurvePreviewLayer();
+  const source = map.getSource('preview-draw-curves');
+  if (source?.setData) source.setData(curvePreviewData);
+  ensureCurveHandlesLayer();
+  const handleSource = map.getSource('preview-curve-handles');
+  if (handleSource?.setData) {
+    handleSource.setData({ type: 'FeatureCollection', features: handleFeatures });
+  }
+  if (map.getLayer('preview-curve-handles')) {
+    map.setLayoutProperty(
+      'preview-curve-handles',
+      'visibility',
+      drawVisible && (drawMode === 'edit' || drawMode === 'curve') ? 'visible' : 'none'
+    );
+  }
 }
 
 function ensureDraw() {
@@ -369,17 +613,24 @@ function bindDrawEvents() {
     features.forEach((feature) => {
       if (feature?.geometry?.type === 'LineString' && Array.isArray(feature?.geometry?.coordinates)) {
         const snappedCoordinates = snapLineCoordinates(feature.geometry.coordinates);
+        const curveReadyCoordinates = drawMode === 'curve' ? buildCurveControlCoords(snappedCoordinates) : snappedCoordinates;
         if (snappedCoordinates.length >= 2) {
           upsertDrawFeature({
             ...feature,
-            geometry: { ...feature.geometry, coordinates: snappedCoordinates },
+            properties: {
+              ...(feature.properties || {}),
+              edgeCurve: drawMode === 'curve',
+              edgeCurvePrepared: drawMode === 'curve',
+            },
+            geometry: { ...feature.geometry, coordinates: curveReadyCoordinates },
           });
         }
       }
-      if (feature?.id) applyDrawStyleToFeature(feature.id);
+      if (feature?.id) applyDrawStyleToFeature(feature.id, drawMode === 'curve');
     });
     pushDrawHistory();
     syncDrawLinePaint();
+    updateCurvePreviewFromDraw();
   });
   map.on('draw.update', (event) => {
     if (drawMutating) return;
@@ -397,10 +648,16 @@ function bindDrawEvents() {
     });
     pushDrawHistory();
     syncDrawLinePaint();
+    updateCurvePreviewFromDraw();
   });
   map.on('draw.delete', () => {
     pushDrawHistory();
     syncDrawLinePaint();
+    updateCurvePreviewFromDraw();
+  });
+  map.on('click', (event) => {
+    if (!event?.lngLat) return;
+    eraseNearestVertexAt(event.lngLat);
   });
 }
 
@@ -927,6 +1184,8 @@ async function handleStyleReady() {
     ensureDraw();
     bindDrawEvents();
     syncDrawLinePaint();
+    ensureCurvePreviewLayer();
+    updateCurvePreviewFromDraw();
     if (!drawVisible) {
       draw.changeMode('simple_select');
     } else if (drawMode === 'draw' || drawMode === 'curve') {
@@ -1022,24 +1281,50 @@ export function setMapboxLineToolVisible(visible) {
   if (!draw) return false;
   if (!drawVisible) {
     draw.changeMode('simple_select');
+    if (map.getLayer('preview-curve-handles')) {
+      map.setLayoutProperty('preview-curve-handles', 'visibility', 'none');
+    }
     return true;
   }
   if (drawMode === 'draw' || drawMode === 'curve') draw.changeMode('draw_line_string');
   else if (drawMode === 'edit') draw.changeMode('direct_select');
   else draw.changeMode('simple_select');
+  updateCurvePreviewFromDraw();
   return true;
 }
 
 export function setMapboxLineToolMode(mode = 'draw') {
   drawMode = String(mode || 'draw');
   if (!draw || !drawVisible) return true;
-  if (drawMode === 'draw' || drawMode === 'curve') draw.changeMode('draw_line_string');
-  else if (drawMode === 'edit') {
+  if (drawMode === 'curve') {
+    const firstLine = getDrawLineFeatures()[0];
+    if (firstLine?.id) {
+      const baseCoords = Array.isArray(firstLine.geometry?.coordinates) ? firstLine.geometry.coordinates : [];
+      const coords = buildCurveControlCoords(baseCoords);
+      upsertDrawFeature({
+        type: 'Feature',
+        id: firstLine.id,
+        properties: {
+          ...(firstLine.properties || {}),
+          edgeCurve: true,
+          edgeCurvePrepared: true,
+        },
+        geometry: { type: 'LineString', coordinates: coords },
+      });
+      applyDrawStyleToFeature(firstLine.id, true);
+      draw.changeMode('direct_select', { featureId: firstLine.id });
+    } else {
+      draw.changeMode('draw_line_string');
+    }
+  } else if (drawMode === 'draw') {
+    draw.changeMode('draw_line_string');
+  } else if (drawMode === 'edit') {
     const firstLine = getDrawLineFeatures()[0];
     if (firstLine?.id) draw.changeMode('direct_select', { featureId: firstLine.id });
     else draw.changeMode('simple_select');
   }
   else draw.changeMode('simple_select');
+  updateCurvePreviewFromDraw();
   return true;
 }
 
@@ -1054,6 +1339,7 @@ export function setMapboxLineToolStyle(style = 'dashed') {
     if (feature?.id) applyDrawStyleToFeature(feature.id);
   });
   syncDrawLinePaint();
+  updateCurvePreviewFromDraw();
   return true;
 }
 
@@ -1063,6 +1349,7 @@ export function setMapboxLineToolColor(color = '#E7C769') {
     if (feature?.id) applyDrawStyleToFeature(feature.id);
   });
   syncDrawLinePaint();
+  updateCurvePreviewFromDraw();
   return true;
 }
 
@@ -1076,11 +1363,17 @@ export function undoMapboxLineDraft() {
   if (coords.length < 2) return true;
   const featureId = draw.add({
     type: 'Feature',
-    properties: { edgeStyle: drawLineStyle, edgeColor: drawLineColor },
+    properties: {
+      edgeStyle: drawLineStyle,
+      edgeColor: drawLineColor,
+      edgeCurve: drawMode === 'curve',
+      edgeCurvePrepared: drawMode === 'curve',
+    },
     geometry: { type: 'LineString', coordinates: coords },
   })?.[0];
-  if (featureId) applyDrawStyleToFeature(featureId);
+  if (featureId) applyDrawStyleToFeature(featureId, drawMode === 'curve');
   syncDrawLinePaint();
+  updateCurvePreviewFromDraw();
   return true;
 }
 
@@ -1092,6 +1385,7 @@ export function clearMapboxLineDraft() {
     if (feature?.id) draw.delete(feature.id);
   });
   syncDrawLinePaint();
+  updateCurvePreviewFromDraw();
   return true;
 }
 
@@ -1113,11 +1407,17 @@ export function setMapboxLineDraftFromPoints(vertices = []) {
   }
   const featureId = draw.add({
     type: 'Feature',
-    properties: { edgeStyle: drawLineStyle, edgeColor: drawLineColor },
-    geometry: { type: 'LineString', coordinates: coords },
+    properties: {
+      edgeStyle: drawLineStyle,
+      edgeColor: drawLineColor,
+      edgeCurve: drawMode === 'curve',
+      edgeCurvePrepared: drawMode === 'curve',
+    },
+    geometry: { type: 'LineString', coordinates: drawMode === 'curve' ? buildCurveControlCoords(coords) : coords },
   })?.[0];
-  if (featureId) applyDrawStyleToFeature(featureId);
+  if (featureId) applyDrawStyleToFeature(featureId, drawMode === 'curve');
   syncDrawLinePaint();
+  updateCurvePreviewFromDraw();
   pushDrawHistory();
   return true;
 }
