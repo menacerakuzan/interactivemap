@@ -42,8 +42,8 @@ const POINT_TYPE_MARKER_FILE = {
   other: 'social_services.svg',
 };
 const ZOOM_SWITCH = {
-  clusterMax: 10.8,
-  svgMin: 13.0,
+  clusterMax: 11.2,
+  svgMin: 13.35,
 };
 let map = null;
 let pointsLoaded = false;
@@ -64,6 +64,7 @@ let drawSnapEnabled = true;
 let drawLineStyle = 'dashed';
 let drawLineColor = '#E7C769';
 let drawHistory = [];
+let drawMutating = false;
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -242,6 +243,33 @@ function nearestPointFor(lat, lng, maxMeters = 35) {
   return best;
 }
 
+function snapCoordinatePair(pair, maxMeters = 35) {
+  const lng = Number(pair?.[0]);
+  const lat = Number(pair?.[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (!drawSnapEnabled) return [lng, lat];
+  const nearest = nearestPointFor(lat, lng, maxMeters);
+  if (!nearest) return [lng, lat];
+  return [Number(nearest.lng), Number(nearest.lat)];
+}
+
+function snapLineCoordinates(coords = []) {
+  if (!Array.isArray(coords) || !coords.length) return [];
+  return coords
+    .map((pair) => snapCoordinatePair(pair, 35))
+    .filter((pair) => Array.isArray(pair) && Number.isFinite(Number(pair[0])) && Number.isFinite(Number(pair[1])));
+}
+
+function upsertDrawFeature(feature) {
+  if (!draw || !feature) return;
+  drawMutating = true;
+  try {
+    draw.add(feature);
+  } finally {
+    drawMutating = false;
+  }
+}
+
 function applyDrawStyleToFeature(featureId) {
   if (!draw || !featureId) return;
   try {
@@ -336,14 +364,37 @@ function bindDrawEvents() {
   if (!map || !draw || drawBound) return;
   drawBound = true;
   map.on('draw.create', (event) => {
+    if (drawMutating) return;
     const features = event?.features || [];
     features.forEach((feature) => {
+      if (feature?.geometry?.type === 'LineString' && Array.isArray(feature?.geometry?.coordinates)) {
+        const snappedCoordinates = snapLineCoordinates(feature.geometry.coordinates);
+        if (snappedCoordinates.length >= 2) {
+          upsertDrawFeature({
+            ...feature,
+            geometry: { ...feature.geometry, coordinates: snappedCoordinates },
+          });
+        }
+      }
       if (feature?.id) applyDrawStyleToFeature(feature.id);
     });
     pushDrawHistory();
     syncDrawLinePaint();
   });
-  map.on('draw.update', () => {
+  map.on('draw.update', (event) => {
+    if (drawMutating) return;
+    const features = event?.features || [];
+    features.forEach((feature) => {
+      if (feature?.geometry?.type === 'LineString' && Array.isArray(feature?.geometry?.coordinates)) {
+        const snappedCoordinates = snapLineCoordinates(feature.geometry.coordinates);
+        if (snappedCoordinates.length >= 2) {
+          upsertDrawFeature({
+            ...feature,
+            geometry: { ...feature.geometry, coordinates: snappedCoordinates },
+          });
+        }
+      }
+    });
     pushDrawHistory();
     syncDrawLinePaint();
   });
@@ -881,7 +932,12 @@ async function handleStyleReady() {
     } else if (drawMode === 'draw' || drawMode === 'curve') {
       draw.changeMode('draw_line_string');
     } else if (drawMode === 'edit') {
-      draw.changeMode('direct_select');
+      const firstLine = getDrawLineFeatures()[0];
+      if (firstLine?.id) {
+        draw.changeMode('direct_select', { featureId: firstLine.id });
+      } else {
+        draw.changeMode('simple_select');
+      }
     } else {
       draw.changeMode('simple_select');
     }
@@ -978,7 +1034,11 @@ export function setMapboxLineToolMode(mode = 'draw') {
   drawMode = String(mode || 'draw');
   if (!draw || !drawVisible) return true;
   if (drawMode === 'draw' || drawMode === 'curve') draw.changeMode('draw_line_string');
-  else if (drawMode === 'edit') draw.changeMode('direct_select');
+  else if (drawMode === 'edit') {
+    const firstLine = getDrawLineFeatures()[0];
+    if (firstLine?.id) draw.changeMode('direct_select', { featureId: firstLine.id });
+    else draw.changeMode('simple_select');
+  }
   else draw.changeMode('simple_select');
   return true;
 }
