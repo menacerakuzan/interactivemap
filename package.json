@@ -19,6 +19,7 @@
   "type": "commonjs",
   "dependencies": {
     "@luomus/leaflet-smooth-wheel-zoom": "^1.0.0",
+    "@mapbox/mapbox-gl-draw": "^1.5.1",
     "@supabase/supabase-js": "^2.97.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",

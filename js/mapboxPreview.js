@@ -1,5 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import MapboxDraw from '@mapbox/mapbox-gl-draw';
+import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
 const ODESA_START = { lng: 30.7233, lat: 46.4825, zoom: 10.8 };
 const MAPBOX_STYLES = {
@@ -54,6 +56,14 @@ let markerVisualBound = false;
 let markerVisualRaf = 0;
 let markerVisualMode = 'cluster';
 let unclusteredClickBound = false;
+let draw = null;
+let drawBound = false;
+let drawVisible = false;
+let drawMode = 'cursor';
+let drawSnapEnabled = true;
+let drawLineStyle = 'dashed';
+let drawLineColor = '#E7C769';
+let drawHistory = [];
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -146,6 +156,9 @@ const MARKER_URL_BY_FILE = EXPECTED_MARKER_FILES.reduce((acc, expectedFileName) 
   }
   return acc;
 }, {});
+const DRAW_SOURCE_COLD = 'mapbox-gl-draw-cold';
+const DRAW_SOURCE_HOT = 'mapbox-gl-draw-hot';
+const DRAW_LINE_LAYER_IDS = ['gl-draw-line-inactive', 'gl-draw-line-active', 'gl-draw-line-static'];
 
 function ensureStatusNode() {
   let node = document.getElementById('mapbox-status');
@@ -201,6 +214,143 @@ function resolvePointMarkerUrl(point) {
   const code = String(point?.pointType?.code || '').trim();
   const fileName = POINT_TYPE_MARKER_FILE[code] || POINT_TYPE_MARKER_FILE.other;
   return MARKER_URL_BY_FILE[fileName] || MARKER_URL_BY_FILE['social_services.svg'] || '';
+}
+
+function metersBetween(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function nearestPointFor(lat, lng, maxMeters = 35) {
+  let best = null;
+  allPoints.forEach((point) => {
+    const pLat = Number(point?.lat);
+    const pLng = Number(point?.lng);
+    if (!Number.isFinite(pLat) || !Number.isFinite(pLng)) return;
+    const distance = metersBetween(lat, lng, pLat, pLng);
+    if (distance > maxMeters) return;
+    if (!best || distance < best.distance) {
+      best = { point, lat: pLat, lng: pLng, distance };
+    }
+  });
+  return best;
+}
+
+function applyDrawStyleToFeature(featureId) {
+  if (!draw || !featureId) return;
+  try {
+    draw.setFeatureProperty(featureId, 'edgeStyle', drawLineStyle);
+    draw.setFeatureProperty(featureId, 'edgeColor', drawLineColor);
+  } catch (_e) {
+    // noop
+  }
+}
+
+function getDrawLineFeatures() {
+  if (!draw) return [];
+  const collection = draw.getAll();
+  return (collection?.features || []).filter((feature) => feature?.geometry?.type === 'LineString');
+}
+
+function captureDrawSnapshot() {
+  const lines = getDrawLineFeatures();
+  const snapshots = lines.map((feature) => {
+    const coords = Array.isArray(feature?.geometry?.coordinates) ? feature.geometry.coordinates : [];
+    const edgeStyle = feature?.properties?.edgeStyle || drawLineStyle;
+    const edgeColor = feature?.properties?.edgeColor || drawLineColor;
+    return coords
+      .map((pair) => {
+        const lng = Number(pair?.[0]);
+        const lat = Number(pair?.[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        const snap = nearestPointFor(lat, lng, 30);
+        return {
+          lat: snap ? snap.lat : lat,
+          lng: snap ? snap.lng : lng,
+          pointId: snap?.point?.id ? Number(snap.point.id) : null,
+          snapped: Boolean(snap),
+          edgeStyle,
+          edgeColor,
+          edgeCurve: false,
+        };
+      })
+      .filter(Boolean);
+  });
+  return snapshots.flat();
+}
+
+function pushDrawHistory() {
+  const snapshot = captureDrawSnapshot();
+  drawHistory.push(snapshot);
+  if (drawHistory.length > 50) drawHistory.shift();
+}
+
+function syncDrawLinePaint() {
+  if (!map) return;
+  DRAW_LINE_LAYER_IDS.forEach((layerId) => {
+    if (!map.getLayer(layerId)) return;
+    map.setPaintProperty(layerId, 'line-color', [
+      'coalesce',
+      ['get', 'edgeColor'],
+      drawLineColor,
+    ]);
+    map.setPaintProperty(layerId, 'line-dasharray', [
+      'case',
+      ['==', ['get', 'edgeStyle'], 'solid'],
+      ['literal', [1, 0]],
+      ['==', ['get', 'edgeStyle'], 'dashdot'],
+      ['literal', [2, 1, 0.3, 1]],
+      ['literal', [2, 1.4]],
+    ]);
+    map.setPaintProperty(layerId, 'line-width', [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      8,
+      2.2,
+      12,
+      3.2,
+      15,
+      4.8,
+    ]);
+  });
+}
+
+function ensureDraw() {
+  if (!map || draw) return;
+  draw = new MapboxDraw({
+    displayControlsDefault: false,
+    controls: {},
+    defaultMode: 'simple_select',
+  });
+  map.addControl(draw);
+}
+
+function bindDrawEvents() {
+  if (!map || !draw || drawBound) return;
+  drawBound = true;
+  map.on('draw.create', (event) => {
+    const features = event?.features || [];
+    features.forEach((feature) => {
+      if (feature?.id) applyDrawStyleToFeature(feature.id);
+    });
+    pushDrawHistory();
+    syncDrawLinePaint();
+  });
+  map.on('draw.update', () => {
+    pushDrawHistory();
+    syncDrawLinePaint();
+  });
+  map.on('draw.delete', () => {
+    pushDrawHistory();
+    syncDrawLinePaint();
+  });
 }
 
 function clearDomPointMarkers() {
@@ -722,6 +872,22 @@ async function handleStyleReady() {
     setStatus('Mapbox: points layer error');
   }
   syncDomPointMarkers();
+  try {
+    ensureDraw();
+    bindDrawEvents();
+    syncDrawLinePaint();
+    if (!drawVisible) {
+      draw.changeMode('simple_select');
+    } else if (drawMode === 'draw' || drawMode === 'curve') {
+      draw.changeMode('draw_line_string');
+    } else if (drawMode === 'edit') {
+      draw.changeMode('direct_select');
+    } else {
+      draw.changeMode('simple_select');
+    }
+  } catch (_e) {
+    // noop
+  }
   if (is3DMode) {
     try {
       setMapboxPerspective(true);
@@ -775,6 +941,8 @@ export async function ensureMapboxPreview() {
     });
     map.on('remove', () => {
       clearDomPointMarkers();
+      draw = null;
+      drawBound = false;
     });
   } else {
     map.resize();
@@ -791,6 +959,135 @@ export async function ensureMapboxPreview() {
   syncDomPointMarkers();
 
   return { ok: true, map };
+}
+
+export function setMapboxLineToolVisible(visible) {
+  drawVisible = Boolean(visible);
+  if (!draw) return false;
+  if (!drawVisible) {
+    draw.changeMode('simple_select');
+    return true;
+  }
+  if (drawMode === 'draw' || drawMode === 'curve') draw.changeMode('draw_line_string');
+  else if (drawMode === 'edit') draw.changeMode('direct_select');
+  else draw.changeMode('simple_select');
+  return true;
+}
+
+export function setMapboxLineToolMode(mode = 'draw') {
+  drawMode = String(mode || 'draw');
+  if (!draw || !drawVisible) return true;
+  if (drawMode === 'draw' || drawMode === 'curve') draw.changeMode('draw_line_string');
+  else if (drawMode === 'edit') draw.changeMode('direct_select');
+  else draw.changeMode('simple_select');
+  return true;
+}
+
+export function setMapboxLineToolSnapEnabled(enabled = true) {
+  drawSnapEnabled = Boolean(enabled);
+  return true;
+}
+
+export function setMapboxLineToolStyle(style = 'dashed') {
+  drawLineStyle = ['solid', 'dashed', 'dashdot'].includes(style) ? style : 'dashed';
+  getDrawLineFeatures().forEach((feature) => {
+    if (feature?.id) applyDrawStyleToFeature(feature.id);
+  });
+  syncDrawLinePaint();
+  return true;
+}
+
+export function setMapboxLineToolColor(color = '#E7C769') {
+  drawLineColor = /^#[0-9a-f]{6}$/i.test(String(color || '')) ? String(color) : '#E7C769';
+  getDrawLineFeatures().forEach((feature) => {
+    if (feature?.id) applyDrawStyleToFeature(feature.id);
+  });
+  syncDrawLinePaint();
+  return true;
+}
+
+export function undoMapboxLineDraft() {
+  if (!draw || drawHistory.length < 2) return false;
+  drawHistory.pop();
+  const snapshot = drawHistory[drawHistory.length - 1] || [];
+  clearMapboxLineDraft();
+  if (!snapshot.length) return true;
+  const coords = snapshot.map((v) => [Number(v.lng), Number(v.lat)]).filter(([lng, lat]) => Number.isFinite(lat) && Number.isFinite(lng));
+  if (coords.length < 2) return true;
+  const featureId = draw.add({
+    type: 'Feature',
+    properties: { edgeStyle: drawLineStyle, edgeColor: drawLineColor },
+    geometry: { type: 'LineString', coordinates: coords },
+  })?.[0];
+  if (featureId) applyDrawStyleToFeature(featureId);
+  syncDrawLinePaint();
+  return true;
+}
+
+export function clearMapboxLineDraft() {
+  if (!draw) return false;
+  const lines = getDrawLineFeatures();
+  if (!lines.length) return true;
+  lines.forEach((feature) => {
+    if (feature?.id) draw.delete(feature.id);
+  });
+  syncDrawLinePaint();
+  return true;
+}
+
+export function getMapboxLineDraftSnapshot() {
+  return captureDrawSnapshot();
+}
+
+export function setMapboxLineDraftFromPoints(vertices = []) {
+  if (!draw) return false;
+  clearMapboxLineDraft();
+  const coords = (Array.isArray(vertices) ? vertices : [])
+    .map((vertex) => [Number(vertex?.lng), Number(vertex?.lat)])
+    .filter(([lng, lat]) => Number.isFinite(lat) && Number.isFinite(lng));
+  if (coords.length < 2) return true;
+  const first = coords[0];
+  const last = coords[coords.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    // keep as open polyline
+  }
+  const featureId = draw.add({
+    type: 'Feature',
+    properties: { edgeStyle: drawLineStyle, edgeColor: drawLineColor },
+    geometry: { type: 'LineString', coordinates: coords },
+  })?.[0];
+  if (featureId) applyDrawStyleToFeature(featureId);
+  syncDrawLinePaint();
+  pushDrawHistory();
+  return true;
+}
+
+export function applyMapboxLineDraftToRoute() {
+  if (!draw) {
+    return { ok: false, message: 'Mapbox draw is not initialized' };
+  }
+  const snapshot = captureDrawSnapshot();
+  if (!snapshot.length) {
+    return { ok: false, message: 'Додайте лінію маршруту' };
+  }
+  const pointIds = [];
+  snapshot.forEach((vertex) => {
+    let pointId = Number(vertex?.pointId);
+    if (!Number.isFinite(pointId) || pointId <= 0) {
+      if (drawSnapEnabled) {
+        const snap = nearestPointFor(Number(vertex?.lat), Number(vertex?.lng), 35);
+        pointId = snap?.point?.id ? Number(snap.point.id) : NaN;
+      }
+    }
+    if (Number.isFinite(pointId) && pointId > 0 && !pointIds.includes(pointId)) {
+      pointIds.push(pointId);
+    }
+  });
+  return {
+    ok: true,
+    pointIds,
+    color: drawLineColor,
+  };
 }
 
 export function resizeMapboxPreview() {

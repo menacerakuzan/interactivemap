@@ -13,6 +13,16 @@ import {
   setMapboxPoints,
   setMapboxStyle,
   getMapboxStyleKey,
+  setMapboxLineToolVisible,
+  setMapboxLineToolMode,
+  setMapboxLineToolSnapEnabled,
+  setMapboxLineToolStyle,
+  setMapboxLineToolColor,
+  undoMapboxLineDraft,
+  clearMapboxLineDraft,
+  setMapboxLineDraftFromPoints,
+  getMapboxLineDraftSnapshot,
+  applyMapboxLineDraftToRoute,
 } from './js/mapboxPreview.js';
 import { dataService } from './js/dataService.js';
 import { COMMUNITIES_BY_DISTRICT, DISTRICT_CENTERS } from './js/communities.js';
@@ -621,6 +631,75 @@ function syncMapEngineButton() {
     const key3d = getMapboxPerspective?.() ? 'mapbox_2d_btn' : 'mapbox_3d_btn';
     btn3D.textContent = translations[currentLang]?.[key3d] || '3D';
   }
+}
+
+function isMapboxEngineActive() {
+  return currentMapEngine === 'mapbox';
+}
+
+function lineToolsApi() {
+  if (isMapboxEngineActive()) {
+    return {
+      setLineToolVisible: setMapboxLineToolVisible,
+      setLineToolMode: setMapboxLineToolMode,
+      setLineToolSnapEnabled: setMapboxLineToolSnapEnabled,
+      setLineToolStyle: setMapboxLineToolStyle,
+      setLineToolColor: setMapboxLineToolColor,
+      undoLineDraft: undoMapboxLineDraft,
+      clearLineDraft: clearMapboxLineDraft,
+      setLineDraftFromPoints: setMapboxLineDraftFromPoints,
+      getLineDraftSnapshot: getMapboxLineDraftSnapshot,
+      applyLineDraftToRoute: applyMapboxLineDraftToRoute,
+      stopPointDrag: () => {},
+    };
+  }
+  return {
+    setLineToolVisible: mapController?.setLineToolVisible?.bind(mapController),
+    setLineToolMode: mapController?.setLineToolMode?.bind(mapController),
+    setLineToolSnapEnabled: mapController?.setLineToolSnapEnabled?.bind(mapController),
+    setLineToolStyle: mapController?.setLineToolStyle?.bind(mapController),
+    setLineToolColor: mapController?.setLineToolColor?.bind(mapController),
+    undoLineDraft: mapController?.undoLineDraft?.bind(mapController),
+    clearLineDraft: mapController?.clearLineDraft?.bind(mapController),
+    setLineDraftFromPoints: mapController?.setLineDraftFromPoints?.bind(mapController),
+    getLineDraftSnapshot: mapController?.getLineDraftSnapshot?.bind(mapController),
+    applyLineDraftToRoute: mapController?.applyLineDraftToRoute?.bind(mapController),
+    stopPointDrag: mapController?.stopPointDrag?.bind(mapController),
+  };
+}
+
+function lineSetVisible(value) {
+  lineToolsApi().setLineToolVisible?.(value);
+}
+function lineSetMode(value) {
+  lineToolsApi().setLineToolMode?.(value);
+}
+function lineSetSnap(value) {
+  lineToolsApi().setLineToolSnapEnabled?.(value);
+}
+function lineSetStyle(value) {
+  lineToolsApi().setLineToolStyle?.(value);
+}
+function lineSetColor(value) {
+  lineToolsApi().setLineToolColor?.(value);
+}
+function lineUndo() {
+  return lineToolsApi().undoLineDraft?.();
+}
+function lineClear() {
+  return lineToolsApi().clearLineDraft?.();
+}
+function lineSetDraft(vertices) {
+  return lineToolsApi().setLineDraftFromPoints?.(vertices);
+}
+function lineGetDraft() {
+  return lineToolsApi().getLineDraftSnapshot?.() || [];
+}
+function lineApplyToRoute() {
+  return lineToolsApi().applyLineDraftToRoute?.();
+}
+function lineStopPointDrag(payload = { commit: false }) {
+  return lineToolsApi().stopPointDrag?.(payload);
 }
 
 function hasValidSupabaseSession(session) {
@@ -1350,8 +1429,8 @@ function setActiveSpecialistTab(tabName) {
     mapView.classList.toggle('route-toolbar-visible', showRouteLineToolbar);
   }
   // Do not auto-arm drawing on tab open.
-  mapController?.setLineToolVisible?.(false);
-  mapController?.stopPointDrag?.({ commit: false });
+  lineSetVisible(false);
+  lineStopPointDrag({ commit: false });
 
   saveUiState();
 }
@@ -1428,7 +1507,7 @@ function resolveRouteEditorPointsForMap() {
 }
 
 function syncRouteLineDraftFromEditor() {
-  mapController?.setLineDraftFromPoints?.(resolveRouteEditorPointsForMap());
+  lineSetDraft(resolveRouteEditorPointsForMap());
 }
 
 function refreshRouteSelectors() {
@@ -2084,8 +2163,8 @@ function setAuthState(token, user, session = undefined) {
     if (mapView) {
       mapView.classList.remove('route-toolbar-visible');
     }
-    mapController?.setLineToolVisible?.(false);
-    mapController?.stopPointDrag?.({ commit: false });
+    lineSetVisible(false);
+    lineStopPointDrag({ commit: false });
   }
 }
 
@@ -2141,12 +2220,12 @@ function resetRouteEditor() {
   if (routeColorInput) routeColorInput.value = DEFAULT_ROUTE_COLOR;
   const lineColorInput = document.getElementById('line-color-input');
   if (lineColorInput) lineColorInput.value = DEFAULT_ROUTE_COLOR;
-  mapController?.setLineToolColor?.(DEFAULT_ROUTE_COLOR);
+  lineSetColor(DEFAULT_ROUTE_COLOR);
   setSelectedRouteTransportModes([]);
-  mapController?.clearLineDraft?.();
-  mapController?.setLineToolMode?.('draw');
-  mapController?.setLineToolVisible?.(false);
-  mapController?.setLineToolSnapEnabled?.(true);
+  lineClear();
+  lineSetMode('draw');
+  lineSetVisible(false);
+  lineSetSnap(true);
   renderRoutePointOrder();
   mapController?.clearRouteHighlight?.();
   syncEditorActionButtons();
@@ -2166,7 +2245,7 @@ function openRouteInEditor(routeId, options = {}) {
   if (routeColorInput) routeColorInput.value = route.routeColor || getRouteColor(route.id);
   const lineColorInput = document.getElementById('line-color-input');
   if (lineColorInput) lineColorInput.value = route.routeColor || getRouteColor(route.id);
-  mapController?.setLineToolColor?.(route.routeColor || getRouteColor(route.id));
+  lineSetColor(route.routeColor || getRouteColor(route.id));
   setSelectedRouteTransportModes(route.transportModes || []);
   routeEditorPoints = route.points.map((p) => ({ pointId: p.id, title: p.title }));
   routeOrderHistory = [];
@@ -2182,9 +2261,9 @@ function openRouteInEditor(routeId, options = {}) {
       edgeColor: route.routeColor || getRouteColor(route.id),
       edgeCurve: false,
     }));
-  mapController?.setLineDraftFromPoints?.(routeDraftPath);
-  mapController?.setLineToolMode?.('draw');
-  mapController?.setLineToolVisible?.(false);
+  lineSetDraft(routeDraftPath);
+  lineSetMode('draw');
+  lineSetVisible(false);
   renderRoutePointOrder();
   mapController?.highlightRoute?.(route);
   setActiveSpecialistTab('route-editor');
@@ -2912,9 +2991,9 @@ function bindSpecialistTools() {
   };
 
   setLineToolButtonState('cursor');
-  mapController?.setLineToolVisible?.(false);
-  mapController?.setLineToolMode?.('draw');
-  mapController?.setLineToolSnapEnabled?.(lineSnapEnabled);
+  lineSetVisible(false);
+  lineSetMode('draw');
+  lineSetSnap(lineSnapEnabled);
   if (btnLineSnap) btnLineSnap.classList.toggle('active', lineSnapEnabled);
 
   if (routeLineToolbar) {
@@ -2956,7 +3035,7 @@ function bindSpecialistTools() {
   if (btnLineCursor) {
     btnLineCursor.addEventListener('click', () => {
       setLineToolButtonState('cursor');
-      mapController?.setLineToolVisible?.(false);
+      lineSetVisible(false);
       setSpecialistMessage('Режим курсора: перегляд точок без редагування лінії');
     });
   }
@@ -2964,8 +3043,8 @@ function bindSpecialistTools() {
   if (btnLineDraw) {
     btnLineDraw.addEventListener('click', () => {
       setLineToolButtonState('draw');
-      mapController?.setLineToolVisible?.(true);
-      mapController?.setLineToolMode?.('draw');
+      lineSetVisible(true);
+      lineSetMode('draw');
       setSpecialistMessage('Перо: клік по карті додає вершину. Alt = тимчасово без snap.');
     });
   }
@@ -2973,8 +3052,8 @@ function bindSpecialistTools() {
   if (btnLineCurve) {
     btnLineCurve.addEventListener('click', () => {
       setLineToolButtonState('curve');
-      mapController?.setLineToolVisible?.(true);
-      mapController?.setLineToolMode?.('curve');
+      lineSetVisible(true);
+      lineSetMode('curve');
       setSpecialistMessage('Крива: ставте опорні точки, лінія згладжується автоматично.');
     });
   }
@@ -2982,8 +3061,8 @@ function bindSpecialistTools() {
   if (btnLineEdit) {
     btnLineEdit.addEventListener('click', () => {
       setLineToolButtonState('edit');
-      mapController?.setLineToolVisible?.(true);
-      mapController?.setLineToolMode?.('edit');
+      lineSetVisible(true);
+      lineSetMode('edit');
       setSpecialistMessage('Редагування: тягніть вузли мишкою, клік по сегменту додає вузол, Alt+клік по вузлу видаляє.');
     });
   }
@@ -2991,8 +3070,8 @@ function bindSpecialistTools() {
   if (btnLineErase) {
     btnLineErase.addEventListener('click', () => {
       setLineToolButtonState('erase');
-      mapController?.setLineToolVisible?.(true);
-      mapController?.setLineToolMode?.('erase');
+      lineSetVisible(true);
+      lineSetMode('erase');
       setSpecialistMessage('Режим стирача: клікніть біля вузла, щоб видалити його');
     });
   }
@@ -3000,7 +3079,7 @@ function bindSpecialistTools() {
   if (btnLineSnap) {
     btnLineSnap.addEventListener('click', () => {
       lineSnapEnabled = !lineSnapEnabled;
-      mapController?.setLineToolSnapEnabled?.(lineSnapEnabled);
+      lineSetSnap(lineSnapEnabled);
       btnLineSnap.classList.toggle('active', lineSnapEnabled);
       btnLineSnap.textContent = lineSnapEnabled ? 'Snap ON' : 'Snap OFF';
       setSpecialistMessage(lineSnapEnabled ? 'Snap увімкнено' : 'Snap вимкнено');
@@ -3009,7 +3088,7 @@ function bindSpecialistTools() {
 
   if (btnLineUndo) {
     btnLineUndo.addEventListener('click', () => {
-      const ok = mapController?.undoLineDraft?.();
+      const ok = lineUndo();
       if (!ok) {
         setSpecialistMessage('Немає точок для скасування', true);
       }
@@ -3018,23 +3097,23 @@ function bindSpecialistTools() {
 
   if (btnLineClear) {
     btnLineClear.addEventListener('click', () => {
-      mapController?.clearLineDraft?.();
+      lineClear();
       setSpecialistMessage('Лінію очищено');
     });
   }
 
   if (lineStyleSelect) {
-    mapController?.setLineToolStyle?.(lineStyleSelect.value || 'dashed');
+    lineSetStyle(lineStyleSelect.value || 'dashed');
     lineStyleSelect.addEventListener('change', () => {
-      mapController?.setLineToolStyle?.(lineStyleSelect.value || 'dashed');
+      lineSetStyle(lineStyleSelect.value || 'dashed');
     });
   }
 
   if (lineColorInput) {
-    mapController?.setLineToolColor?.(lineColorInput.value || DEFAULT_ROUTE_COLOR);
+    lineSetColor(lineColorInput.value || DEFAULT_ROUTE_COLOR);
     lineColorInput.addEventListener('input', () => {
       const value = lineColorInput.value || DEFAULT_ROUTE_COLOR;
-      mapController?.setLineToolColor?.(value);
+      lineSetColor(value);
       const routeColorInputEl = document.getElementById('route-color');
       if (routeColorInputEl) routeColorInputEl.value = value;
     });
@@ -3042,8 +3121,8 @@ function bindSpecialistTools() {
 
   if (btnLineApplyRoute) {
     btnLineApplyRoute.addEventListener('click', () => {
-      const lineDraftSnapshot = mapController?.getLineDraftSnapshot?.() || [];
-      const result = mapController?.applyLineDraftToRoute?.();
+      const lineDraftSnapshot = lineGetDraft() || [];
+      const result = lineApplyToRoute();
       if (!result?.ok) {
         setSpecialistMessage(result?.message || 'Не вдалося застосувати лінію', true);
         return;
@@ -3066,7 +3145,7 @@ function bindSpecialistTools() {
       routeEditorPoints = mappedPoints;
       renderRoutePointOrder();
       if (lineDraftSnapshot.length) {
-        mapController?.setLineDraftFromPoints?.(lineDraftSnapshot);
+        lineSetDraft(lineDraftSnapshot);
       }
 
       if (result.color) {
@@ -3197,7 +3276,7 @@ function bindSpecialistTools() {
         status: 'published',
         routeColor: document.getElementById('route-color')?.value || DEFAULT_ROUTE_COLOR,
         points: validatedPoints.points,
-        pathJson: buildValidatedRoutePath(mapController?.getLineDraftSnapshot?.() || []),
+        pathJson: buildValidatedRoutePath(lineGetDraft() || []),
       };
       if (!payload.name) {
         setSpecialistMessage('Вкажіть назву маршруту', true);
@@ -3235,7 +3314,7 @@ function bindSpecialistTools() {
         status: 'published',
         routeColor: document.getElementById('route-color')?.value || getRouteColor(editingRouteId),
         points: validatedPoints.points,
-        pathJson: buildValidatedRoutePath(mapController?.getLineDraftSnapshot?.() || []),
+        pathJson: buildValidatedRoutePath(lineGetDraft() || []),
       };
       if (!payload.name) {
         setSpecialistMessage('Вкажіть назву маршруту', true);
@@ -3517,7 +3596,7 @@ function bindSpecialistTools() {
 
   if (routeColorInput) {
     routeColorInput.addEventListener('input', () => {
-      mapController?.setLineToolColor?.(routeColorInput.value || DEFAULT_ROUTE_COLOR);
+      lineSetColor(routeColorInput.value || DEFAULT_ROUTE_COLOR);
       if (lineColorInput) lineColorInput.value = routeColorInput.value || DEFAULT_ROUTE_COLOR;
       if (!editingRouteId) return;
       const route = dashboardRoutes.find((r) => r.id === editingRouteId);
