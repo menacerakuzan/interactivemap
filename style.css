@@ -423,6 +423,15 @@ body::before {
   pointer-events: none;
 }
 
+.mapbox-dom-point {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--point-color, #E7C769);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(11, 37, 69, 0.25);
+}
+
 body.mapbox-preview-active .filter-menu {
   opacity: 1 !important;
   pointer-events: auto !important;

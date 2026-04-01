@@ -14,6 +14,7 @@ let is3DMode = false;
 let allPoints = [];
 let currentStyleKey = 'standard';
 let pointsBridgeBound = false;
+let domPointMarkers = [];
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -57,10 +58,53 @@ function normalizeApiPoint(point) {
     title: point?.title || '',
     lat: Number(latRaw),
     lng: Number(lngRaw),
+    color: String(
+      point?.pointType?.color
+      || point?.point_type?.color
+      || point?.pointTypeColor
+      || '#E7C769'
+    ),
     pointType: pointType
       ? { code: pointType.code || pointType?.id || '' }
       : { code: '' },
   };
+}
+
+function clearDomPointMarkers() {
+  if (!domPointMarkers.length) return;
+  domPointMarkers.forEach((marker) => {
+    try {
+      marker.remove();
+    } catch (_e) {
+      // noop
+    }
+  });
+  domPointMarkers = [];
+}
+
+function syncDomPointMarkers() {
+  if (!map) return;
+  clearDomPointMarkers();
+  const points = Array.isArray(allPoints) ? allPoints : [];
+  points.forEach((point) => {
+    const lat = Number(point?.lat);
+    const lng = Number(point?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    const markerEl = document.createElement('div');
+    markerEl.className = 'mapbox-dom-point';
+    markerEl.style.setProperty('--point-color', point?.color || '#E7C769');
+    markerEl.setAttribute('title', String(point?.title || 'Point'));
+
+    const marker = new mapboxgl.Marker({
+      element: markerEl,
+      anchor: 'center',
+    })
+      .setLngLat([lng, lat])
+      .addTo(map);
+
+    domPointMarkers.push(marker);
+  });
 }
 
 function collectGeometryCoords(geometry, acc = []) {
@@ -236,10 +280,12 @@ function updatePointsSource() {
   if (!source?.setData) {
     pointsLoaded = false;
     ensurePointsLayer().catch(() => null);
+    syncDomPointMarkers();
     return;
   }
   const collection = buildPointFeatureCollection();
   source.setData(collection);
+  syncDomPointMarkers();
   setStatus(`Mapbox points: ${collection.features.length}`);
 }
 
@@ -396,6 +442,7 @@ export function setMapboxPoints(points = []) {
   if (typeof window !== 'undefined') {
     window.__ODESA_POINTS_CACHE = allPoints;
   }
+  syncDomPointMarkers();
   if (!map) return;
   if (!pointsLoaded) return;
   updatePointsSource();
@@ -426,6 +473,7 @@ async function handleStyleReady() {
   } catch (_e) {
     setStatus('Mapbox: points layer error');
   }
+  syncDomPointMarkers();
   if (is3DMode) {
     try {
       setMapboxPerspective(true);
@@ -477,6 +525,9 @@ export async function ensureMapboxPreview() {
     map.on('load', () => {
       handleStyleReady().catch(() => null);
     });
+    map.on('remove', () => {
+      clearDomPointMarkers();
+    });
   } else {
     map.resize();
     if (map.isStyleLoaded()) await handleStyleReady();
@@ -489,6 +540,7 @@ export async function ensureMapboxPreview() {
       updatePointsSource();
     }
   }
+  syncDomPointMarkers();
 
   return { ok: true, map };
 }
