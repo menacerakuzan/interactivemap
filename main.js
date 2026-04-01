@@ -4110,8 +4110,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentMapEngine = engine === 'mapbox' ? 'mapbox' : 'leaflet';
     const isMapbox = currentMapEngine === 'mapbox';
     document.body.classList.toggle('mapbox-preview-active', isMapbox);
+    if (leafletMapView) leafletMapView.classList.toggle('map-engine-mapbox', isMapbox);
 
-    if (leafletMapView) leafletMapView.style.display = isMapbox ? 'none' : 'block';
+    if (leafletMapView) leafletMapView.style.display = 'block';
     if (mapboxPreviewWrap) mapboxPreviewWrap.style.display = isMapbox ? 'block' : 'none';
     if (contextPanel) contextPanel.style.display = '';
     if (btnMapbox3DToggle) btnMapbox3DToggle.style.display = isMapbox ? 'inline-flex' : 'none';
@@ -4150,6 +4151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!preview?.ok) {
         currentMapEngine = 'leaflet';
         document.body.classList.remove('mapbox-preview-active');
+        if (leafletMapView) leafletMapView.classList.remove('map-engine-mapbox');
         if (leafletMapView) leafletMapView.style.display = 'block';
         if (mapboxPreviewWrap) mapboxPreviewWrap.style.display = 'none';
         syncMapEngineButton();

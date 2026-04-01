@@ -392,6 +392,17 @@ body::before {
   transition: transform var(--t-fast) var(--ease-smooth);
 }
 
+.map-view.map-engine-mapbox .leaflet-pane,
+.map-view.map-engine-mapbox .leaflet-control-container,
+.map-view.map-engine-mapbox .leaflet-marker-pane,
+.map-view.map-engine-mapbox .leaflet-shadow-pane,
+.map-view.map-engine-mapbox .leaflet-overlay-pane,
+.map-view.map-engine-mapbox .leaflet-tooltip-pane,
+.map-view.map-engine-mapbox .leaflet-popup-pane {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .mapbox-preview-wrap {
   position: absolute;
   inset: 0;
