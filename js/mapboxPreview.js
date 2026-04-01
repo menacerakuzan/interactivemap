@@ -13,6 +13,7 @@ let pointsLoaded = false;
 let is3DMode = false;
 let allPoints = [];
 let currentStyleKey = 'standard';
+let pointsBridgeBound = false;
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -49,11 +50,13 @@ function setStatus(message = '') {
 
 function normalizeApiPoint(point) {
   const pointType = point?.pointType || point?.point_type || null;
+  const latRaw = point?.lat ?? point?.latitude ?? point?.point_lat ?? point?.y;
+  const lngRaw = point?.lng ?? point?.lon ?? point?.longitude ?? point?.point_lng ?? point?.x;
   return {
     id: point?.id ?? null,
     title: point?.title || '',
-    lat: Number(point?.lat),
-    lng: Number(point?.lng),
+    lat: Number(latRaw),
+    lng: Number(lngRaw),
     pointType: pointType
       ? { code: pointType.code || pointType?.id || '' }
       : { code: '' },
@@ -115,6 +118,22 @@ async function fetchPointsFallback() {
   } catch (_e) {
     return [];
   }
+}
+
+function bindPointsBridge() {
+  if (pointsBridgeBound || typeof window === 'undefined') return;
+  pointsBridgeBound = true;
+
+  window.addEventListener('map:points-updated', (event) => {
+    const rows = Array.isArray(event?.detail) ? event.detail : [];
+    allPoints = rows.map(normalizeApiPoint);
+    if (!map || !map.isStyleLoaded()) return;
+    if (!pointsLoaded) {
+      ensurePointsLayer().catch(() => null);
+      return;
+    }
+    updatePointsSource();
+  });
 }
 
 function buildPointFeatureCollection() {
@@ -369,7 +388,10 @@ function applyTimePreset() {
 }
 
 export function setMapboxPoints(points = []) {
-  allPoints = Array.isArray(points) ? points : [];
+  allPoints = (Array.isArray(points) ? points : []).map(normalizeApiPoint);
+  if (typeof window !== 'undefined') {
+    window.__ODESA_POINTS_CACHE = allPoints;
+  }
   if (!map) return;
   if (!pointsLoaded) return;
   updatePointsSource();
@@ -431,6 +453,7 @@ export async function ensureMapboxPreview() {
 
   mapboxgl.accessToken = token;
   setStatus('Mapbox: initializing...');
+  bindPointsBridge();
 
   if (!map) {
     map = new mapboxgl.Map({
@@ -453,6 +476,14 @@ export async function ensureMapboxPreview() {
   } else {
     map.resize();
     if (map.isStyleLoaded()) await handleStyleReady();
+  }
+
+  if (!allPoints.length && typeof window !== 'undefined' && Array.isArray(window.__ODESA_POINTS_CACHE)) {
+    allPoints = window.__ODESA_POINTS_CACHE.map(normalizeApiPoint);
+    if (map.isStyleLoaded()) {
+      if (!pointsLoaded) await ensurePointsLayer();
+      updatePointsSource();
+    }
   }
 
   return { ok: true, map };

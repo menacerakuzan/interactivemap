@@ -136,6 +136,9 @@ const hiddenPointTypeCodes = new Set();
 let communityCentersIndexPromise = null;
 let boundaryGeoIndexPromise = null;
 let currentMapEngine = 'leaflet';
+if (typeof window !== 'undefined' && !Array.isArray(window.__ODESA_POINTS_CACHE)) {
+  window.__ODESA_POINTS_CACHE = [];
+}
 const MAX_POINT_SECTION_COUNT = 12;
 const ROUTE_COLOR_KEY = 'odesaRouteColors';
 const DEFAULT_ROUTE_COLOR = '#E7C769';
@@ -1875,6 +1878,9 @@ async function refreshDashboardData() {
     if (!knownTypeCodes.has(code)) hiddenPointTypeCodes.delete(code);
   });
   dashboardPoints = (pointRows || []).map((point) => normalizePointRecord(point));
+  if (typeof window !== 'undefined') {
+    window.__ODESA_POINTS_CACHE = dashboardPoints;
+  }
   setMapboxPoints(dashboardPoints);
   dashboardRoutes = (routeRows || []).map((r) => ({
     ...r,
@@ -1910,6 +1916,9 @@ async function refreshPublicData() {
       if (!knownTypeCodes.has(code)) hiddenPointTypeCodes.delete(code);
     });
     dashboardPoints = (pointRows || []).map((point) => normalizePointRecord(point));
+    if (typeof window !== 'undefined') {
+      window.__ODESA_POINTS_CACHE = dashboardPoints;
+    }
     setMapboxPoints(dashboardPoints);
     dashboardRoutes = (routeRows || []).map((r) => ({
       ...r,
