@@ -1,6 +1,14 @@
 import { initLenis, initInteractions } from './js/globalEffects.js';
 import { initMap } from './js/mapInit.js';
-import { ensureMapboxPreview, resizeMapboxPreview } from './js/mapboxPreview.js';
+import {
+  ensureMapboxPreview,
+  resizeMapboxPreview,
+  setMapboxFocusBoundary,
+  clearMapboxFocusBoundary,
+  focusMapboxBoundary,
+  focusMapboxLocation,
+  resetMapboxView,
+} from './js/mapboxPreview.js';
 import { dataService } from './js/dataService.js';
 import { COMMUNITIES_BY_DISTRICT, DISTRICT_CENTERS } from './js/communities.js';
 
@@ -2590,9 +2598,14 @@ function bindFilterMenu() {
       if (!mapController) return;
 
       if (!value) {
-        mapController.clearFocusBoundary?.();
-        mapController.focusLocation?.(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
-        await mapController.setFilter({ type: 'all', certified: false, district: '', community: '' });
+        if (currentMapEngine === 'mapbox') {
+          clearMapboxFocusBoundary();
+          resetMapboxView();
+        } else {
+          mapController.clearFocusBoundary?.();
+          mapController.focusLocation?.(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
+          await mapController.setFilter({ type: 'all', certified: false, district: '', community: '' });
+        }
         setSpecialistMessage(currentLang === 'uk' ? 'Фокус на Одесі' : 'Focus set to Odesa');
         saveUiState();
         return;
@@ -2601,23 +2614,38 @@ function bindFilterMenu() {
       if (value.startsWith('district::')) {
         const district = value.split('::')[1];
         selectedDistrict = district;
-        await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: '' });
+        if (currentMapEngine !== 'mapbox') {
+          await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: '' });
+        }
         const districtGeo = await geocodeDistrict(district);
         if (requestId !== locationFocusRequestId) return;
-        const hasBoundary = districtGeo?.geojson ? mapController.setFocusBoundary?.(districtGeo.geojson) : false;
-        if (!hasBoundary) mapController.clearFocusBoundary?.();
-        const districtNeedle = normalizeGeoText(district);
-        const points = dashboardPoints.filter((p) =>
-          normalizeGeoText(p.district).includes(districtNeedle)
-        );
-        const focusedByPoints = mapController.focusPoints?.(points, { maxZoom: 11, singleZoom: 11 });
-        if (districtGeo && hasBoundary) {
-          mapController.focusBoundary?.({ maxZoom: 11 });
-        } else if (districtGeo) {
-          mapController.focusLocation?.(districtGeo.lat, districtGeo.lng, districtGeo.zoom || 11);
-        } else if (!focusedByPoints) {
-          const center = DISTRICT_CENTERS[district];
-          if (center) mapController.focusLocation?.(center.lat, center.lng, center.zoom || 11);
+        if (currentMapEngine === 'mapbox') {
+          const hasBoundary = districtGeo?.geojson ? setMapboxFocusBoundary(districtGeo.geojson) : false;
+          if (!hasBoundary) clearMapboxFocusBoundary();
+          if (districtGeo && hasBoundary) {
+            focusMapboxBoundary({ maxZoom: 11 });
+          } else if (districtGeo) {
+            focusMapboxLocation(districtGeo.lat, districtGeo.lng, districtGeo.zoom || 11);
+          } else {
+            const center = DISTRICT_CENTERS[district];
+            if (center) focusMapboxLocation(center.lat, center.lng, center.zoom || 11);
+          }
+        } else {
+          const hasBoundary = districtGeo?.geojson ? mapController.setFocusBoundary?.(districtGeo.geojson) : false;
+          if (!hasBoundary) mapController.clearFocusBoundary?.();
+          const districtNeedle = normalizeGeoText(district);
+          const points = dashboardPoints.filter((p) =>
+            normalizeGeoText(p.district).includes(districtNeedle)
+          );
+          const focusedByPoints = mapController.focusPoints?.(points, { maxZoom: 11, singleZoom: 11 });
+          if (districtGeo && hasBoundary) {
+            mapController.focusBoundary?.({ maxZoom: 11 });
+          } else if (districtGeo) {
+            mapController.focusLocation?.(districtGeo.lat, districtGeo.lng, districtGeo.zoom || 11);
+          } else if (!focusedByPoints) {
+            const center = DISTRICT_CENTERS[district];
+            if (center) mapController.focusLocation?.(center.lat, center.lng, center.zoom || 11);
+          }
         }
         setSpecialistMessage(
           currentLang === 'uk' ? `Фокус на: ${district}` : `Focused on district: ${district}`
@@ -2628,38 +2656,55 @@ function bindFilterMenu() {
         const [, district, community] = value.split('::');
         selectedDistrict = district;
         selectedCommunity = community;
-        await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: selectedCommunity });
-        const districtNeedle = normalizeGeoText(district);
-        const communityNeedle = normalizeGeoText(community);
-        const strictCommunityPoints = dashboardPoints.filter((p) => {
-          const districtValue = normalizeGeoText(p.district);
-          const communityValue = normalizeGeoText(p.community);
-          return (
-            districtValue.includes(districtNeedle) &&
-            communityValue &&
-            communityValue.includes(communityNeedle)
-          );
-        });
-        const districtOnlyPoints = dashboardPoints.filter((p) =>
-          normalizeGeoText(p.district).includes(districtNeedle)
-        );
-        const pointsForFocus = strictCommunityPoints.length ? strictCommunityPoints : districtOnlyPoints;
-        const focusedByPoints = mapController.focusPoints?.(pointsForFocus, { maxZoom: 13, singleZoom: 13 });
+        if (currentMapEngine !== 'mapbox') {
+          await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: selectedCommunity });
+        }
 
         const geo = await geocodeCommunity(district, community);
         if (requestId !== locationFocusRequestId) return;
-        const hasBoundary = geo?.geojson ? mapController.setFocusBoundary?.(geo.geojson) : false;
-        if (!hasBoundary) mapController.clearFocusBoundary?.();
+        let hasBoundary = false;
+        if (currentMapEngine === 'mapbox') {
+          hasBoundary = geo?.geojson ? setMapboxFocusBoundary(geo.geojson) : false;
+          if (!hasBoundary) clearMapboxFocusBoundary();
+          if (geo && hasBoundary) {
+            focusMapboxBoundary({ maxZoom: 13 });
+          } else if (geo) {
+            focusMapboxLocation(geo.lat, geo.lng, geo.zoom || 13);
+          } else if (DISTRICT_CENTERS[district]) {
+            const center = DISTRICT_CENTERS[district];
+            focusMapboxLocation(center.lat, center.lng, center.zoom || 11);
+          }
+        } else {
+          const districtNeedle = normalizeGeoText(district);
+          const communityNeedle = normalizeGeoText(community);
+          const strictCommunityPoints = dashboardPoints.filter((p) => {
+            const districtValue = normalizeGeoText(p.district);
+            const communityValue = normalizeGeoText(p.community);
+            return (
+              districtValue.includes(districtNeedle) &&
+              communityValue &&
+              communityValue.includes(communityNeedle)
+            );
+          });
+          const districtOnlyPoints = dashboardPoints.filter((p) =>
+            normalizeGeoText(p.district).includes(districtNeedle)
+          );
+          const pointsForFocus = strictCommunityPoints.length ? strictCommunityPoints : districtOnlyPoints;
+          const focusedByPoints = mapController.focusPoints?.(pointsForFocus, { maxZoom: 13, singleZoom: 13 });
 
-        if (geo && hasBoundary) {
-          mapController.focusBoundary?.({ maxZoom: 13 });
-        } else if (geo) {
-          mapController.focusLocation?.(geo.lat, geo.lng, geo.zoom || 13);
-        } else if (focusedByPoints) {
-          // already focused by local points for selected district/community
-        } else if (DISTRICT_CENTERS[district]) {
-          const center = DISTRICT_CENTERS[district];
-          mapController.focusLocation?.(center.lat, center.lng, center.zoom || 11);
+          hasBoundary = geo?.geojson ? mapController.setFocusBoundary?.(geo.geojson) : false;
+          if (!hasBoundary) mapController.clearFocusBoundary?.();
+
+          if (geo && hasBoundary) {
+            mapController.focusBoundary?.({ maxZoom: 13 });
+          } else if (geo) {
+            mapController.focusLocation?.(geo.lat, geo.lng, geo.zoom || 13);
+          } else if (focusedByPoints) {
+            // already focused by local points for selected district/community
+          } else if (DISTRICT_CENTERS[district]) {
+            const center = DISTRICT_CENTERS[district];
+            mapController.focusLocation?.(center.lat, center.lng, center.zoom || 11);
+          }
         }
         setSpecialistMessage(
           hasBoundary

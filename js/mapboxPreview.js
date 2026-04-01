@@ -4,6 +4,10 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 const ODESA_START = { lng: 30.7233, lat: 46.4825, zoom: 10.8 };
 let map = null;
 let pointsLoaded = false;
+let focusBoundaryData = {
+  type: 'FeatureCollection',
+  features: [],
+};
 
 function getToken() {
   return (
@@ -24,6 +28,36 @@ function setStatus(message = '') {
   }
   node.style.display = 'block';
   node.textContent = message;
+}
+
+function collectGeometryCoords(geometry, acc = []) {
+  if (!geometry || typeof geometry !== 'object') return acc;
+  const scan = (node) => {
+    if (!Array.isArray(node)) return;
+    if (node.length >= 2 && Number.isFinite(Number(node[0])) && Number.isFinite(Number(node[1]))) {
+      acc.push([Number(node[0]), Number(node[1])]);
+      return;
+    }
+    node.forEach(scan);
+  };
+  scan(geometry.coordinates);
+  return acc;
+}
+
+function computeBoundsFromGeometry(geometry) {
+  const coords = collectGeometryCoords(geometry, []);
+  if (!coords.length) return null;
+  let minLng = Number.POSITIVE_INFINITY;
+  let maxLng = Number.NEGATIVE_INFINITY;
+  let minLat = Number.POSITIVE_INFINITY;
+  let maxLat = Number.NEGATIVE_INFINITY;
+  coords.forEach(([lng, lat]) => {
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+  });
+  return new mapboxgl.LngLatBounds([minLng, minLat], [maxLng, maxLat]);
 }
 
 async function loadPublicPoints() {
@@ -128,14 +162,90 @@ async function ensurePointsLayer() {
     },
   });
 
-  map.on('mouseenter', 'preview-unclustered', () => {
-    map.getCanvas().style.cursor = 'pointer';
-  });
-  map.on('mouseleave', 'preview-unclustered', () => {
-    map.getCanvas().style.cursor = '';
-  });
-
   pointsLoaded = true;
+}
+
+function ensureFocusBoundaryLayers() {
+  if (!map || !map.isStyleLoaded()) return;
+
+  if (!map.getSource('preview-focus-boundary')) {
+    map.addSource('preview-focus-boundary', {
+      type: 'geojson',
+      data: focusBoundaryData,
+    });
+  }
+
+  if (!map.getLayer('preview-focus-fill')) {
+    map.addLayer({
+      id: 'preview-focus-fill',
+      type: 'fill',
+      source: 'preview-focus-boundary',
+      paint: {
+        'fill-color': '#3B82F6',
+        'fill-opacity': 0.1,
+      },
+    });
+  }
+
+  if (!map.getLayer('preview-focus-line')) {
+    map.addLayer({
+      id: 'preview-focus-line',
+      type: 'line',
+      source: 'preview-focus-boundary',
+      paint: {
+        'line-color': '#1D4ED8',
+        'line-width': 2,
+      },
+    });
+  }
+}
+
+function updateFocusBoundarySource() {
+  if (!map) return;
+  ensureFocusBoundaryLayers();
+  const source = map.getSource('preview-focus-boundary');
+  if (source?.setData) source.setData(focusBoundaryData);
+}
+
+export function setMapboxFocusBoundary(geometry) {
+  if (!geometry) return false;
+  focusBoundaryData = {
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', properties: {}, geometry }],
+  };
+  updateFocusBoundarySource();
+  return true;
+}
+
+export function clearMapboxFocusBoundary() {
+  focusBoundaryData = { type: 'FeatureCollection', features: [] };
+  updateFocusBoundarySource();
+}
+
+export function focusMapboxBoundary({ maxZoom = 12, padding = 44 } = {}) {
+  if (!map || !focusBoundaryData.features.length) return false;
+  const geometry = focusBoundaryData.features[0]?.geometry;
+  const bounds = computeBoundsFromGeometry(geometry);
+  if (!bounds) return false;
+  map.fitBounds(bounds, {
+    padding,
+    maxZoom,
+    duration: 420,
+    essential: true,
+  });
+  return true;
+}
+
+export function focusMapboxLocation(lat, lng, zoom = 12) {
+  if (!map || !Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  map.easeTo({ center: [lng, lat], zoom, duration: 380, essential: true });
+  return true;
+}
+
+export function resetMapboxView() {
+  if (!map) return false;
+  map.easeTo({ center: [ODESA_START.lng, ODESA_START.lat], zoom: ODESA_START.zoom, duration: 420, essential: true });
+  return true;
 }
 
 export async function ensureMapboxPreview() {
@@ -164,12 +274,16 @@ export async function ensureMapboxPreview() {
 
     map.on('load', async () => {
       setStatus('');
+      ensureFocusBoundaryLayers();
+      updateFocusBoundarySource();
       await ensurePointsLayer();
     });
   } else {
     map.resize();
     if (map.isStyleLoaded()) {
       setStatus('');
+      ensureFocusBoundaryLayers();
+      updateFocusBoundarySource();
       await ensurePointsLayer();
     }
   }

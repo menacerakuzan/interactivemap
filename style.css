@@ -422,7 +422,11 @@ body::before {
   white-space: nowrap;
 }
 
-body.mapbox-preview-active .filter-menu,
+body.mapbox-preview-active .filter-menu {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
 body.mapbox-preview-active .specialist-panel,
 body.mapbox-preview-active .map-legend,
 body.mapbox-preview-active .map-fullscreen-btn,
