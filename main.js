@@ -11,6 +11,8 @@ import {
   setMapboxPerspective,
   getMapboxPerspective,
   setMapboxPoints,
+  setMapboxStyle,
+  getMapboxStyleKey,
 } from './js/mapboxPreview.js';
 import { dataService } from './js/dataService.js';
 import { COMMUNITIES_BY_DISTRICT, DISTRICT_CENTERS } from './js/communities.js';
@@ -2002,6 +2004,7 @@ function bindLegendPointsSync() {
   window.addEventListener('map:points-updated', (event) => {
     if (!Array.isArray(event?.detail)) return;
     dashboardPoints = event.detail;
+    setMapboxPoints(dashboardPoints);
     renderLegend();
   });
 }
@@ -4006,6 +4009,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnLangToggle = document.getElementById('btn-lang-toggle');
   const btnMapEngineToggle = document.getElementById('btn-map-engine-toggle');
   const btnMapbox3DToggle = document.getElementById('btn-mapbox-3d-toggle');
+  const btnMapboxStyleLight = document.getElementById('btn-mapbox-style-light');
+  const btnMapboxStyleStreets = document.getElementById('btn-mapbox-style-streets');
+  const btnMapboxStyleDark = document.getElementById('btn-mapbox-style-dark');
   const btnNewsScroll = document.getElementById('btn-news-scroll');
   const btnProposalScroll = document.getElementById('btn-proposal-scroll');
   const leafletMapView = document.getElementById('map');
@@ -4021,8 +4027,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (mapboxPreviewWrap) mapboxPreviewWrap.style.display = isMapbox ? 'block' : 'none';
     if (contextPanel) contextPanel.style.display = isMapbox ? 'none' : '';
     if (btnMapbox3DToggle) btnMapbox3DToggle.style.display = isMapbox ? 'inline-flex' : 'none';
+    if (btnMapboxStyleLight) btnMapboxStyleLight.style.display = isMapbox ? 'inline-flex' : 'none';
+    if (btnMapboxStyleStreets) btnMapboxStyleStreets.style.display = isMapbox ? 'inline-flex' : 'none';
+    if (btnMapboxStyleDark) btnMapboxStyleDark.style.display = isMapbox ? 'inline-flex' : 'none';
 
     if (isMapbox) {
+      mapController?.refresh?.().catch(() => null);
       setMapboxPoints(dashboardPoints);
       const preview = await ensureMapboxPreview();
       if (!preview?.ok) {
@@ -4048,6 +4058,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     syncMapEngineButton();
+    syncStyleButtons();
   };
 
   if (btnMapEngineToggle) {
@@ -4066,6 +4077,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       syncMapEngineButton();
     });
   }
+  const styleButtons = [
+    { key: 'light', node: btnMapboxStyleLight },
+    { key: 'streets', node: btnMapboxStyleStreets },
+    { key: 'dark', node: btnMapboxStyleDark },
+  ];
+  const syncStyleButtons = () => {
+    const activeKey = getMapboxStyleKey?.() || 'standard';
+    styleButtons.forEach(({ key, node }) => {
+      if (!node) return;
+      node.style.opacity = activeKey === key ? '1' : '0.65';
+      node.style.fontWeight = activeKey === key ? '700' : '500';
+    });
+  };
+  styleButtons.forEach(({ key, node }) => {
+    if (!node) return;
+    node.addEventListener('click', async (event) => {
+      event.preventDefault();
+      if (currentMapEngine !== 'mapbox') return;
+      await setMapboxStyle(key);
+      syncStyleButtons();
+    });
+  });
   if (btnLangToggle) {
     btnLangToggle.addEventListener('click', (e) => {
       e.preventDefault();
@@ -4097,6 +4130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateLanguage(currentLang);
   syncMapEngineButton();
   await setMapEngine('leaflet');
+  syncStyleButtons();
   if (dataService.mode === 'supabase' && hasValidSupabaseSession(authSession)) {
     try {
       await dataService.restoreAuthSession?.(authSession);

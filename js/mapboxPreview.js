@@ -2,11 +2,17 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const ODESA_START = { lng: 30.7233, lat: 46.4825, zoom: 10.8 };
-const MAPBOX_STYLE_URL = 'mapbox://styles/mapbox/standard';
+const MAPBOX_STYLES = {
+  standard: 'mapbox://styles/mapbox/standard',
+  light: 'mapbox://styles/mapbox/light-v11',
+  streets: 'mapbox://styles/mapbox/streets-v12',
+  dark: 'mapbox://styles/mapbox/dark-v11',
+};
 let map = null;
 let pointsLoaded = false;
 let is3DMode = false;
 let allPoints = [];
+let currentStyleKey = 'standard';
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -292,6 +298,10 @@ export function getMapboxPerspective() {
   return is3DMode;
 }
 
+export function getMapboxStyleKey() {
+  return currentStyleKey;
+}
+
 function getTimePreset() {
   const hour = new Date().getHours();
   if (hour >= 7 && hour < 18) return 'day';
@@ -317,6 +327,28 @@ export function setMapboxPoints(points = []) {
   updatePointsSource();
 }
 
+async function handleStyleReady() {
+  if (!map || !map.isStyleLoaded()) return;
+  setStatus('');
+  applyTimePreset();
+  ensure3DBuildingsLayer();
+  ensureFocusBoundaryLayers();
+  updateFocusBoundarySource();
+  await ensurePointsLayer();
+  updatePointsSource();
+  if (is3DMode) setMapboxPerspective(true);
+}
+
+export async function setMapboxStyle(styleKey = 'standard') {
+  if (!map) return false;
+  const nextKey = MAPBOX_STYLES[styleKey] ? styleKey : 'standard';
+  if (currentStyleKey === nextKey) return true;
+  currentStyleKey = nextKey;
+  pointsLoaded = false;
+  map.setStyle(MAPBOX_STYLES[nextKey]);
+  return true;
+}
+
 export async function ensureMapboxPreview() {
   const container = document.getElementById('mapbox-map');
   if (!container) return { ok: false, reason: 'no_container' };
@@ -332,7 +364,7 @@ export async function ensureMapboxPreview() {
   if (!map) {
     map = new mapboxgl.Map({
       container,
-      style: MAPBOX_STYLE_URL,
+      style: MAPBOX_STYLES[currentStyleKey],
       center: [ODESA_START.lng, ODESA_START.lat],
       zoom: ODESA_START.zoom,
       pitchWithRotate: false,
@@ -341,28 +373,15 @@ export async function ensureMapboxPreview() {
 
     map.addControl(new mapboxgl.NavigationControl({ visualizePitch: false }), 'bottom-right');
 
-    map.on('load', async () => {
-      setStatus('');
-      applyTimePreset();
-      ensure3DBuildingsLayer();
-      ensureFocusBoundaryLayers();
-      updateFocusBoundarySource();
-      await ensurePointsLayer();
-      updatePointsSource();
-      if (is3DMode) setMapboxPerspective(true);
+    map.on('style.load', () => {
+      handleStyleReady().catch(() => null);
+    });
+    map.on('load', () => {
+      handleStyleReady().catch(() => null);
     });
   } else {
     map.resize();
-    if (map.isStyleLoaded()) {
-      setStatus('');
-      applyTimePreset();
-      ensure3DBuildingsLayer();
-      ensureFocusBoundaryLayers();
-      updateFocusBoundarySource();
-      await ensurePointsLayer();
-      updatePointsSource();
-      if (is3DMode) setMapboxPerspective(true);
-    }
+    if (map.isStyleLoaded()) await handleStyleReady();
   }
 
   return { ok: true, map };
