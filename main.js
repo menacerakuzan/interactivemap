@@ -11,6 +11,7 @@ import {
   setMapboxPerspective,
   getMapboxPerspective,
   setMapboxPoints,
+  setMapboxHiddenPointTypes,
   setMapboxStyle,
   getMapboxStyleKey,
   setMapboxLineToolVisible,
@@ -720,6 +721,16 @@ async function apiRequest(path, options = {}) {
   try {
     return await dataService.request(path, { ...options, headers });
   } catch (error) {
+    const errorText = String(error?.message || '').toLowerCase();
+    const transientNetworkError =
+      errorText.includes('load failed')
+      || errorText.includes('failed to fetch')
+      || errorText.includes('networkerror')
+      || errorText.includes('network request failed');
+    if (transientNetworkError) {
+      await new Promise((resolve) => setTimeout(resolve, 260));
+      return dataService.request(path, { ...options, headers });
+    }
     const isMissingSession = String(error?.message || '').includes('Auth session missing');
     if (!isMissingSession || dataService.mode !== 'supabase' || !hasValidSupabaseSession(authSession)) {
       throw error;
@@ -1652,6 +1663,7 @@ function renderLegend() {
         hiddenPointTypeCodes.add(code);
       }
       mapController?.setHiddenPointTypes?.(Array.from(hiddenPointTypeCodes));
+      setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
       renderLegend();
     });
   });
@@ -1659,6 +1671,7 @@ function renderLegend() {
   legend.querySelector('[data-legend-reset]')?.addEventListener('click', () => {
     hiddenPointTypeCodes.clear();
     mapController?.setHiddenPointTypes?.([]);
+    setMapboxHiddenPointTypes([]);
     renderLegend();
   });
 }
@@ -1962,6 +1975,7 @@ async function refreshDashboardData() {
     window.__ODESA_POINTS_CACHE = dashboardPoints;
   }
   setMapboxPoints(dashboardPoints);
+  setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
   dashboardRoutes = (routeRows || []).map((r) => ({
     ...r,
     routeColor: r.routeColor || getRouteColor(r.id),
@@ -2000,6 +2014,7 @@ async function refreshPublicData() {
       window.__ODESA_POINTS_CACHE = dashboardPoints;
     }
     setMapboxPoints(dashboardPoints);
+    setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
     dashboardRoutes = (routeRows || []).map((r) => ({
       ...r,
       routeColor: r.routeColor || getRouteColor(r.id),
@@ -2094,6 +2109,7 @@ function bindLegendPointsSync() {
     if (!Array.isArray(event?.detail)) return;
     dashboardPoints = event.detail;
     setMapboxPoints(dashboardPoints);
+    setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
     renderLegend();
   });
 }
@@ -4136,6 +4152,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   const mapboxPreviewWrap = document.getElementById('mapbox-preview-wrap');
   const contextPanel = document.getElementById('context-panel');
 
+  const ensureMapboxControlDock = () => {
+    if (!leafletMapView) return;
+    let dock = document.getElementById('mapbox-control-dock');
+    if (!dock) {
+      dock = document.createElement('div');
+      dock.id = 'mapbox-control-dock';
+      dock.className = 'mapbox-control-dock';
+      leafletMapView.appendChild(dock);
+    }
+    const nodes = [
+      btnMapEngineToggle,
+      btnMapbox3DToggle,
+      btnMapboxStyleLight,
+      btnMapboxStyleStreets,
+      btnMapboxStyleDark,
+    ].filter(Boolean);
+    nodes.forEach((node) => {
+      node.classList.add('mapbox-dock-btn');
+      if (node.parentElement !== dock) {
+        dock.appendChild(node);
+      }
+    });
+  };
+  ensureMapboxControlDock();
+
   const setMapEngine = async (engine) => {
     currentMapEngine = engine === 'mapbox' ? 'mapbox' : 'leaflet';
     const isMapbox = currentMapEngine === 'mapbox';
@@ -4177,6 +4218,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.__ODESA_POINTS_CACHE = pointsForMapbox;
       }
       setMapboxPoints(pointsForMapbox);
+      setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
       const preview = await ensureMapboxPreview();
       if (!preview?.ok) {
         currentMapEngine = 'leaflet';
@@ -4194,6 +4236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       setMapboxPoints(pointsForMapbox);
+      setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
       setTimeout(() => {
         resizeMapboxPreview();
       }, 60);

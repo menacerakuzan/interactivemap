@@ -66,6 +66,7 @@ let drawLineColor = '#E7C769';
 let drawHistory = [];
 let drawMutating = false;
 let curvePreviewData = { type: 'FeatureCollection', features: [] };
+let hiddenPointTypeCodes = new Set();
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -249,6 +250,15 @@ function normalizeApiPoint(point) {
   };
 }
 
+function isPointTypeHidden(point) {
+  const code = String(point?.pointType?.code || point?.pointTypeCode || '').trim();
+  return code && hiddenPointTypeCodes.has(code);
+}
+
+function getVisiblePoints() {
+  return (Array.isArray(allPoints) ? allPoints : []).filter((point) => !isPointTypeHidden(point));
+}
+
 function resolvePointMarkerUrl(point) {
   const code = String(point?.pointType?.code || '').trim();
   const fileName = POINT_TYPE_MARKER_FILE[code] || POINT_TYPE_MARKER_FILE.other;
@@ -408,10 +418,10 @@ function captureDrawSnapshot() {
         const lng = Number(pair?.[0]);
         const lat = Number(pair?.[1]);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-        const snap = nearestPointFor(lat, lng, 30);
+        const snap = nearestPointFor(lat, lng, 24);
         return {
-          lat: snap ? snap.lat : lat,
-          lng: snap ? snap.lng : lng,
+          lat,
+          lng,
           pointId: snap?.point?.id ? Number(snap.point.id) : null,
           snapped: Boolean(snap),
           edgeStyle,
@@ -746,7 +756,7 @@ function syncDomPointMarkers() {
   bindMarkerVisualScale();
 
   const nextKeys = new Set();
-  const points = Array.isArray(allPoints) ? allPoints : [];
+  const points = getVisiblePoints();
   points.forEach((point, index) => {
     const lat = Number(point?.lat);
     const lng = Number(point?.lng);
@@ -877,7 +887,7 @@ function bindPointsBridge() {
 function buildPointFeatureCollection() {
   return {
     type: 'FeatureCollection',
-    features: allPoints.map(toPointFeature).filter(Boolean),
+    features: getVisiblePoints().map(toPointFeature).filter(Boolean),
   };
 }
 
@@ -1154,6 +1164,20 @@ export function setMapboxPoints(points = []) {
   updatePointsSource();
 }
 
+export function setMapboxHiddenPointTypes(codes = []) {
+  hiddenPointTypeCodes = new Set(
+    (Array.isArray(codes) ? codes : [])
+      .map((code) => String(code || '').trim())
+      .filter(Boolean)
+  );
+  if (map && pointsLoaded) {
+    updatePointsSource();
+  }
+  if (map) {
+    syncDomPointMarkers();
+  }
+}
+
 async function handleStyleReady() {
   if (!map || !map.isStyleLoaded()) return;
   setStatus('Mapbox: style loaded');
@@ -1245,6 +1269,35 @@ export async function ensureMapboxPreview() {
       pitchWithRotate: false,
       dragRotate: false,
     });
+
+    const canvas = map.getCanvas();
+    let rightPanActive = false;
+    let lastX = 0;
+    let lastY = 0;
+    canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+    canvas.addEventListener('mousedown', (event) => {
+      if (event.button !== 2) return;
+      rightPanActive = true;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      canvas.style.cursor = 'grabbing';
+      event.preventDefault();
+    });
+    window.addEventListener('mousemove', (event) => {
+      if (!rightPanActive || !map) return;
+      const dx = event.clientX - lastX;
+      const dy = event.clientY - lastY;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      map.panBy([-dx, -dy], { animate: false });
+    });
+    const stopRightPan = () => {
+      if (!rightPanActive) return;
+      rightPanActive = false;
+      canvas.style.cursor = '';
+    };
+    window.addEventListener('mouseup', stopRightPan);
+    window.addEventListener('blur', stopRightPan);
 
     map.addControl(new mapboxgl.NavigationControl({ visualizePitch: false }), 'bottom-right');
 
@@ -1361,17 +1414,16 @@ export function undoMapboxLineDraft() {
   if (!snapshot.length) return true;
   const coords = snapshot.map((v) => [Number(v.lng), Number(v.lat)]).filter(([lng, lat]) => Number.isFinite(lat) && Number.isFinite(lng));
   if (coords.length < 2) return true;
+  const first = snapshot[0] || {};
+  const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(first.edgeStyle) ? first.edgeStyle : drawLineStyle;
+  const edgeColor = /^#[0-9a-f]{6}$/i.test(String(first.edgeColor || '')) ? String(first.edgeColor) : drawLineColor;
+  const edgeCurve = Boolean(first.edgeCurve);
   const featureId = draw.add({
     type: 'Feature',
-    properties: {
-      edgeStyle: drawLineStyle,
-      edgeColor: drawLineColor,
-      edgeCurve: drawMode === 'curve',
-      edgeCurvePrepared: drawMode === 'curve',
-    },
-    geometry: { type: 'LineString', coordinates: coords },
+    properties: { edgeStyle, edgeColor, edgeCurve, edgeCurvePrepared: edgeCurve },
+    geometry: { type: 'LineString', coordinates: edgeCurve ? buildCurveControlCoords(coords) : coords },
   })?.[0];
-  if (featureId) applyDrawStyleToFeature(featureId, drawMode === 'curve');
+  if (featureId) applyDrawStyleToFeature(featureId, edgeCurve);
   syncDrawLinePaint();
   updateCurvePreviewFromDraw();
   return true;
@@ -1396,26 +1448,26 @@ export function getMapboxLineDraftSnapshot() {
 export function setMapboxLineDraftFromPoints(vertices = []) {
   if (!draw) return false;
   clearMapboxLineDraft();
-  const coords = (Array.isArray(vertices) ? vertices : [])
+  const normalized = Array.isArray(vertices) ? vertices : [];
+  const coords = normalized
     .map((vertex) => [Number(vertex?.lng), Number(vertex?.lat)])
     .filter(([lng, lat]) => Number.isFinite(lat) && Number.isFinite(lng));
   if (coords.length < 2) return true;
-  const first = coords[0];
-  const last = coords[coords.length - 1];
-  if (first[0] !== last[0] || first[1] !== last[1]) {
+  const firstVertex = normalized.find((v) => v && typeof v === 'object') || {};
+  const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(firstVertex.edgeStyle) ? firstVertex.edgeStyle : drawLineStyle;
+  const edgeColor = /^#[0-9a-f]{6}$/i.test(String(firstVertex.edgeColor || '')) ? String(firstVertex.edgeColor) : drawLineColor;
+  const edgeCurve = normalized.some((v) => Boolean(v?.edgeCurve));
+  const startCoord = coords[0];
+  const endCoord = coords[coords.length - 1];
+  if (startCoord[0] !== endCoord[0] || startCoord[1] !== endCoord[1]) {
     // keep as open polyline
   }
   const featureId = draw.add({
     type: 'Feature',
-    properties: {
-      edgeStyle: drawLineStyle,
-      edgeColor: drawLineColor,
-      edgeCurve: drawMode === 'curve',
-      edgeCurvePrepared: drawMode === 'curve',
-    },
-    geometry: { type: 'LineString', coordinates: drawMode === 'curve' ? buildCurveControlCoords(coords) : coords },
+    properties: { edgeStyle, edgeColor, edgeCurve, edgeCurvePrepared: edgeCurve },
+    geometry: { type: 'LineString', coordinates: edgeCurve ? buildCurveControlCoords(coords) : coords },
   })?.[0];
-  if (featureId) applyDrawStyleToFeature(featureId, drawMode === 'curve');
+  if (featureId) applyDrawStyleToFeature(featureId, edgeCurve);
   syncDrawLinePaint();
   updateCurvePreviewFromDraw();
   pushDrawHistory();
