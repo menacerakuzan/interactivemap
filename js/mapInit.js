@@ -1092,6 +1092,7 @@ function setPublishedRoutes(routes = []) {
                 typeof vertex.edgeColor === 'string' && vertex.edgeColor.startsWith('#')
                   ? vertex.edgeColor
                   : route?.routeColor || '#E7C769',
+              edgeCurve: Boolean(vertex.edgeCurve),
             };
           })
           .filter(Boolean)
@@ -1110,6 +1111,7 @@ function setPublishedRoutes(routes = []) {
           lng,
           edgeStyle: 'solid',
           edgeColor: route?.routeColor || '#E7C769',
+          edgeCurve: false,
         };
       })
       .filter(Boolean);
@@ -1126,11 +1128,15 @@ function setPublishedRoutes(routes = []) {
         const prev = pathVertices[index - 1];
         const next = pathVertices[index];
         const dashArray = next.edgeStyle === 'solid' ? null : next.edgeStyle === 'dashdot' ? '12 7 2 7' : '12 7';
+        const segmentPoints =
+          next.edgeCurve && pathVertices.length > 2
+            ? buildCurvedSegmentPoints(pathVertices, index - 1)
+            : [
+                [prev.lat, prev.lng],
+                [next.lat, next.lng],
+              ];
         const segment = L.polyline(
-          [
-            [prev.lat, prev.lng],
-            [next.lat, next.lng],
-          ],
+          segmentPoints,
           {
             color: next.edgeColor || color,
             weight: 4,
@@ -1185,6 +1191,7 @@ function highlightRoute(route) {
               typeof vertex.edgeColor === 'string' && vertex.edgeColor.startsWith('#')
                 ? vertex.edgeColor
                 : route?.routeColor || '#E7C769',
+            edgeCurve: Boolean(vertex.edgeCurve),
           };
         })
         .filter(Boolean)
@@ -1193,7 +1200,7 @@ function highlightRoute(route) {
           const lat = Number(p?.lat);
           const lng = Number(p?.lng);
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-          return { lat, lng, edgeStyle: 'dashed', edgeColor: route?.routeColor || '#E7C769' };
+          return { lat, lng, edgeStyle: 'dashed', edgeColor: route?.routeColor || '#E7C769', edgeCurve: false };
         })
         .filter(Boolean);
   if (!pathVertices.length) return;
@@ -1213,11 +1220,15 @@ function highlightRoute(route) {
       const prev = pathVertices[index - 1];
       const next = pathVertices[index];
       const dashArray = next.edgeStyle === 'solid' ? null : next.edgeStyle === 'dashdot' ? '10 7 2 7' : '10 7';
+      const segmentPoints =
+        next.edgeCurve && pathVertices.length > 2
+          ? buildCurvedSegmentPoints(pathVertices, index - 1)
+          : [
+              [prev.lat, prev.lng],
+              [next.lat, next.lng],
+            ];
       L.polyline(
-        [
-          [prev.lat, prev.lng],
-          [next.lat, next.lng],
-        ],
+        segmentPoints,
         {
           color: next.edgeColor || color,
           weight: 5,

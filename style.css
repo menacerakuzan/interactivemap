@@ -254,8 +254,9 @@ body::before {
 .filter-toggle {
   background: var(--c-admiralty);
   color: #FFF;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.24);
   padding: 12px 24px;
+  min-width: 176px;
   border-radius: 100px;
   font-family: var(--font-ui);
   font-size: 13px;
@@ -265,10 +266,16 @@ body::before {
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   box-shadow: var(--shadow-float);
   transition: background-color var(--t-fast) var(--ease-smooth), transform var(--t-fast) var(--ease-smooth), box-shadow var(--t-fast) var(--ease-smooth);
   pointer-events: auto;
+}
+
+.filter-menu:not(.active) .filter-toggle {
+  padding: 10px 18px;
+  box-shadow: 0 10px 24px rgba(10, 25, 46, 0.24);
 }
 
 .filter-toggle:hover {
@@ -575,8 +582,10 @@ body.mapbox-preview-active .filter-menu {
 
 .mapbox-control-dock {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  top: auto;
+  left: auto;
+  right: 16px;
+  bottom: 16px;
   z-index: 1042;
   display: flex;
   align-items: center;
@@ -616,7 +625,7 @@ body.mapbox-preview-active .filter-menu {
   top: 12px;
   bottom: auto;
   transform: translateX(-50%);
-  z-index: 1020;
+  z-index: 1055;
   display: flex;
   align-items: center;
   gap: 9px;

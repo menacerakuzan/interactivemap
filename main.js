@@ -1421,8 +1421,7 @@ function setActiveSpecialistTab(tabName) {
     }
   }
 
-  const canUseLineTools = Boolean(authUser && ['admin', 'specialist'].includes(authUser.role));
-  const showRouteLineToolbar = action === 'route-editor' && canUseLineTools;
+  const showRouteLineToolbar = action === 'route-editor';
   const routeLineToolbar = document.getElementById('route-line-toolbar');
   const mapView = document.querySelector('.map-view');
   if (routeLineToolbar) {
