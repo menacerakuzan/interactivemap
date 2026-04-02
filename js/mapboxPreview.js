@@ -67,6 +67,7 @@ let drawHistory = [];
 let drawMutating = false;
 let curvePreviewData = { type: 'FeatureCollection', features: [] };
 let hiddenPointTypeCodes = new Set();
+let publishedRoutes = [];
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -841,6 +842,33 @@ function computeBoundsFromGeometry(geometry) {
   return new mapboxgl.LngLatBounds([minLng, minLat], [maxLng, maxLat]);
 }
 
+function buildCurvedSegmentCoords(vertices, segmentIndex, steps = 18) {
+  const p0 = vertices[Math.max(0, segmentIndex - 1)];
+  const p1 = vertices[segmentIndex];
+  const p2 = vertices[segmentIndex + 1];
+  const p3 = vertices[Math.min(vertices.length - 1, segmentIndex + 2)];
+  const points = [];
+  for (let step = 0; step <= steps; step += 1) {
+    const t = step / steps;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const lat =
+      0.5 *
+      ((2 * p1.lat)
+        + (-p0.lat + p2.lat) * t
+        + (2 * p0.lat - 5 * p1.lat + 4 * p2.lat - p3.lat) * t2
+        + (-p0.lat + 3 * p1.lat - 3 * p2.lat + p3.lat) * t3);
+    const lng =
+      0.5 *
+      ((2 * p1.lng)
+        + (-p0.lng + p2.lng) * t
+        + (2 * p0.lng - 5 * p1.lng + 4 * p2.lng - p3.lng) * t2
+        + (-p0.lng + 3 * p1.lng - 3 * p2.lng + p3.lng) * t3);
+    points.push([lng, lat]);
+  }
+  return points;
+}
+
 function toPointFeature(point) {
   const lng = Number(point?.lng);
   const lat = Number(point?.lat);
@@ -889,6 +917,128 @@ function buildPointFeatureCollection() {
     type: 'FeatureCollection',
     features: getVisiblePoints().map(toPointFeature).filter(Boolean),
   };
+}
+
+function resolveRoutePathVertices(route) {
+  const fromPath = Array.isArray(route?.pathJson)
+    ? route.pathJson
+        .map((vertex) => {
+          if (!vertex || typeof vertex !== 'object') return null;
+          const lat = Number(vertex.lat);
+          const lng = Number(vertex.lng);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          return {
+            lat,
+            lng,
+            edgeStyle: ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed',
+            edgeColor:
+              typeof vertex.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(vertex.edgeColor)
+                ? vertex.edgeColor
+                : route?.routeColor || '#E7C769',
+            edgeCurve: Boolean(vertex.edgeCurve),
+          };
+        })
+        .filter(Boolean)
+    : [];
+  if (fromPath.length) return fromPath;
+
+  if (!Array.isArray(route?.points)) return [];
+  return route.points
+    .map((point) => {
+      const lat = Number(point?.lat);
+      const lng = Number(point?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return {
+        lat,
+        lng,
+        edgeStyle: 'solid',
+        edgeColor: route?.routeColor || '#E7C769',
+        edgeCurve: false,
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildRouteFeatureCollection() {
+  const features = [];
+  const routes = (Array.isArray(publishedRoutes) ? publishedRoutes : []).filter((route) => route?.status === 'published');
+  routes.forEach((route) => {
+    const vertices = resolveRoutePathVertices(route);
+    if (vertices.length < 2) return;
+    for (let index = 1; index < vertices.length; index += 1) {
+      const prev = vertices[index - 1];
+      const next = vertices[index];
+      const coords =
+        next.edgeCurve && vertices.length > 2
+          ? buildCurvedSegmentCoords(vertices, index - 1)
+          : [
+              [prev.lng, prev.lat],
+              [next.lng, next.lat],
+            ];
+      if (coords.length < 2) continue;
+      features.push({
+        type: 'Feature',
+        properties: {
+          routeId: Number(route.id) || null,
+          routeName: String(route.name || ''),
+          edgeStyle: ['solid', 'dashed', 'dashdot'].includes(next.edgeStyle) ? next.edgeStyle : 'dashed',
+          edgeColor:
+            typeof next.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(next.edgeColor)
+              ? next.edgeColor
+              : route?.routeColor || '#E7C769',
+        },
+        geometry: { type: 'LineString', coordinates: coords },
+      });
+    }
+  });
+  return { type: 'FeatureCollection', features };
+}
+
+function ensureRoutesLayer() {
+  if (!map || !map.isStyleLoaded()) return;
+  const routeCollection = buildRouteFeatureCollection();
+  if (!map.getSource('preview-routes')) {
+    map.addSource('preview-routes', {
+      type: 'geojson',
+      data: routeCollection,
+    });
+  }
+  if (!map.getLayer('preview-routes-line')) {
+    map.addLayer({
+      id: 'preview-routes-line',
+      type: 'line',
+      source: 'preview-routes',
+      paint: {
+        'line-color': ['coalesce', ['get', 'edgeColor'], '#E7C769'],
+        'line-dasharray': [
+          'case',
+          ['==', ['get', 'edgeStyle'], 'solid'],
+          ['literal', [1, 0]],
+          ['==', ['get', 'edgeStyle'], 'dashdot'],
+          ['literal', [2, 1, 0.3, 1]],
+          ['literal', [2, 1.4]],
+        ],
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          8,
+          2.6,
+          12,
+          4,
+          15,
+          5.8,
+        ],
+        'line-opacity': 0.9,
+      },
+      layout: {
+        'line-cap': 'round',
+        'line-join': 'round',
+      },
+    });
+  }
+  const source = map.getSource('preview-routes');
+  if (source?.setData) source.setData(routeCollection);
 }
 
 async function ensurePointsLayer() {
@@ -1164,6 +1314,12 @@ export function setMapboxPoints(points = []) {
   updatePointsSource();
 }
 
+export function setMapboxPublishedRoutes(routes = []) {
+  publishedRoutes = Array.isArray(routes) ? routes : [];
+  if (!map || !map.isStyleLoaded()) return;
+  ensureRoutesLayer();
+}
+
 export function setMapboxHiddenPointTypes(codes = []) {
   hiddenPointTypeCodes = new Set(
     (Array.isArray(codes) ? codes : [])
@@ -1202,6 +1358,11 @@ async function handleStyleReady() {
     updatePointsSource();
   } catch (_e) {
     setStatus('Mapbox: points layer error');
+  }
+  try {
+    ensureRoutesLayer();
+  } catch (_e) {
+    // noop
   }
   syncDomPointMarkers();
   try {
