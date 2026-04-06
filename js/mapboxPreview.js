@@ -246,6 +246,22 @@ function maybeSnapBearingToNorth() {
   });
 }
 
+function syncMapGestureStateForLineTool() {
+  if (!map) return;
+  const editingModes = new Set(['draw', 'curve', 'edit', 'erase']);
+  const lockPan = drawVisible && editingModes.has(drawMode);
+
+  if (lockPan) {
+    map.dragPan?.disable?.();
+    map.doubleClickZoom?.disable?.();
+    map.boxZoom?.disable?.();
+  } else {
+    map.dragPan?.enable?.();
+    map.doubleClickZoom?.enable?.();
+    map.boxZoom?.enable?.();
+  }
+}
+
 function setStatus(message = '') {
   if (!import.meta.env?.DEV) return;
   const node = ensureStatusNode();
@@ -1478,6 +1494,7 @@ async function handleStyleReady() {
   } catch (_e) {
     // noop
   }
+  syncMapGestureStateForLineTool();
   if (is3DMode) {
     try {
       setMapboxPerspective(true);
@@ -1570,12 +1587,14 @@ export function setMapboxLineToolVisible(visible) {
     if (map.getLayer('preview-curve-handles')) {
       map.setLayoutProperty('preview-curve-handles', 'visibility', 'none');
     }
+    syncMapGestureStateForLineTool();
     return true;
   }
   if (drawMode === 'draw' || drawMode === 'curve') draw.changeMode('draw_line_string');
   else if (drawMode === 'edit') draw.changeMode('direct_select');
   else draw.changeMode('simple_select');
   updateCurvePreviewFromDraw();
+  syncMapGestureStateForLineTool();
   return true;
 }
 
@@ -1611,6 +1630,7 @@ export function setMapboxLineToolMode(mode = 'draw') {
   }
   else draw.changeMode('simple_select');
   updateCurvePreviewFromDraw();
+  syncMapGestureStateForLineTool();
   return true;
 }
 
