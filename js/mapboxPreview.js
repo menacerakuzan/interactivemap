@@ -1029,9 +1029,22 @@ function resolveRoutePathVertices(route) {
   const fromPath = Array.isArray(rawPath)
     ? rawPath
         .map((vertex) => {
-          if (!vertex || typeof vertex !== 'object') return null;
-          const lat = Number(vertex.lat);
-          const lng = Number(vertex.lng);
+          if (!vertex) return null;
+          if (Array.isArray(vertex) && vertex.length >= 2) {
+            const lng = Number(vertex[0]);
+            const lat = Number(vertex[1]);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            return {
+              lat,
+              lng,
+              edgeStyle: 'dashed',
+              edgeColor: route?.routeColor || '#E7C769',
+              edgeCurve: false,
+            };
+          }
+          if (typeof vertex !== 'object') return null;
+          const lat = Number(vertex.lat ?? vertex.latitude);
+          const lng = Number(vertex.lng ?? vertex.lon ?? vertex.longitude);
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
           return {
             lat,

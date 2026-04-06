@@ -130,6 +130,106 @@ if (!routeColumns.some((c) => c.name === 'path_json')) {
   db.exec('ALTER TABLE routes ADD COLUMN path_json TEXT');
 }
 
+function normalizeRoutePathVertex(vertex, fallbackColor = '#E7C769') {
+  if (!vertex) return null;
+  if (Array.isArray(vertex) && vertex.length >= 2) {
+    const lng = Number(vertex[0]);
+    const lat = Number(vertex[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return {
+      lat,
+      lng,
+      pointId: null,
+      title: '',
+      snapped: false,
+      edgeStyle: 'dashed',
+      edgeColor: fallbackColor,
+      edgeCurve: false,
+    };
+  }
+  if (typeof vertex !== 'object') return null;
+  const lat = Number(vertex.lat ?? vertex.latitude);
+  const lng = Number(vertex.lng ?? vertex.lon ?? vertex.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const pointIdRaw = Number(vertex.pointId);
+  const pointId = Number.isFinite(pointIdRaw) ? pointIdRaw : null;
+  const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed';
+  const edgeColor =
+    typeof vertex.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(vertex.edgeColor)
+      ? vertex.edgeColor
+      : fallbackColor;
+  return {
+    lat,
+    lng,
+    pointId,
+    title: typeof vertex.title === 'string' ? vertex.title : '',
+    snapped: Boolean(vertex.snapped),
+    edgeStyle,
+    edgeColor,
+    edgeCurve: Boolean(vertex.edgeCurve),
+  };
+}
+
+function normalizeRoutePathCollection(pathJsonRaw, fallbackColor = '#E7C769') {
+  let parsed = pathJsonRaw;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch (_e) {
+      parsed = [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map((vertex) => normalizeRoutePathVertex(vertex, fallbackColor)).filter(Boolean).slice(0, 4000);
+}
+
+function buildRoutePathFromRoutePoints(routeId, fallbackColor = '#E7C769') {
+  const rows = db
+    .prepare(
+      `SELECT rp.point_id, p.title, p.lat, p.lng
+       FROM route_points rp
+       JOIN points p ON p.id = rp.point_id
+       WHERE rp.route_id = ?
+       ORDER BY rp.position`
+    )
+    .all(routeId);
+  return rows
+    .map((row) => {
+      const lat = Number(row.lat);
+      const lng = Number(row.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return {
+        lat,
+        lng,
+        pointId: Number(row.point_id) || null,
+        title: String(row.title || ''),
+        snapped: true,
+        edgeStyle: 'dashed',
+        edgeColor: fallbackColor,
+        edgeCurve: false,
+      };
+    })
+    .filter(Boolean);
+}
+
+const routeRowsForPathBackfill = db.prepare('SELECT id, route_color, path_json FROM routes').all();
+const updateRoutePathJsonStmt = db.prepare(
+  "UPDATE routes SET path_json = ?, updated_at = COALESCE(updated_at, datetime('now')) WHERE id = ?"
+);
+routeRowsForPathBackfill.forEach((route) => {
+  const fallbackColor =
+    typeof route.route_color === 'string' && /^#[0-9a-f]{6}$/i.test(route.route_color)
+      ? route.route_color
+      : '#E7C769';
+  let normalized = normalizeRoutePathCollection(route.path_json, fallbackColor);
+  if (normalized.length < 2) {
+    normalized = buildRoutePathFromRoutePoints(route.id, fallbackColor);
+  }
+  if (normalized.length >= 2) {
+    updateRoutePathJsonStmt.run(JSON.stringify(normalized), route.id);
+  }
+});
+
 const seedPointTypes = [
   ['school', 'Школа', 'School', '#1D4ED8'],
   ['housing', 'Житло', 'Housing', '#2B6CB0'],
