@@ -42,19 +42,24 @@ const POINT_TYPE_MARKER_FILE = {
   other: 'social_services.svg',
 };
 const ZOOM_SWITCH = {
-  clusterMax: 11.2,
-  svgMin: 13.35,
+  clusterEnter: 10.85,
+  clusterExit: 11.1,
+  svgEnter: 13.1,
+  svgExit: 12.85,
 };
 let map = null;
 let pointsLoaded = false;
 let is3DMode = false;
 let allPoints = [];
-let currentStyleKey = 'standard';
+let currentStyleKey = 'light';
 let pointsBridgeBound = false;
 const domPointMarkers = new Map();
 let markerVisualBound = false;
 let markerVisualRaf = 0;
 let markerVisualMode = 'cluster';
+let markerBlendValue = 0;
+let markerBlendTarget = 0;
+let markerBlendRaf = 0;
 let unclusteredClickBound = false;
 let draw = null;
 let drawBound = false;
@@ -222,7 +227,27 @@ function getToken() {
   );
 }
 
+function normalizeBearingDeg(value = 0) {
+  let bearing = Number(value) || 0;
+  while (bearing > 180) bearing -= 360;
+  while (bearing < -180) bearing += 360;
+  return bearing;
+}
+
+function maybeSnapBearingToNorth() {
+  if (!map) return;
+  const current = normalizeBearingDeg(map.getBearing());
+  const SNAP_THRESHOLD = 16;
+  if (Math.abs(current) > SNAP_THRESHOLD) return;
+  map.easeTo({
+    bearing: 0,
+    duration: 220,
+    essential: true,
+  });
+}
+
 function setStatus(message = '') {
+  if (!import.meta.env?.DEV) return;
   const node = ensureStatusNode();
   if (!node) return;
   const finalMessage = String(message || 'Mapbox active');
@@ -695,16 +720,34 @@ function buildPointMarkerKey(point, index = 0) {
 function updateDomMarkerVisualScale() {
   markerVisualRaf = 0;
   if (!map) return;
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const z = Number(map.getZoom() || 10);
-  const isClusterMode = z < ZOOM_SWITCH.clusterMax;
-  const isSvgMode = z >= ZOOM_SWITCH.svgMin;
-  markerVisualMode = isClusterMode ? 'cluster' : isSvgMode ? 'svg' : 'dot';
-  const size = isSvgMode ? Math.max(18, Math.min(30, 18 + (z - ZOOM_SWITCH.svgMin) * 2.1)) : Math.max(7, Math.min(14, 7 + (z - 9) * 1.2));
+  const prevMode = markerVisualMode || 'cluster';
+  let nextMode = prevMode;
+
+  if (prevMode === 'cluster') {
+    nextMode = z >= ZOOM_SWITCH.clusterExit ? 'dot' : 'cluster';
+  } else if (prevMode === 'dot') {
+    if (z <= ZOOM_SWITCH.clusterEnter) nextMode = 'cluster';
+    else if (z >= ZOOM_SWITCH.svgEnter) nextMode = 'svg';
+    else nextMode = 'dot';
+  } else {
+    nextMode = z <= ZOOM_SWITCH.svgExit ? 'dot' : 'svg';
+  }
+
+  markerVisualMode = nextMode;
+  const isClusterMode = markerVisualMode === 'cluster';
+  const isSvgMode = markerVisualMode === 'svg';
+  const size = isSvgMode
+    ? Math.max(18, Math.min(30, 18 + (z - ZOOM_SWITCH.svgEnter) * 2.1))
+    : Math.max(7, Math.min(14, 7 + (z - 9) * 1.2));
   const opacity = isClusterMode ? 0 : 1;
   const container = map.getContainer?.();
   if (!container) return;
   container.style.setProperty('--mapbox-point-size', `${size.toFixed(2)}px`);
   container.style.setProperty('--mapbox-point-opacity', `${opacity}`);
+  markerBlendTarget = clamp((z - 12.75) / (13.2 - 12.75), 0, 1);
+  scheduleMarkerBlend();
   container.dataset.pointMode = markerVisualMode;
 
   const clusterVisibility = isClusterMode ? 'visible' : 'none';
@@ -741,6 +784,26 @@ function updateDomMarkerVisualScale() {
 function scheduleDomMarkerVisualScale() {
   if (markerVisualRaf) return;
   markerVisualRaf = requestAnimationFrame(updateDomMarkerVisualScale);
+}
+
+function scheduleMarkerBlend() {
+  if (markerBlendRaf) return;
+  const animateBlend = () => {
+    markerBlendRaf = 0;
+    if (!map) return;
+    const container = map.getContainer?.();
+    if (!container) return;
+    const delta = markerBlendTarget - markerBlendValue;
+    markerBlendValue += delta * 0.24;
+    if (Math.abs(delta) < 0.003) {
+      markerBlendValue = markerBlendTarget;
+    }
+    container.style.setProperty('--mapbox-svg-mix', `${markerBlendValue.toFixed(3)}`);
+    if (Math.abs(markerBlendTarget - markerBlendValue) >= 0.003) {
+      markerBlendRaf = requestAnimationFrame(animateBlend);
+    }
+  };
+  markerBlendRaf = requestAnimationFrame(animateBlend);
 }
 
 function bindMarkerVisualScale() {
@@ -920,8 +983,33 @@ function buildPointFeatureCollection() {
 }
 
 function resolveRoutePathVertices(route) {
-  const fromPath = Array.isArray(route?.pathJson)
-    ? route.pathJson
+  const rawPath =
+    Array.isArray(route?.pathJson)
+      ? route.pathJson
+      : typeof route?.pathJson === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(route.pathJson);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch (_e) {
+              return [];
+            }
+          })()
+        : Array.isArray(route?.path)
+          ? route.path
+          : typeof route?.path === 'string'
+            ? (() => {
+                try {
+                  const parsed = JSON.parse(route.path);
+                  return Array.isArray(parsed) ? parsed : [];
+                } catch (_e) {
+                  return [];
+                }
+              })()
+            : [];
+
+  const fromPath = Array.isArray(rawPath)
+    ? rawPath
         .map((vertex) => {
           if (!vertex || typeof vertex !== 'object') return null;
           const lat = Number(vertex.lat);
@@ -961,7 +1049,7 @@ function resolveRoutePathVertices(route) {
 
 function buildRouteFeatureCollection() {
   const features = [];
-  const routes = (Array.isArray(publishedRoutes) ? publishedRoutes : []).filter((route) => route?.status === 'published');
+  const routes = Array.isArray(publishedRoutes) ? publishedRoutes : [];
   routes.forEach((route) => {
     const vertices = resolveRoutePathVertices(route);
     if (vertices.length < 2) return;
@@ -1397,9 +1485,9 @@ async function handleStyleReady() {
   }
 }
 
-export async function setMapboxStyle(styleKey = 'standard') {
+export async function setMapboxStyle(styleKey = 'light') {
   if (!map) return false;
-  const nextKey = MAPBOX_STYLES[styleKey] ? styleKey : 'standard';
+  const nextKey = MAPBOX_STYLES[styleKey] ? styleKey : 'light';
   if (currentStyleKey === nextKey) return true;
   currentStyleKey = nextKey;
   pointsLoaded = false;
@@ -1427,51 +1515,33 @@ export async function ensureMapboxPreview() {
       style: MAPBOX_STYLES[currentStyleKey],
       center: [ODESA_START.lng, ODESA_START.lat],
       zoom: ODESA_START.zoom,
-      pitchWithRotate: false,
-      dragRotate: false,
+      pitchWithRotate: true,
+      dragRotate: true,
     });
-
-    const canvas = map.getCanvas();
-    let rightPanActive = false;
-    let lastX = 0;
-    let lastY = 0;
-    canvas.addEventListener('contextmenu', (event) => event.preventDefault());
-    canvas.addEventListener('mousedown', (event) => {
-      if (event.button !== 2) return;
-      rightPanActive = true;
-      lastX = event.clientX;
-      lastY = event.clientY;
-      canvas.style.cursor = 'grabbing';
-      event.preventDefault();
-    });
-    window.addEventListener('mousemove', (event) => {
-      if (!rightPanActive || !map) return;
-      const dx = event.clientX - lastX;
-      const dy = event.clientY - lastY;
-      lastX = event.clientX;
-      lastY = event.clientY;
-      map.panBy([-dx, -dy], { animate: false });
-    });
-    const stopRightPan = () => {
-      if (!rightPanActive) return;
-      rightPanActive = false;
-      canvas.style.cursor = '';
-    };
-    window.addEventListener('mouseup', stopRightPan);
-    window.addEventListener('blur', stopRightPan);
 
     map.addControl(new mapboxgl.NavigationControl({ visualizePitch: false }), 'bottom-right');
+    map.dragRotate.enable();
+    map.touchZoomRotate.enableRotation();
+    if (map.touchPitch?.enable) {
+      map.touchPitch.enable();
+    }
 
     map.on('style.load', () => {
       handleStyleReady().catch(() => null);
     });
-    map.on('load', () => {
-      handleStyleReady().catch(() => null);
+    map.on('rotateend', () => {
+      maybeSnapBearingToNorth();
     });
     map.on('remove', () => {
       clearDomPointMarkers();
       draw = null;
       drawBound = false;
+      if (markerBlendRaf) {
+        cancelAnimationFrame(markerBlendRaf);
+        markerBlendRaf = 0;
+      }
+      markerBlendValue = 0;
+      markerBlendTarget = 0;
     });
   } else {
     map.resize();

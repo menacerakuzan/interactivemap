@@ -4283,7 +4283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     { key: 'dark', node: btnMapboxStyleDark },
   ];
   const syncStyleButtons = () => {
-    const activeKey = getMapboxStyleKey?.() || 'standard';
+    const activeKey = getMapboxStyleKey?.() || 'light';
     styleButtons.forEach(({ key, node }) => {
       if (!node) return;
       node.style.opacity = activeKey === key ? '1' : '0.65';
