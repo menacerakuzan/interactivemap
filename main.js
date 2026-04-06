@@ -1440,8 +1440,22 @@ function setActiveSpecialistTab(tabName) {
   if (mapView) {
     mapView.classList.toggle('route-toolbar-visible', showRouteLineToolbar);
   }
-  // Do not auto-arm drawing on tab open.
-  lineSetVisible(false);
+  if (showRouteLineToolbar) {
+    lineSetMode('draw');
+    lineSetVisible(true);
+    const btnLineCursor = document.getElementById('btn-line-cursor');
+    const btnLineDraw = document.getElementById('btn-line-draw');
+    const btnLineCurve = document.getElementById('btn-line-curve');
+    const btnLineEdit = document.getElementById('btn-line-edit');
+    const btnLineErase = document.getElementById('btn-line-erase');
+    btnLineCursor?.classList.remove('active');
+    btnLineCurve?.classList.remove('active');
+    btnLineEdit?.classList.remove('active');
+    btnLineErase?.classList.remove('active');
+    btnLineDraw?.classList.add('active');
+  } else {
+    lineSetVisible(false);
+  }
   lineStopPointDrag({ commit: false });
 
   saveUiState();
