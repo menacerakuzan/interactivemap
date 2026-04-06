@@ -1441,8 +1441,12 @@ function setActiveSpecialistTab(tabName) {
     mapView.classList.toggle('route-toolbar-visible', showRouteLineToolbar);
   }
   if (showRouteLineToolbar) {
-    lineSetMode('draw');
-    lineSetVisible(true);
+    ensureMapboxPreview()
+      .then(() => {
+        lineSetMode('draw');
+        lineSetVisible(true);
+      })
+      .catch(() => null);
     const btnLineCursor = document.getElementById('btn-line-cursor');
     const btnLineDraw = document.getElementById('btn-line-draw');
     const btnLineCurve = document.getElementById('btn-line-curve');

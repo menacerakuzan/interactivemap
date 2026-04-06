@@ -1046,7 +1046,7 @@ function resolveRoutePathVertices(route) {
         })
         .filter(Boolean)
     : [];
-  if (fromPath.length) return fromPath;
+  if (fromPath.length >= 2) return fromPath;
 
   if (!Array.isArray(route?.points)) return [];
   return route.points
