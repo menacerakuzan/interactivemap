@@ -1067,7 +1067,11 @@ function resolveRoutePathVertices(route) {
 
 function buildRouteFeatureCollection() {
   const features = [];
-  const routes = Array.isArray(publishedRoutes) ? publishedRoutes : [];
+  const routes = (Array.isArray(publishedRoutes) ? publishedRoutes : []).filter((route) => {
+    const status = String(route?.status || '').trim().toLowerCase();
+    if (!status) return true;
+    return status !== 'draft' && status !== 'archived';
+  });
   routes.forEach((route) => {
     const vertices = resolveRoutePathVertices(route);
     if (vertices.length < 2) return;
@@ -1581,6 +1585,10 @@ export async function ensureMapboxPreview() {
 
 export function setMapboxLineToolVisible(visible) {
   drawVisible = Boolean(visible);
+  if (!draw) {
+    ensureDraw();
+    bindDrawEvents();
+  }
   if (!draw) return false;
   if (!drawVisible) {
     draw.changeMode('simple_select');
@@ -1600,7 +1608,14 @@ export function setMapboxLineToolVisible(visible) {
 
 export function setMapboxLineToolMode(mode = 'draw') {
   drawMode = String(mode || 'draw');
-  if (!draw || !drawVisible) return true;
+  if (!draw) {
+    ensureDraw();
+    bindDrawEvents();
+  }
+  if (!draw || !drawVisible) {
+    syncMapGestureStateForLineTool();
+    return true;
+  }
   if (drawMode === 'curve') {
     const firstLine = getDrawLineFeatures()[0];
     if (firstLine?.id) {

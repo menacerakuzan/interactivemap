@@ -1995,7 +1995,7 @@ async function refreshDashboardData() {
     routeColor: r.routeColor || getRouteColor(r.id),
     transportModes: normalizeTransportModes(r.transportModes),
   }));
-  setMapboxPublishedRoutes(dashboardRoutes.filter((r) => r.status === 'published'));
+  setMapboxPublishedRoutes(dashboardRoutes);
   dashboardProposals = proposals || [];
   mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
   mapController?.setHiddenPointTypes?.(Array.from(hiddenPointTypeCodes));
@@ -2035,7 +2035,7 @@ async function refreshPublicData() {
       routeColor: r.routeColor || getRouteColor(r.id),
       transportModes: normalizeTransportModes(r.transportModes),
     }));
-    setMapboxPublishedRoutes(dashboardRoutes.filter((r) => r.status === 'published'));
+    setMapboxPublishedRoutes(dashboardRoutes);
     mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
     mapController?.setHiddenPointTypes?.(Array.from(hiddenPointTypeCodes));
     renderNews();
@@ -2126,7 +2126,7 @@ function bindLegendPointsSync() {
     dashboardPoints = event.detail;
     setMapboxPoints(dashboardPoints);
     setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
-    setMapboxPublishedRoutes((dashboardRoutes || []).filter((r) => r.status === 'published'));
+    setMapboxPublishedRoutes(dashboardRoutes || []);
     renderLegend();
   });
 }
@@ -4249,7 +4249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     setMapboxPoints(pointsForMapbox);
     setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
-    setMapboxPublishedRoutes((dashboardRoutes || []).filter((r) => r.status === 'published'));
+    setMapboxPublishedRoutes(dashboardRoutes || []);
     const preview = await ensureMapboxPreview();
     if (!preview?.ok) {
       setSpecialistMessage(
@@ -4264,7 +4264,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setMapboxPerspective(true);
     setMapboxPoints(pointsForMapbox);
     setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
-    setMapboxPublishedRoutes((dashboardRoutes || []).filter((r) => r.status === 'published'));
+    setMapboxPublishedRoutes(dashboardRoutes || []);
     setTimeout(() => {
       resizeMapboxPreview();
     }, 60);
