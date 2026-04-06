@@ -626,9 +626,9 @@ function updateLanguage(lang) {
 
 function syncMapEngineButton() {
   const button = document.getElementById('btn-map-engine-toggle');
-  if (!button) return;
-  const key = currentMapEngine === 'mapbox' ? 'leaflet_mode_btn' : 'mapbox_preview_btn';
-  button.textContent = translations[currentLang]?.[key] || 'MAPBOX PREVIEW';
+  if (button) {
+    button.textContent = 'MAPBOX';
+  }
   const btn3D = document.getElementById('btn-mapbox-3d-toggle');
   if (btn3D) {
     const key3d = getMapboxPerspective?.() ? 'mapbox_2d_btn' : 'mapbox_3d_btn';
@@ -3623,6 +3623,14 @@ function bindSpecialistTools() {
     const updateFullscreenLabel = () => {
       btnMapFullscreen.textContent = document.fullscreenElement ? 'Вийти з повного екрана' : 'На весь екран';
     };
+    const syncFullscreenMapSize = () => {
+      if (currentMapEngine === 'mapbox') {
+        resizeMapboxPreview();
+        setTimeout(() => resizeMapboxPreview(), 140);
+      } else {
+        window.dispatchEvent(new Event('resize'));
+      }
+    };
 
     btnMapFullscreen.addEventListener('click', async () => {
       if (!fullscreenNode) return;
@@ -3636,10 +3644,14 @@ function bindSpecialistTools() {
         setSpecialistMessage('Не вдалося змінити режим екрана', true);
       } finally {
         updateFullscreenLabel();
+        syncFullscreenMapSize();
       }
     });
 
-    document.addEventListener('fullscreenchange', updateFullscreenLabel);
+    document.addEventListener('fullscreenchange', () => {
+      updateFullscreenLabel();
+      syncFullscreenMapSize();
+    });
     updateFullscreenLabel();
   }
 
@@ -4165,7 +4177,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       leafletMapView.appendChild(dock);
     }
     const nodes = [
-      btnMapEngineToggle,
       btnMapbox3DToggle,
       btnMapboxStyleLight,
       btnMapboxStyleStreets,
@@ -4179,10 +4190,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   };
   ensureMapboxControlDock();
+  if (btnMapEngineToggle) {
+    btnMapEngineToggle.style.display = 'none';
+  }
 
   const setMapEngine = async (engine) => {
-    currentMapEngine = engine === 'mapbox' ? 'mapbox' : 'leaflet';
-    const isMapbox = currentMapEngine === 'mapbox';
+    currentMapEngine = 'mapbox';
+    const isMapbox = true;
     document.body.classList.toggle('mapbox-preview-active', isMapbox);
     if (leafletMapView) leafletMapView.classList.toggle('map-engine-mapbox', isMapbox);
 
@@ -4194,73 +4208,60 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (btnMapboxStyleStreets) btnMapboxStyleStreets.style.display = isMapbox ? 'inline-flex' : 'none';
     if (btnMapboxStyleDark) btnMapboxStyleDark.style.display = isMapbox ? 'inline-flex' : 'none';
 
-    if (isMapbox) {
-      let pointsForMapbox = [];
-      try {
-        const refreshed = await mapController?.refresh?.();
-        if (Array.isArray(refreshed) && refreshed.length) {
-          pointsForMapbox = refreshed.map((point) => normalizePointRecord(point));
-        }
-      } catch (_e) {
-        // keep fallback path below
+    let pointsForMapbox = [];
+    try {
+      const refreshed = await mapController?.refresh?.();
+      if (Array.isArray(refreshed) && refreshed.length) {
+        pointsForMapbox = refreshed.map((point) => normalizePointRecord(point));
       }
-
-      if (!pointsForMapbox.length) {
-        pointsForMapbox = Array.isArray(dashboardPoints) ? dashboardPoints : [];
-      }
-      if (!pointsForMapbox.length) {
-        try {
-          const rows = await apiRequest('/api/points');
-          pointsForMapbox = (rows || []).map((point) => normalizePointRecord(point));
-          dashboardPoints = pointsForMapbox;
-        } catch (_e) {
-          // keep current in-memory points if request fails
-        }
-      }
-      if (typeof window !== 'undefined') {
-        window.__ODESA_POINTS_CACHE = pointsForMapbox;
-      }
-      setMapboxPoints(pointsForMapbox);
-      setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
-      setMapboxPublishedRoutes((dashboardRoutes || []).filter((r) => r.status === 'published'));
-      const preview = await ensureMapboxPreview();
-      if (!preview?.ok) {
-        currentMapEngine = 'leaflet';
-        document.body.classList.remove('mapbox-preview-active');
-        if (leafletMapView) leafletMapView.classList.remove('map-engine-mapbox');
-        if (leafletMapView) leafletMapView.style.display = 'block';
-        if (mapboxPreviewWrap) mapboxPreviewWrap.style.display = 'none';
-        syncMapEngineButton();
-        setSpecialistMessage(
-          currentLang === 'uk'
-            ? 'Mapbox Preview не запущено: додайте VITE_MAPBOX_TOKEN (або localStorage mapbox_token).'
-            : 'Mapbox Preview not started: set VITE_MAPBOX_TOKEN (or localStorage mapbox_token).',
-          true
-        );
-        return;
-      }
-      setMapboxPoints(pointsForMapbox);
-      setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
-      setMapboxPublishedRoutes((dashboardRoutes || []).filter((r) => r.status === 'published'));
-      setTimeout(() => {
-        resizeMapboxPreview();
-      }, 60);
-    } else {
-      mapController?.refresh?.().catch(() => null);
-      window.dispatchEvent(new Event('resize'));
+    } catch (_e) {
+      // keep fallback path below
     }
+
+    if (!pointsForMapbox.length) {
+      pointsForMapbox = Array.isArray(dashboardPoints) ? dashboardPoints : [];
+    }
+    if (!pointsForMapbox.length) {
+      try {
+        const rows = await apiRequest('/api/points');
+        pointsForMapbox = (rows || []).map((point) => normalizePointRecord(point));
+        dashboardPoints = pointsForMapbox;
+      } catch (_e) {
+        // keep current in-memory points if request fails
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.__ODESA_POINTS_CACHE = pointsForMapbox;
+    }
+    setMapboxPoints(pointsForMapbox);
+    setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
+    setMapboxPublishedRoutes((dashboardRoutes || []).filter((r) => r.status === 'published'));
+    const preview = await ensureMapboxPreview();
+    if (!preview?.ok) {
+      setSpecialistMessage(
+        currentLang === 'uk'
+          ? 'Mapbox не запущено: додайте VITE_MAPBOX_TOKEN (або localStorage mapbox_token).'
+          : 'Mapbox not started: set VITE_MAPBOX_TOKEN (or localStorage mapbox_token).',
+        true
+      );
+      return;
+    }
+    await setMapboxStyle('light');
+    setMapboxPerspective(true);
+    setMapboxPoints(pointsForMapbox);
+    setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
+    setMapboxPublishedRoutes((dashboardRoutes || []).filter((r) => r.status === 'published'));
+    setTimeout(() => {
+      resizeMapboxPreview();
+    }, 60);
+    setTimeout(() => {
+      setMapboxPoints(pointsForMapbox);
+      setMapboxPublishedRoutes((dashboardRoutes || []).filter((r) => r.status === 'published'));
+    }, 180);
 
     syncMapEngineButton();
     syncStyleButtons();
   };
-
-  if (btnMapEngineToggle) {
-    btnMapEngineToggle.addEventListener('click', async (event) => {
-      event.preventDefault();
-      const next = currentMapEngine === 'leaflet' ? 'mapbox' : 'leaflet';
-      await setMapEngine(next);
-    });
-  }
   window.addEventListener('mapbox:point-click', (event) => {
     const pointId = Number(event?.detail?.pointId);
     if (!Number.isFinite(pointId)) return;
@@ -4329,7 +4330,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   updateLanguage(currentLang);
   syncMapEngineButton();
-  await setMapEngine('leaflet');
+  await setMapEngine('mapbox');
   syncStyleButtons();
   if (dataService.mode === 'supabase' && hasValidSupabaseSession(authSession)) {
     try {

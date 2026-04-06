@@ -594,12 +594,12 @@ body.mapbox-preview-active .filter-menu {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(9, 17, 28, 0.76);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 10px 24px rgba(10, 25, 46, 0.25);
+  padding: 8px;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 24px rgba(10, 25, 46, 0.16);
 }
 
 .mapbox-dock-btn {
@@ -607,19 +607,23 @@ body.mapbox-preview-active .filter-menu {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
-  padding: 6px 10px;
-  border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.08);
-  color: #e6edf7 !important;
-  font-size: 12px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(19, 49, 92, 0.18);
+  background: rgba(19, 49, 92, 0.06);
+  color: var(--c-admiralty) !important;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   text-decoration: none;
-  transition: background-color 160ms var(--ease-smooth), transform 160ms var(--ease-smooth);
+  transition: background-color 180ms var(--ease-smooth), transform 180ms var(--ease-smooth), border-color 180ms var(--ease-smooth), color 180ms var(--ease-smooth);
 }
 
 .mapbox-dock-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(19, 49, 92, 0.12);
+  border-color: rgba(19, 49, 92, 0.32);
   transform: translateY(-1px);
 }
 

@@ -760,10 +760,12 @@ function updateDomMarkerVisualScale() {
   if (map.getLayer('preview-unclustered')) {
     map.setLayoutProperty('preview-unclustered', 'visibility', circleVisibility);
   }
+  const clusterLayersReady = Boolean(map.getLayer('preview-clusters') && map.getLayer('preview-unclustered'));
+  const shouldHideDomMarkers = isClusterMode && clusterLayersReady;
 
   domPointMarkers.forEach(({ element, point }) => {
     if (!element) return;
-    element.classList.toggle('is-hidden', isClusterMode);
+    element.classList.toggle('is-hidden', shouldHideDomMarkers);
     element.classList.toggle('is-svg', !isClusterMode && isSvgMode);
     element.classList.toggle('is-dot', !isClusterMode && !isSvgMode);
     if (!isClusterMode && isSvgMode) {
