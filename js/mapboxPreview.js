@@ -73,6 +73,8 @@ let drawMutating = false;
 let curvePreviewData = { type: 'FeatureCollection', features: [] };
 let hiddenPointTypeCodes = new Set();
 let publishedRoutes = [];
+let pointPickMode = false;
+let pointPickCallback = null;
 let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
@@ -244,6 +246,12 @@ function maybeSnapBearingToNorth() {
     duration: 220,
     essential: true,
   });
+}
+
+function syncPointPickUi() {
+  const container = map?.getContainer?.();
+  if (!container) return;
+  container.classList.toggle('point-pick', Boolean(pointPickMode));
 }
 
 function syncMapGestureStateForLineTool() {
@@ -1565,6 +1573,22 @@ export async function ensureMapboxPreview() {
     map.on('style.load', () => {
       handleStyleReady().catch(() => null);
     });
+    map.on('click', (event) => {
+      if (!pointPickMode || typeof pointPickCallback !== 'function') return;
+      const originalTarget = event?.originalEvent?.target;
+      if (originalTarget?.closest?.('#route-line-toolbar')) return;
+      const lat = Number(event?.lngLat?.lat);
+      const lng = Number(event?.lngLat?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      try {
+        pointPickCallback({ lat, lng });
+      } catch (_e) {
+        // noop
+      }
+      pointPickMode = false;
+      pointPickCallback = null;
+      syncPointPickUi();
+    });
     map.on('rotateend', () => {
       maybeSnapBearingToNorth();
     });
@@ -1578,6 +1602,8 @@ export async function ensureMapboxPreview() {
       }
       markerBlendValue = 0;
       markerBlendTarget = 0;
+      pointPickMode = false;
+      pointPickCallback = null;
     });
   } else {
     map.resize();
@@ -1592,12 +1618,18 @@ export async function ensureMapboxPreview() {
     }
   }
   syncDomPointMarkers();
+  syncPointPickUi();
 
   return { ok: true, map };
 }
 
 export function setMapboxLineToolVisible(visible) {
   drawVisible = Boolean(visible);
+  if (drawVisible) {
+    pointPickMode = false;
+    pointPickCallback = null;
+    syncPointPickUi();
+  }
   if (!draw) {
     ensureDraw();
     bindDrawEvents();
@@ -1621,6 +1653,11 @@ export function setMapboxLineToolVisible(visible) {
 
 export function setMapboxLineToolMode(mode = 'draw') {
   drawMode = String(mode || 'draw');
+  if (['draw', 'curve', 'edit', 'erase'].includes(drawMode)) {
+    pointPickMode = false;
+    pointPickCallback = null;
+    syncPointPickUi();
+  }
   if (!draw) {
     ensureDraw();
     bindDrawEvents();
@@ -1664,6 +1701,27 @@ export function setMapboxLineToolMode(mode = 'draw') {
 
 export function setMapboxLineToolSnapEnabled(enabled = true) {
   drawSnapEnabled = Boolean(enabled);
+  return true;
+}
+
+export function enableMapboxPointPicking(callback) {
+  pointPickMode = true;
+  pointPickCallback = typeof callback === 'function' ? callback : null;
+  if (drawVisible) {
+    drawVisible = false;
+    if (draw) {
+      draw.changeMode('simple_select');
+    }
+  }
+  syncPointPickUi();
+  syncMapGestureStateForLineTool();
+  return true;
+}
+
+export function disableMapboxPointPicking() {
+  pointPickMode = false;
+  pointPickCallback = null;
+  syncPointPickUi();
   return true;
 }
 

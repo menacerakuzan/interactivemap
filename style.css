@@ -1321,6 +1321,11 @@ body.context-open #btn-show-partners {
   cursor: crosshair;
 }
 
+#mapbox-map.point-pick .mapboxgl-canvas,
+#mapbox-map.point-pick .mapboxgl-canvas-container {
+  cursor: crosshair !important;
+}
+
 .leaflet-container.line-tool-active {
   cursor: crosshair;
 }

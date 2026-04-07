@@ -25,6 +25,8 @@ import {
   setMapboxLineDraftFromPoints,
   getMapboxLineDraftSnapshot,
   applyMapboxLineDraftToRoute,
+  enableMapboxPointPicking,
+  disableMapboxPointPicking,
 } from './js/mapboxPreview.js';
 import { dataService } from './js/dataService.js';
 import { COMMUNITIES_BY_DISTRICT, DISTRICT_CENTERS } from './js/communities.js';
@@ -1441,12 +1443,12 @@ function setActiveSpecialistTab(tabName) {
     mapView.classList.toggle('route-toolbar-visible', showRouteLineToolbar);
   }
   if (showRouteLineToolbar) {
-    ensureMapboxPreview()
-      .then(() => {
-        lineSetMode('draw');
-        lineSetVisible(true);
-      })
-      .catch(() => null);
+    if (!editingRouteId && !routeEditorPoints.length) {
+      lineClear();
+      lineSetDraft([]);
+    }
+    lineSetMode('draw');
+    lineSetVisible(true);
     const btnLineCursor = document.getElementById('btn-line-cursor');
     const btnLineDraw = document.getElementById('btn-line-draw');
     const btnLineCurve = document.getElementById('btn-line-curve');
@@ -1459,6 +1461,7 @@ function setActiveSpecialistTab(tabName) {
     btnLineDraw?.classList.add('active');
   } else {
     lineSetVisible(false);
+    disableMapboxPointPicking();
   }
   lineStopPointDrag({ commit: false });
 
@@ -2250,6 +2253,8 @@ function resetRouteEditor() {
   editingRouteId = null;
   routeEditorPoints = [];
   routeOrderHistory = [];
+  const routeEditSelect = document.getElementById('route-edit-select');
+  if (routeEditSelect) routeEditSelect.value = '';
   document.getElementById('route-name').value = '';
   document.getElementById('route-description').value = '';
   const routeStatusInput = document.getElementById('route-status');
@@ -2261,9 +2266,20 @@ function resetRouteEditor() {
   lineSetColor(DEFAULT_ROUTE_COLOR);
   setSelectedRouteTransportModes([]);
   lineClear();
+  lineSetDraft([]);
   lineSetMode('draw');
   lineSetVisible(false);
   lineSetSnap(true);
+  if (isMapboxEngineActive()) {
+    ensureMapboxPreview()
+      .then(() => {
+        clearMapboxLineDraft();
+        setMapboxLineDraftFromPoints([]);
+        setMapboxLineToolMode('draw');
+        setMapboxLineToolVisible(false);
+      })
+      .catch(() => null);
+  }
   renderRoutePointOrder();
   mapController?.clearRouteHighlight?.();
   syncEditorActionButtons();
@@ -2286,6 +2302,8 @@ function openRouteInEditor(routeId, options = {}) {
   lineSetColor(route.routeColor || getRouteColor(route.id));
   setSelectedRouteTransportModes(route.transportModes || []);
   routeEditorPoints = route.points.map((p) => ({ pointId: p.id, title: p.title }));
+  const routeEditSelect = document.getElementById('route-edit-select');
+  if (routeEditSelect) routeEditSelect.value = String(route.id);
   routeOrderHistory = [];
   const routeDraftPath = Array.isArray(route.pathJson) && route.pathJson.length
     ? route.pathJson
@@ -2301,7 +2319,7 @@ function openRouteInEditor(routeId, options = {}) {
     }));
   lineSetDraft(routeDraftPath);
   lineSetMode('draw');
-  lineSetVisible(false);
+  lineSetVisible(true);
   renderRoutePointOrder();
   mapController?.highlightRoute?.(route);
   setActiveSpecialistTab('route-editor');
@@ -3087,16 +3105,23 @@ function bindSpecialistTools() {
 
   if (btnPickOnMap) {
     btnPickOnMap.addEventListener('click', () => {
-      if (!mapController) {
+      if (!mapController && currentMapEngine !== 'mapbox') {
         setSpecialistMessage('Карта ще не готова', true);
         return;
       }
       setSpecialistMessage('Клікніть на карті для вибору координат');
-      mapController.enablePointPicking(({ lat, lng }) => {
+      const onPicked = ({ lat, lng }) => {
         document.getElementById('point-lat').value = lat.toFixed(6);
         document.getElementById('point-lng').value = lng.toFixed(6);
         setSpecialistSuccess('Координати вибрано');
-      });
+      };
+      if (currentMapEngine === 'mapbox') {
+        lineSetVisible(false);
+        disableMapboxPointPicking();
+        enableMapboxPointPicking(onPicked);
+      } else {
+        mapController.enablePointPicking(onPicked);
+      }
     });
   }
 
