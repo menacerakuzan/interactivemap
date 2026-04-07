@@ -1109,7 +1109,7 @@ function setPublishedRoutes(routes = []) {
         return {
           lat,
           lng,
-          edgeStyle: 'solid',
+          edgeStyle: 'dashed',
           edgeColor: route?.routeColor || '#E7C769',
           edgeCurve: false,
         };

@@ -73,6 +73,8 @@ let drawMutating = false;
 let curvePreviewData = { type: 'FeatureCollection', features: [] };
 let hiddenPointTypeCodes = new Set();
 let publishedRoutes = [];
+let routeRenderTimer = 0;
+let routeRenderRetryCount = 0;
 let pointPickMode = false;
 let pointPickCallback = null;
 let focusBoundaryData = {
@@ -1078,7 +1080,7 @@ function resolveRoutePathVertices(route) {
       return {
         lat,
         lng,
-        edgeStyle: 'solid',
+        edgeStyle: 'dashed',
         edgeColor: route?.routeColor || '#E7C769',
         edgeCurve: false,
       };
@@ -1170,6 +1172,35 @@ function ensureRoutesLayer() {
   }
   const source = map.getSource('preview-routes');
   if (source?.setData) source.setData(routeCollection);
+}
+
+function renderRoutesOverlayNow() {
+  if (!map || !map.isStyleLoaded()) return false;
+  ensureRoutesLayer();
+  return true;
+}
+
+function scheduleRoutesOverlayRender({ resetRetry = false } = {}) {
+  if (resetRetry) routeRenderRetryCount = 0;
+  if (routeRenderTimer) {
+    clearTimeout(routeRenderTimer);
+    routeRenderTimer = 0;
+  }
+  routeRenderTimer = setTimeout(() => {
+    routeRenderTimer = 0;
+    try {
+      const rendered = renderRoutesOverlayNow();
+      if (!rendered && routeRenderRetryCount < 6) {
+        routeRenderRetryCount += 1;
+        scheduleRoutesOverlayRender();
+      }
+    } catch (_e) {
+      if (routeRenderRetryCount < 6) {
+        routeRenderRetryCount += 1;
+        scheduleRoutesOverlayRender();
+      }
+    }
+  }, routeRenderRetryCount === 0 ? 0 : 140);
 }
 
 async function ensurePointsLayer() {
@@ -1447,8 +1478,7 @@ export function setMapboxPoints(points = []) {
 
 export function setMapboxPublishedRoutes(routes = []) {
   publishedRoutes = Array.isArray(routes) ? routes : [];
-  if (!map || !map.isStyleLoaded()) return;
-  ensureRoutesLayer();
+  scheduleRoutesOverlayRender({ resetRetry: true });
 }
 
 export function setMapboxHiddenPointTypes(codes = []) {
@@ -1491,7 +1521,7 @@ async function handleStyleReady() {
     setStatus('Mapbox: points layer error');
   }
   try {
-    ensureRoutesLayer();
+    scheduleRoutesOverlayRender({ resetRetry: true });
   } catch (_e) {
     // noop
   }
@@ -1571,7 +1601,14 @@ export async function ensureMapboxPreview() {
     }
 
     map.on('style.load', () => {
+      routeRenderRetryCount = 0;
       handleStyleReady().catch(() => null);
+    });
+    map.on('styledata', () => {
+      scheduleRoutesOverlayRender();
+    });
+    map.on('idle', () => {
+      scheduleRoutesOverlayRender();
     });
     map.on('click', (event) => {
       if (!pointPickMode || typeof pointPickCallback !== 'function') return;
@@ -1596,6 +1633,11 @@ export async function ensureMapboxPreview() {
       clearDomPointMarkers();
       draw = null;
       drawBound = false;
+      if (routeRenderTimer) {
+        clearTimeout(routeRenderTimer);
+        routeRenderTimer = 0;
+      }
+      routeRenderRetryCount = 0;
       if (markerBlendRaf) {
         cancelAnimationFrame(markerBlendRaf);
         markerBlendRaf = 0;
