@@ -1419,9 +1419,17 @@ function setActiveSpecialistTab(tabName) {
       editor.classList.add('active');
       backButton.style.display = 'block';
       dashboardBlockIds.forEach((id) => setVisible(id, false));
-      Object.entries(editorActionToBlockId).forEach(([actionName, id]) => {
-        setVisible(id, actionName === action);
-      });
+      const visibleEditorIds = new Set(
+        Object.entries(editorActionToBlockId)
+          .filter(([actionName]) => actionName === action)
+          .map(([, id]) => id)
+      );
+      // route-editor and edit-route share one block
+      if (action === 'route-editor' || action === 'edit-route') {
+        visibleEditorIds.add('editor-route-block');
+      }
+      const allEditorIds = new Set(Object.values(editorActionToBlockId));
+      allEditorIds.forEach((id) => setVisible(id, visibleEditorIds.has(id)));
       const focusId = editorActionToBlockId[action];
       if (focusId) document.getElementById(focusId)?.classList.add('action-focus');
     }
@@ -2466,6 +2474,8 @@ function syncEditorActionButtons() {
   const btnCreateRoute = document.getElementById('btn-create-route');
   const btnSaveRoute = document.getElementById('btn-save-route');
   const btnDeleteRoute = document.getElementById('btn-delete-route');
+  const btnNewRoute = document.getElementById('btn-new-route');
+  const routeEditSelect = document.getElementById('route-edit-select');
   if (btnCreateRoute && btnSaveRoute) {
     if (currentSpecialistAction === 'route-editor') {
       btnCreateRoute.style.display = '';
@@ -2480,6 +2490,12 @@ function syncEditorActionButtons() {
   }
   if (btnDeleteRoute) {
     btnDeleteRoute.style.display = currentSpecialistAction === 'edit-route' && editingRouteId ? '' : 'none';
+  }
+  if (btnNewRoute) {
+    btnNewRoute.style.display = currentSpecialistAction === 'route-editor' ? '' : 'none';
+  }
+  if (routeEditSelect) {
+    routeEditSelect.style.display = currentSpecialistAction === 'edit-route' ? '' : 'none';
   }
 
   const btnCreateNews = document.getElementById('btn-create-news');
