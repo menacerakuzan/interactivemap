@@ -370,6 +370,7 @@ const dashboardBlockIds = [
 const editorActionToBlockId = {
   'add-point': 'editor-add-point-block',
   'route-editor': 'editor-route-block',
+  'edit-route': 'editor-route-block',
   'edit-point': 'editor-edit-point-block',
   'news-editor': 'editor-news-block',
 };
@@ -770,7 +771,8 @@ function setSpecialistGuide(action) {
     dashboard: 'Огляд: перевіряйте маршрути/точки, відкривайте потрібний обʼєкт і переходьте до редагування.',
     'add-point': 'Додавання точки: заповніть назву, тип, координати, головне фото та за потреби додайте розділи з фото.',
     'edit-point': 'Редагування точки: виберіть точку зі списку, змініть дані, фото або розділи та натисніть «Зберегти точку».',
-    'route-editor': 'Маршрути: оберіть існуючий маршрут або створіть новий, додайте точки, збережіть або видаліть.',
+    'route-editor': 'Створення маршруту: задайте назву, колір і одразу малюйте лінію потрібним інструментом.',
+    'edit-route': 'Редагування маршруту: виберіть існуючий маршрут, змініть геометрію/точки і збережіть.',
     'news-editor': 'Новини: створюйте новини з коротким описом і посиланням, або редагуйте/видаляйте існуючі.',
   };
   guide.textContent = hints[action] || hints.menu;
@@ -1390,7 +1392,8 @@ function setActiveSpecialistTab(tabName) {
     dashboard: 'РЕЖИМ: ОГЛЯД',
     'add-point': 'РЕЖИМ: ДОДАТИ ТОЧКУ',
     'edit-point': 'РЕЖИМ: РЕДАГУВАТИ ТОЧКУ',
-    'route-editor': 'РЕЖИМ: МАРШРУТИ',
+    'route-editor': 'РЕЖИМ: СТВОРИТИ МАРШРУТ',
+    'edit-route': 'РЕЖИМ: РЕДАГУВАТИ МАРШРУТ',
     'news-editor': 'РЕЖИМ: НОВИНИ',
   };
   if (modeLabel) {
@@ -1424,7 +1427,7 @@ function setActiveSpecialistTab(tabName) {
     }
   }
 
-  const showRouteLineToolbar = action === 'route-editor';
+  const showRouteLineToolbar = action === 'route-editor' || action === 'edit-route';
   const routeLineToolbar = document.getElementById('route-line-toolbar');
   const mapView = document.querySelector('.map-view');
   if (routeLineToolbar) {
@@ -1443,7 +1446,7 @@ function setActiveSpecialistTab(tabName) {
     mapView.classList.toggle('route-toolbar-visible', showRouteLineToolbar);
   }
   if (showRouteLineToolbar) {
-    if (!editingRouteId && !routeEditorPoints.length) {
+    if (action === 'route-editor' && !editingRouteId && !routeEditorPoints.length) {
       lineClear();
       lineSetDraft([]);
     }
@@ -2012,8 +2015,8 @@ async function refreshDashboardData() {
   renderLegend();
   refreshRouteSelectors();
 
-  if (currentSpecialistAction === 'route-editor' && editingRouteId && !routeEditorPoints.length) {
-    openRouteInEditor(editingRouteId, { silent: true });
+  if ((currentSpecialistAction === 'route-editor' || currentSpecialistAction === 'edit-route') && editingRouteId && !routeEditorPoints.length) {
+    openRouteInEditor(editingRouteId, { silent: true, tab: currentSpecialistAction });
   }
 }
 
@@ -2217,12 +2220,34 @@ function bindSpecialistTabs() {
     dashboard: 'Відкрито панель огляду',
     'add-point': 'Режим: додавання точки',
     'edit-point': 'Режим: редагування точки',
-    'route-editor': 'Режим: редактор маршрутів',
+    'route-editor': 'Режим: створення маршруту',
+    'edit-route': 'Режим: редагування маршруту',
     'news-editor': 'Режим: редактор новин',
   };
 
   const openAction = (action) => {
     if (!action) return;
+    if (action === 'route-editor') {
+      resetRouteEditor();
+      setActiveSpecialistTab('route-editor');
+      setSpecialistMessage('Режим: створення нового маршруту');
+      return;
+    }
+    if (action === 'edit-route') {
+      setActiveSpecialistTab('edit-route');
+      if (!editingRouteId) {
+        const routeEditSelect = document.getElementById('route-edit-select');
+        const selectedId = Number(routeEditSelect?.value);
+        if (Number.isFinite(selectedId) && selectedId > 0) {
+          openRouteInEditor(selectedId);
+          return;
+        }
+        setSpecialistMessage('Оберіть маршрут зі списку для редагування');
+        return;
+      }
+      setSpecialistMessage(`Редагування маршруту: ${document.getElementById('route-name')?.value || 'поточний маршрут'}`);
+      return;
+    }
     setActiveSpecialistTab(action);
     if (action === 'edit-point' && !editingPointId) {
       setSpecialistMessage('Оберіть точку зі списку');
@@ -2322,7 +2347,7 @@ function openRouteInEditor(routeId, options = {}) {
   lineSetVisible(true);
   renderRoutePointOrder();
   mapController?.highlightRoute?.(route);
-  setActiveSpecialistTab('route-editor');
+  setActiveSpecialistTab(options.tab || 'edit-route');
   if (!options.silent) {
     setSpecialistMessage(`Редагування маршруту: ${route.name}`);
   }
@@ -2432,11 +2457,19 @@ function syncEditorActionButtons() {
   const btnSaveRoute = document.getElementById('btn-save-route');
   const btnDeleteRoute = document.getElementById('btn-delete-route');
   if (btnCreateRoute && btnSaveRoute) {
-    btnCreateRoute.style.display = editingRouteId ? 'none' : '';
-    btnSaveRoute.style.display = editingRouteId ? '' : 'none';
+    if (currentSpecialistAction === 'route-editor') {
+      btnCreateRoute.style.display = '';
+      btnSaveRoute.style.display = editingRouteId ? '' : 'none';
+    } else if (currentSpecialistAction === 'edit-route') {
+      btnCreateRoute.style.display = 'none';
+      btnSaveRoute.style.display = editingRouteId ? '' : 'none';
+    } else {
+      btnCreateRoute.style.display = editingRouteId ? 'none' : '';
+      btnSaveRoute.style.display = editingRouteId ? '' : 'none';
+    }
   }
   if (btnDeleteRoute) {
-    btnDeleteRoute.style.display = editingRouteId ? '' : 'none';
+    btnDeleteRoute.style.display = currentSpecialistAction === 'edit-route' && editingRouteId ? '' : 'none';
   }
 
   const btnCreateNews = document.getElementById('btn-create-news');
@@ -2470,7 +2503,7 @@ function bindDashboardActions() {
 
     try {
       if (action === 'edit-route') {
-        openRouteInEditor(routeId);
+        openRouteInEditor(routeId, { tab: 'edit-route' });
       }
 
       if (action === 'advance-route') {
@@ -3053,12 +3086,33 @@ function bindSpecialistTools() {
     if (label) label.textContent = enabled ? 'Snap ON' : 'Snap OFF';
     else btnLineSnap.textContent = enabled ? 'Snap ON' : 'Snap OFF';
   };
+  const resolveActiveRouteLineColor = () => {
+    const routeColorInputEl = document.getElementById('route-color');
+    const lineColorInputEl = document.getElementById('line-color-input');
+    const routeColor = String(routeColorInputEl?.value || '').trim();
+    const toolbarColor = String(lineColorInputEl?.value || '').trim();
+    return /^#[0-9a-f]{6}$/i.test(routeColor)
+      ? routeColor
+      : /^#[0-9a-f]{6}$/i.test(toolbarColor)
+        ? toolbarColor
+        : DEFAULT_ROUTE_COLOR;
+  };
+  const applyActiveLineToolAppearance = () => {
+    const color = resolveActiveRouteLineColor();
+    lineSetColor(color);
+    if (routeColorInput) routeColorInput.value = color;
+    if (lineColorInput) lineColorInput.value = color;
+    if (lineStyleSelect) {
+      lineSetStyle(lineStyleSelect.value || 'dashed');
+    }
+  };
 
   setLineToolButtonState('cursor');
   lineSetVisible(false);
   lineSetMode('draw');
   lineSetSnap(lineSnapEnabled);
   setSnapButtonState(lineSnapEnabled);
+  applyActiveLineToolAppearance();
 
   if (routeLineToolbar) {
     ['pointerdown', 'mousedown', 'click', 'dblclick', 'touchstart', 'wheel'].forEach((eventName) => {
@@ -3135,6 +3189,7 @@ function bindSpecialistTools() {
 
   if (btnLineDraw) {
     btnLineDraw.addEventListener('click', () => {
+      applyActiveLineToolAppearance();
       setLineToolButtonState('draw');
       lineSetVisible(true);
       lineSetMode('draw');
@@ -3144,6 +3199,7 @@ function bindSpecialistTools() {
 
   if (btnLineCurve) {
     btnLineCurve.addEventListener('click', () => {
+      applyActiveLineToolAppearance();
       setLineToolButtonState('curve');
       lineSetVisible(true);
       lineSetMode('curve');
@@ -3153,6 +3209,7 @@ function bindSpecialistTools() {
 
   if (btnLineEdit) {
     btnLineEdit.addEventListener('click', () => {
+      applyActiveLineToolAppearance();
       setLineToolButtonState('edit');
       lineSetVisible(true);
       lineSetMode('edit');
@@ -3162,6 +3219,7 @@ function bindSpecialistTools() {
 
   if (btnLineErase) {
     btnLineErase.addEventListener('click', () => {
+      applyActiveLineToolAppearance();
       setLineToolButtonState('erase');
       lineSetVisible(true);
       lineSetMode('erase');
@@ -3204,6 +3262,12 @@ function bindSpecialistTools() {
   if (lineColorInput) {
     lineSetColor(lineColorInput.value || DEFAULT_ROUTE_COLOR);
     lineColorInput.addEventListener('input', () => {
+      const value = lineColorInput.value || DEFAULT_ROUTE_COLOR;
+      lineSetColor(value);
+      const routeColorInputEl = document.getElementById('route-color');
+      if (routeColorInputEl) routeColorInputEl.value = value;
+    });
+    lineColorInput.addEventListener('change', () => {
       const value = lineColorInput.value || DEFAULT_ROUTE_COLOR;
       lineSetColor(value);
       const routeColorInputEl = document.getElementById('route-color');
@@ -3699,15 +3763,18 @@ function bindSpecialistTools() {
   }
 
   if (routeColorInput) {
-    routeColorInput.addEventListener('input', () => {
-      lineSetColor(routeColorInput.value || DEFAULT_ROUTE_COLOR);
-      if (lineColorInput) lineColorInput.value = routeColorInput.value || DEFAULT_ROUTE_COLOR;
+    const syncRouteColorToLine = () => {
+      const color = routeColorInput.value || DEFAULT_ROUTE_COLOR;
+      lineSetColor(color);
+      if (lineColorInput) lineColorInput.value = color;
       if (!editingRouteId) return;
       const route = dashboardRoutes.find((r) => r.id === editingRouteId);
       if (!route) return;
-      route.routeColor = routeColorInput.value || DEFAULT_ROUTE_COLOR;
+      route.routeColor = color;
       mapController?.highlightRoute?.(route);
-    });
+    };
+    routeColorInput.addEventListener('input', syncRouteColorToLine);
+    routeColorInput.addEventListener('change', syncRouteColorToLine);
   }
 
   if (btnCreateNews) {
