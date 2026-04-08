@@ -494,7 +494,12 @@ function pushDrawHistory() {
 
 function syncDrawLinePaint() {
   if (!map) return;
-  DRAW_LINE_LAYER_IDS.forEach((layerId) => {
+  const styleLayers = map.getStyle?.()?.layers || [];
+  const dynamicLineLayerIds = styleLayers
+    .map((layer) => layer?.id)
+    .filter((layerId) => typeof layerId === 'string' && layerId.startsWith('gl-draw-line'));
+  const layerIds = Array.from(new Set([...DRAW_LINE_LAYER_IDS, ...dynamicLineLayerIds]));
+  layerIds.forEach((layerId) => {
     if (!map.getLayer(layerId)) return;
     map.setPaintProperty(layerId, 'line-color', [
       'coalesce',

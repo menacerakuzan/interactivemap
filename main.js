@@ -1467,6 +1467,7 @@ function setActiveSpecialistTab(tabName) {
     disableMapboxPointPicking();
   }
   lineStopPointDrag({ commit: false });
+  syncEditorActionButtons();
 
   saveUiState();
 }
@@ -2453,6 +2454,15 @@ function openNewsInEditor(newsId) {
 }
 
 function syncEditorActionButtons() {
+  const routeModeBadge = document.getElementById('route-editor-mode-badge');
+  if (routeModeBadge) {
+    const isEditMode = currentSpecialistAction === 'edit-route';
+    routeModeBadge.classList.toggle('is-edit', isEditMode);
+    routeModeBadge.textContent = isEditMode
+      ? `Режим: Редагування маршруту${editingRouteId ? ` #${editingRouteId}` : ''}`
+      : 'Режим: Створення маршруту';
+  }
+
   const btnCreateRoute = document.getElementById('btn-create-route');
   const btnSaveRoute = document.getElementById('btn-save-route');
   const btnDeleteRoute = document.getElementById('btn-delete-route');
@@ -3278,6 +3288,7 @@ function bindSpecialistTools() {
   if (btnLineApplyRoute) {
     btnLineApplyRoute.addEventListener('click', () => {
       const lineDraftSnapshot = lineGetDraft() || [];
+      applyActiveLineToolAppearance();
       const result = lineApplyToRoute();
       if (!result?.ok) {
         setSpecialistMessage(result?.message || 'Не вдалося застосувати лінію', true);
@@ -3292,13 +3303,10 @@ function bindSpecialistTools() {
         })
         .filter(Boolean);
 
-      if (!mappedPoints.length) {
-        setSpecialistMessage('Лінія не містить жодної привʼязаної точки. Додайте точки або увімкніть Snap.', true);
-        return;
-      }
-
       routeOrderHistory.push(routeEditorPoints.map((point) => ({ ...point })));
-      routeEditorPoints = mappedPoints;
+      if (mappedPoints.length) {
+        routeEditorPoints = mappedPoints;
+      }
       renderRoutePointOrder();
       if (lineDraftSnapshot.length) {
         lineSetDraft(lineDraftSnapshot);
@@ -3311,6 +3319,8 @@ function bindSpecialistTools() {
 
       if (result.skippedVertices > 0) {
         setSpecialistSuccess(`Маршрут зібрано. Пропущено ${result.skippedVertices} не привʼязаних вузлів.`);
+      } else if (!mappedPoints.length) {
+        setSpecialistSuccess('Лінію застосовано без привʼязки до точок');
       } else {
         setSpecialistSuccess('Лінію застосовано до маршруту');
       }
