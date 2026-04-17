@@ -1249,7 +1249,7 @@ function ensureRoutesLayer() {
           15,
           5.8,
         ],
-        'line-opacity': 0.9,
+        'line-opacity': 1,
       },
       layout: {
         'line-cap': 'round',

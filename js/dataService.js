@@ -104,25 +104,31 @@ function normalizeRoutePathJson(value) {
   const normalized = [];
   value.forEach((vertex) => {
     if (!vertex || typeof vertex !== 'object') return;
-    const lat = Number(vertex.lat);
-    const lng = Number(vertex.lng);
+    const lat = Number(vertex.lat ?? vertex.latitude);
+    const lng = Number(vertex.lng ?? vertex.lon ?? vertex.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    const pointIdRaw = Number(vertex.pointId);
+    const pointIdRaw = Number(vertex.pointId ?? vertex.point_id);
     const pointId = Number.isFinite(pointIdRaw) ? pointIdRaw : null;
-    const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed';
+    const edgeStyleRaw = String(vertex.edgeStyle ?? vertex.edge_style ?? '').trim().toLowerCase();
+    const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(edgeStyleRaw) ? edgeStyleRaw : 'dashed';
+    const rawEdgeColor = String(vertex.edgeColor ?? vertex.edge_color ?? '').trim();
     const edgeColor =
-      typeof vertex.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(vertex.edgeColor)
-        ? vertex.edgeColor
-        : '#E7C769';
+      /^#[0-9a-f]{6}$/i.test(rawEdgeColor)
+        ? rawEdgeColor
+        : /^[0-9a-f]{6}$/i.test(rawEdgeColor)
+          ? `#${rawEdgeColor}`
+          : /^#[0-9a-f]{3}$/i.test(rawEdgeColor)
+            ? `#${rawEdgeColor[1]}${rawEdgeColor[1]}${rawEdgeColor[2]}${rawEdgeColor[2]}${rawEdgeColor[3]}${rawEdgeColor[3]}`
+            : '#E7C769';
     normalized.push({
       lat,
       lng,
       pointId,
-      title: typeof vertex.title === 'string' ? vertex.title : '',
-      snapped: Boolean(vertex.snapped),
+      title: typeof (vertex.title ?? vertex.point_title) === 'string' ? String(vertex.title ?? vertex.point_title) : '',
+      snapped: Boolean(vertex.snapped ?? vertex.is_snapped),
       edgeStyle,
-      edgeColor,
-      edgeCurve: Boolean(vertex.edgeCurve),
+      edgeColor: edgeColor.toUpperCase(),
+      edgeCurve: Boolean(vertex.edgeCurve ?? vertex.edge_curve),
     });
   });
   return normalized.slice(0, 4000);

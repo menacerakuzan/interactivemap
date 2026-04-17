@@ -151,22 +151,29 @@ function normalizeRoutePathVertex(vertex, fallbackColor = '#E7C769') {
   const lat = Number(vertex.lat ?? vertex.latitude);
   const lng = Number(vertex.lng ?? vertex.lon ?? vertex.longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  const pointIdRaw = Number(vertex.pointId);
+  const pointIdRaw = Number(vertex.pointId ?? vertex.point_id);
   const pointId = Number.isFinite(pointIdRaw) ? pointIdRaw : null;
-  const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed';
-  const edgeColor =
-    typeof vertex.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(vertex.edgeColor)
-      ? vertex.edgeColor
-      : fallbackColor;
+  const edgeStyleRaw = String(vertex.edgeStyle ?? vertex.edge_style ?? '').trim().toLowerCase();
+  const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(edgeStyleRaw) ? edgeStyleRaw : 'dashed';
+  const edgeColorRaw = String(vertex.edgeColor ?? vertex.edge_color ?? '').trim();
+  let edgeColor = fallbackColor;
+  if (/^#[0-9a-f]{6}$/i.test(edgeColorRaw)) {
+    edgeColor = edgeColorRaw.toUpperCase();
+  } else if (/^[0-9a-f]{6}$/i.test(edgeColorRaw)) {
+    edgeColor = `#${edgeColorRaw}`.toUpperCase();
+  } else if (/^#[0-9a-f]{3}$/i.test(edgeColorRaw)) {
+    const [r, g, b] = edgeColorRaw.slice(1).split('');
+    edgeColor = `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
   return {
     lat,
     lng,
     pointId,
-    title: typeof vertex.title === 'string' ? vertex.title : '',
-    snapped: Boolean(vertex.snapped),
+    title: typeof (vertex.title ?? vertex.point_title) === 'string' ? String(vertex.title ?? vertex.point_title) : '',
+    snapped: Boolean(vertex.snapped ?? vertex.is_snapped),
     edgeStyle,
     edgeColor,
-    edgeCurve: Boolean(vertex.edgeCurve),
+    edgeCurve: Boolean(vertex.edgeCurve ?? vertex.edge_curve),
   };
 }
 
@@ -217,10 +224,18 @@ const updateRoutePathJsonStmt = db.prepare(
   "UPDATE routes SET path_json = ?, updated_at = COALESCE(updated_at, datetime('now')) WHERE id = ?"
 );
 routeRowsForPathBackfill.forEach((route) => {
+  const routeColorRaw = String(route.route_color || '').trim();
   const fallbackColor =
-    typeof route.route_color === 'string' && /^#[0-9a-f]{6}$/i.test(route.route_color)
-      ? route.route_color
-      : '#E7C769';
+    /^#[0-9a-f]{6}$/i.test(routeColorRaw)
+      ? routeColorRaw.toUpperCase()
+      : /^[0-9a-f]{6}$/i.test(routeColorRaw)
+        ? `#${routeColorRaw}`.toUpperCase()
+        : /^#[0-9a-f]{3}$/i.test(routeColorRaw)
+          ? (() => {
+              const [r, g, b] = routeColorRaw.slice(1).split('');
+              return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+            })()
+          : '#E7C769';
   let normalized = normalizeRoutePathCollection(route.path_json, fallbackColor);
   if (normalized.length < 2) {
     normalized = buildRoutePathFromRoutePoints(route.id, fallbackColor);

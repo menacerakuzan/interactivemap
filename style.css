@@ -81,6 +81,14 @@ body {
   overflow-x: hidden;
 }
 
+button,
+a,
+input,
+select,
+textarea {
+  font-family: var(--font-ui);
+}
+
 body::before {
   content: '';
   position: fixed;
@@ -1169,6 +1177,8 @@ body.context-open #btn-show-partners {
   padding: 7px 14px;
   border-style: solid;
   font-size: 12px;
+  font-family: var(--font-ui);
+  font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--c-admiralty);

@@ -562,16 +562,55 @@ function normalizeHexRouteColor(value, fallback = DEFAULT_ROUTE_COLOR) {
   return fallback;
 }
 
+function normalizeRoutePathForUi(value) {
+  const source = typeof value === 'string'
+    ? (() => {
+        try {
+          return JSON.parse(value);
+        } catch (_e) {
+          return [];
+        }
+      })()
+    : value;
+  if (!Array.isArray(source)) return [];
+  return source
+    .map((vertex) => {
+      if (!vertex || typeof vertex !== 'object') return null;
+      const lat = Number(vertex.lat ?? vertex.latitude);
+      const lng = Number(vertex.lng ?? vertex.lon ?? vertex.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      const pointIdRaw = Number(vertex.pointId ?? vertex.point_id);
+      const pointId = Number.isFinite(pointIdRaw) ? pointIdRaw : null;
+      const edgeStyleRaw = String(vertex.edgeStyle ?? vertex.edge_style ?? '').trim().toLowerCase();
+      const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(edgeStyleRaw) ? edgeStyleRaw : 'dashed';
+      const edgeColor = normalizeHexRouteColor(vertex.edgeColor ?? vertex.edge_color, DEFAULT_ROUTE_COLOR);
+      return {
+        lat,
+        lng,
+        pointId,
+        title: typeof (vertex.title ?? vertex.point_title) === 'string' ? String(vertex.title ?? vertex.point_title) : '',
+        snapped: Boolean(vertex.snapped ?? vertex.is_snapped),
+        edgeStyle,
+        edgeColor,
+        edgeCurve: Boolean(vertex.edgeCurve ?? vertex.edge_curve),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 4000);
+}
+
 function normalizeRouteRecord(route) {
   const id = Number(route?.id);
+  const pathJson = normalizeRoutePathForUi(route?.pathJson ?? route?.path_json ?? []);
   const persistedColor = normalizeHexRouteColor(route?.routeColor || route?.route_color || '', '');
+  const firstPathColor = normalizeHexRouteColor(pathJson[0]?.edgeColor || '', '');
   const localColor = Number.isFinite(id) ? getRouteColor(id) : DEFAULT_ROUTE_COLOR;
-  const routeColor = persistedColor || localColor || DEFAULT_ROUTE_COLOR;
+  const routeColor = persistedColor || firstPathColor || localColor || DEFAULT_ROUTE_COLOR;
   return {
     ...route,
     routeColor,
     transportModes: normalizeTransportModes(route?.transportModes || route?.transport_modes || []),
-    pathJson: route?.pathJson ?? route?.path_json ?? [],
+    pathJson,
   };
 }
 

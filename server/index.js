@@ -68,25 +68,32 @@ function normalizeRoutePathJson(value) {
   const normalized = [];
   value.forEach((vertex) => {
     if (!vertex || typeof vertex !== 'object') return;
-    const lat = Number(vertex.lat);
-    const lng = Number(vertex.lng);
+    const lat = Number(vertex.lat ?? vertex.latitude);
+    const lng = Number(vertex.lng ?? vertex.lon ?? vertex.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    const pointIdRaw = Number(vertex.pointId);
+    const pointIdRaw = Number(vertex.pointId ?? vertex.point_id);
     const pointId = Number.isFinite(pointIdRaw) ? pointIdRaw : null;
-    const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed';
-    const edgeColor =
-      typeof vertex.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(vertex.edgeColor)
-        ? vertex.edgeColor
-        : '#E7C769';
+    const edgeStyleRaw = String(vertex.edgeStyle ?? vertex.edge_style ?? '').trim().toLowerCase();
+    const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(edgeStyleRaw) ? edgeStyleRaw : 'dashed';
+    const edgeColorRaw = String(vertex.edgeColor ?? vertex.edge_color ?? '').trim();
+    let edgeColor = '#E7C769';
+    if (/^#[0-9a-f]{6}$/i.test(edgeColorRaw)) {
+      edgeColor = edgeColorRaw.toUpperCase();
+    } else if (/^[0-9a-f]{6}$/i.test(edgeColorRaw)) {
+      edgeColor = `#${edgeColorRaw}`.toUpperCase();
+    } else if (/^#[0-9a-f]{3}$/i.test(edgeColorRaw)) {
+      const [r, g, b] = edgeColorRaw.slice(1).split('');
+      edgeColor = `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+    }
     normalized.push({
       lat,
       lng,
       pointId,
-      title: normalizeOptionalText(vertex.title, 180) || '',
-      snapped: Boolean(vertex.snapped),
+      title: normalizeOptionalText(vertex.title ?? vertex.point_title, 180) || '',
+      snapped: Boolean(vertex.snapped ?? vertex.is_snapped),
       edgeStyle,
       edgeColor,
-      edgeCurve: Boolean(vertex.edgeCurve),
+      edgeCurve: Boolean(vertex.edgeCurve ?? vertex.edge_curve),
     });
   });
   return normalized.slice(0, 4000);
