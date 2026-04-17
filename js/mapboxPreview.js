@@ -54,7 +54,7 @@ let mapRevealPending = false;
 let pointsLoaded = false;
 let is3DMode = false;
 let allPoints = [];
-let currentStyleKey = 'custom';
+let currentStyleKey = 'light';
 let pointsBridgeBound = false;
 const domPointMarkers = new Map();
 let markerVisualBound = false;
@@ -1654,9 +1654,9 @@ async function handleStyleReady() {
   }
 }
 
-export async function setMapboxStyle(styleKey = 'custom') {
+export async function setMapboxStyle(styleKey = 'light') {
   if (!map) return false;
-  const nextKey = MAPBOX_STYLES[styleKey] ? styleKey : 'custom';
+  const nextKey = MAPBOX_STYLES[styleKey] ? styleKey : 'light';
   if (currentStyleKey === nextKey) return true;
   currentStyleKey = nextKey;
   const container = map.getContainer?.();
