@@ -2,11 +2,12 @@ import Lenis from 'lenis';
 
 export function initLenis() {
     const lenis = new Lenis({
-        duration: 0.9,
+        duration: 0.72,
         easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Expo ease-out
         smooth: true,
+        smoothTouch: false,
         mouseMultiplier: 1,
-        touchMultiplier: 1.1,
+        touchMultiplier: 1,
         prevent: (node) => {
             if (!node || typeof node.closest !== 'function') return false;
             return Boolean(
@@ -27,39 +28,42 @@ export function initLenis() {
 }
 
 export function initInteractions() {
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    const isCoarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches;
+
     // GSAP Defaults
-    if (typeof gsap !== 'undefined') {
+    if (typeof gsap !== 'undefined' && !prefersReducedMotion) {
         gsap.registerPlugin(ScrollTrigger);
 
         // Parallax
         gsap.to('.parallax-deep', {
-            yPercent: 20,
-            ease: 'none',
-            scrollTrigger: {
-                trigger: '.hero',
-                start: 'top top',
-                end: 'bottom top',
-                scrub: true
-            }
-        });
-        gsap.to('.parallax-mid', {
             yPercent: 12,
             ease: 'none',
             scrollTrigger: {
                 trigger: '.hero',
                 start: 'top top',
                 end: 'bottom top',
-                scrub: true
+                scrub: 0.25
             }
         });
-        gsap.to('.parallax-front', {
-            yPercent: 6,
+        gsap.to('.parallax-mid', {
+            yPercent: 8,
             ease: 'none',
             scrollTrigger: {
                 trigger: '.hero',
                 start: 'top top',
                 end: 'bottom top',
-                scrub: true
+                scrub: 0.25
+            }
+        });
+        gsap.to('.parallax-front', {
+            yPercent: 4,
+            ease: 'none',
+            scrollTrigger: {
+                trigger: '.hero',
+                start: 'top top',
+                end: 'bottom top',
+                scrub: 0.25
             }
         });
 
@@ -104,12 +108,25 @@ export function initInteractions() {
     // Keep card interactions stable; avoid hover jitter from JS tilt.
 
     // Gradient Lighting Shift
-    document.addEventListener('mousemove', (e) => {
-        requestAnimationFrame(() => {
-            const x = (e.clientX / window.innerWidth) * 100;
-            const y = (e.clientY / window.innerHeight) * 100;
-            document.documentElement.style.setProperty('--light-x', `${x}%`);
-            document.documentElement.style.setProperty('--light-y', `${y}%`);
-        });
-    });
+    if (!prefersReducedMotion && !isCoarsePointer) {
+        let lightRaf = 0;
+        let pendingX = 50;
+        let pendingY = 30;
+        const updateLight = () => {
+            lightRaf = 0;
+            const heroVisible = document.querySelector('.hero')?.style?.display !== 'none';
+            if (!heroVisible) return;
+            document.documentElement.style.setProperty('--light-x', `${pendingX}%`);
+            document.documentElement.style.setProperty('--light-y', `${pendingY}%`);
+        };
+        document.addEventListener('mousemove', (e) => {
+            const target = e.target;
+            if (target && typeof target.closest === 'function' && target.closest('.map-container, .map-view, #mapbox-map')) {
+                return;
+            }
+            pendingX = (e.clientX / window.innerWidth) * 100;
+            pendingY = (e.clientY / window.innerHeight) * 100;
+            if (!lightRaf) lightRaf = requestAnimationFrame(updateLight);
+        }, { passive: true });
+    }
 }

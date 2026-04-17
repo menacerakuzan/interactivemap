@@ -3756,7 +3756,7 @@ function bindSpecialistTools() {
   }
 
   if (btnMapFullscreen) {
-    const fullscreenNode = document.querySelector('.map-container .map-view') || document.getElementById('map');
+    const fullscreenNode = document.querySelector('.map-container') || document.getElementById('map');
     const updateFullscreenLabel = () => {
       btnMapFullscreen.textContent = document.fullscreenElement ? 'Вийти з повного екрана' : 'На весь екран';
     };
@@ -4047,6 +4047,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const appInterface = document.querySelector('.app-interface');
   let isTransitioning = false;
   let mapToolsInitialized = false;
+  let mapboxInitDeferred = false;
   const forceMapboxResizeBurst = () => {
     if (currentMapEngine !== 'mapbox') return;
     resizeMapboxPreview();
@@ -4094,6 +4095,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       bindFloatingUiControls();
       applySavedUiState();
       mapToolsInitialized = true;
+    }
+
+    if (mapboxInitDeferred) {
+      mapboxInitDeferred = false;
+      await setMapEngine('mapbox');
     }
 
     await refreshPublicData();
@@ -4345,6 +4351,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const setMapEngine = async (engine) => {
+    const appVisible = appInterface && appInterface.style.display !== 'none';
+    if (!appVisible) {
+      mapboxInitDeferred = true;
+      return;
+    }
     currentMapEngine = 'mapbox';
     const isMapbox = true;
     document.body.classList.toggle('mapbox-preview-active', isMapbox);
@@ -4396,7 +4407,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       return;
     }
-    await setMapboxStyle('light');
+    await setMapboxStyle('custom');
     setMapboxPerspective(true);
     setMapboxPoints(pointsForMapbox);
     setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
@@ -4428,12 +4439,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   const styleButtons = [
+    { key: 'custom', node: btnMapboxStyleStreets },
     { key: 'light', node: btnMapboxStyleLight },
-    { key: 'streets', node: btnMapboxStyleStreets },
     { key: 'dark', node: btnMapboxStyleDark },
   ];
   const syncStyleButtons = () => {
-    const activeKey = getMapboxStyleKey?.() || 'light';
+    const activeKey = getMapboxStyleKey?.() || 'custom';
     styleButtons.forEach(({ key, node }) => {
       if (!node) return;
       node.style.opacity = activeKey === key ? '1' : '0.65';

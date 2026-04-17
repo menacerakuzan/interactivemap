@@ -5,6 +5,7 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
 const ODESA_START = { lng: 30.7233, lat: 46.4825, zoom: 10.8 };
 const MAPBOX_STYLES = {
+  custom: 'mapbox://styles/menacerakuzan/cmnfv8tm5004y01s743klc24x',
   standard: 'mapbox://styles/mapbox/standard',
   light: 'mapbox://styles/mapbox/light-v11',
   streets: 'mapbox://styles/mapbox/streets-v12',
@@ -51,7 +52,7 @@ let map = null;
 let pointsLoaded = false;
 let is3DMode = false;
 let allPoints = [];
-let currentStyleKey = 'light';
+let currentStyleKey = 'custom';
 let pointsBridgeBound = false;
 const domPointMarkers = new Map();
 let markerVisualBound = false;
@@ -81,10 +82,7 @@ let focusBoundaryData = {
   type: 'FeatureCollection',
   features: [],
 };
-const MARKER_MODULES = import.meta.glob('../assets/markers/*.svg', { eager: true, import: 'default' });
-const RAW_MARKER_URL_BY_FILE = Object.fromEntries(
-  Object.entries(MARKER_MODULES).map(([modulePath, url]) => [modulePath.split('/').pop(), url])
-);
+const MARKER_MODULES = import.meta.glob('../assets/markers/*.svg', { import: 'default' });
 const EXPECTED_MARKER_FILES = [
   'administration.svg',
   'trade_objects.svg',
@@ -151,24 +149,26 @@ function normalizeMarkerFileKey(value) {
     .trim();
 }
 
-const RAW_MARKER_URL_BY_NORMALIZED_FILE = Object.fromEntries(
-  Object.entries(RAW_MARKER_URL_BY_FILE).map(([fileName, url]) => [normalizeMarkerFileKey(fileName), url])
+const RAW_MARKER_IMPORTER_BY_NORMALIZED_FILE = Object.fromEntries(
+  Object.entries(MARKER_MODULES).map(([modulePath, importer]) => [normalizeMarkerFileKey(modulePath.split('/').pop()), importer])
 );
 
-const MARKER_URL_BY_FILE = EXPECTED_MARKER_FILES.reduce((acc, expectedFileName) => {
+const MARKER_IMPORTER_BY_FILE = EXPECTED_MARKER_FILES.reduce((acc, expectedFileName) => {
   const expectedNormalized = normalizeMarkerFileKey(expectedFileName);
   const candidates = [expectedFileName, ...(MARKER_LOCALIZED_CANDIDATES[expectedFileName] || [])];
-  let resolvedUrl = RAW_MARKER_URL_BY_NORMALIZED_FILE[expectedNormalized] || '';
-  if (!resolvedUrl) {
-    resolvedUrl = candidates
-      .map((candidate) => RAW_MARKER_URL_BY_NORMALIZED_FILE[normalizeMarkerFileKey(candidate)])
+  let resolvedImporter = RAW_MARKER_IMPORTER_BY_NORMALIZED_FILE[expectedNormalized] || null;
+  if (!resolvedImporter) {
+    resolvedImporter = candidates
+      .map((candidate) => RAW_MARKER_IMPORTER_BY_NORMALIZED_FILE[normalizeMarkerFileKey(candidate)] || null)
       .find(Boolean);
   }
-  if (resolvedUrl) {
-    acc[expectedFileName] = resolvedUrl;
+  if (resolvedImporter) {
+    acc[expectedFileName] = resolvedImporter;
   }
   return acc;
 }, {});
+const MARKER_URL_CACHE = new Map();
+const MARKER_URL_PROMISE_CACHE = new Map();
 const DRAW_SOURCE_COLD = 'mapbox-gl-draw-cold';
 const DRAW_SOURCE_HOT = 'mapbox-gl-draw-hot';
 const DRAW_LINE_LAYER_IDS = ['gl-draw-line-inactive', 'gl-draw-line-active', 'gl-draw-line-static'];
@@ -311,10 +311,77 @@ function getVisiblePoints() {
   return (Array.isArray(allPoints) ? allPoints : []).filter((point) => !isPointTypeHidden(point));
 }
 
-function resolvePointMarkerUrl(point) {
+function resolvePointMarkerFileName(point) {
   const code = String(point?.pointType?.code || '').trim();
-  const fileName = POINT_TYPE_MARKER_FILE[code] || POINT_TYPE_MARKER_FILE.other;
-  return MARKER_URL_BY_FILE[fileName] || MARKER_URL_BY_FILE['social_services.svg'] || '';
+  return POINT_TYPE_MARKER_FILE[code] || POINT_TYPE_MARKER_FILE.other;
+}
+
+async function resolveMarkerUrlByFileName(fileName) {
+  const normalizedFileName = String(fileName || '').trim();
+  const safeFileName = MARKER_IMPORTER_BY_FILE[normalizedFileName] ? normalizedFileName : 'social_services.svg';
+  if (MARKER_URL_CACHE.has(safeFileName)) {
+    return MARKER_URL_CACHE.get(safeFileName) || '';
+  }
+  if (MARKER_URL_PROMISE_CACHE.has(safeFileName)) {
+    return MARKER_URL_PROMISE_CACHE.get(safeFileName);
+  }
+  const importer = MARKER_IMPORTER_BY_FILE[safeFileName];
+  if (!importer) return '';
+
+  const pending = Promise.resolve(importer())
+    .then((url) => {
+      const nextUrl = typeof url === 'string' ? url : '';
+      MARKER_URL_CACHE.set(safeFileName, nextUrl);
+      MARKER_URL_PROMISE_CACHE.delete(safeFileName);
+      return nextUrl;
+    })
+    .catch(() => {
+      MARKER_URL_PROMISE_CACHE.delete(safeFileName);
+      return '';
+    });
+
+  MARKER_URL_PROMISE_CACHE.set(safeFileName, pending);
+  return pending;
+}
+
+function resolvePointMarkerUrl(point) {
+  const fileName = resolvePointMarkerFileName(point);
+  const safeFileName = MARKER_IMPORTER_BY_FILE[fileName] ? fileName : 'social_services.svg';
+  return MARKER_URL_CACHE.get(safeFileName) || '';
+}
+
+function ensurePointMarkerUrl(point, img) {
+  if (!img) return;
+  const fileName = resolvePointMarkerFileName(point);
+  const cacheHitUrl = resolvePointMarkerUrl(point);
+  if (cacheHitUrl) {
+    if (img.getAttribute('src') !== cacheHitUrl) {
+      img.setAttribute('src', cacheHitUrl);
+    }
+    return;
+  }
+  const requestedFile = MARKER_IMPORTER_BY_FILE[fileName] ? fileName : 'social_services.svg';
+  if (img.dataset.markerLoading === requestedFile) return;
+  img.dataset.markerLoading = requestedFile;
+  resolveMarkerUrlByFileName(requestedFile).then((resolvedUrl) => {
+    if (!resolvedUrl) return;
+    if (img.dataset.markerLoading !== requestedFile) return;
+    if (img.getAttribute('src') !== resolvedUrl) {
+      img.setAttribute('src', resolvedUrl);
+    }
+    img.dataset.markerLoading = '';
+  });
+}
+
+function prefetchVisibleMarkerUrls(maxTypes = 10) {
+  const visiblePoints = getVisiblePoints();
+  if (!Array.isArray(visiblePoints) || !visiblePoints.length) return;
+  const uniqueFiles = Array.from(
+    new Set(visiblePoints.map((point) => resolvePointMarkerFileName(point)).filter(Boolean))
+  ).slice(0, Math.max(1, Number(maxTypes) || 10));
+  uniqueFiles.forEach((fileName) => {
+    resolveMarkerUrlByFileName(fileName).catch(() => null);
+  });
 }
 
 function metersBetween(lat1, lng1, lat2, lng2) {
@@ -806,9 +873,8 @@ function updateDomMarkerVisualScale() {
         if (img.getAttribute('src') !== markerUrl) {
           img.setAttribute('src', markerUrl);
         }
-      } else if (!markerUrl) {
-        element.classList.remove('is-svg');
-        element.classList.add('is-dot');
+      } else if (img) {
+        ensurePointMarkerUrl(point, img);
       }
     }
   });
@@ -1319,6 +1385,13 @@ function updatePointsSource() {
   const collection = buildPointFeatureCollection();
   source.setData(collection);
   syncDomPointMarkers();
+  if (typeof window !== 'undefined') {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => prefetchVisibleMarkerUrls(12), { timeout: 900 });
+    } else {
+      setTimeout(() => prefetchVisibleMarkerUrls(12), 120);
+    }
+  }
   setStatus(`Mapbox points: ${collection.features.length}`);
 }
 
@@ -1564,9 +1637,9 @@ async function handleStyleReady() {
   }
 }
 
-export async function setMapboxStyle(styleKey = 'light') {
+export async function setMapboxStyle(styleKey = 'custom') {
   if (!map) return false;
-  const nextKey = MAPBOX_STYLES[styleKey] ? styleKey : 'light';
+  const nextKey = MAPBOX_STYLES[styleKey] ? styleKey : 'custom';
   if (currentStyleKey === nextKey) return true;
   currentStyleKey = nextKey;
   pointsLoaded = false;

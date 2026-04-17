@@ -24,30 +24,6 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: 'e-Ukraine Head';
-  src: url('./assets/fonts/e-UkraineHead-Regular.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'e-Ukraine Head';
-  src: url('./assets/fonts/e-UkraineHead-Medium.otf') format('opentype');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'e-Ukraine Head';
-  src: url('./assets/fonts/e-UkraineHead-Bold.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   /* Core Luxury Palette - Modern Coastal */
   --c-bg: #F8FAFC;
@@ -73,7 +49,7 @@
   --font-display: 'Playfair Display', serif;
   --font-ui: 'e-Ukraine', sans-serif;
   --font-data: 'e-Ukraine', sans-serif;
-  --font-nav: 'e-Ukraine Head', sans-serif;
+  --font-nav: 'e-Ukraine', sans-serif;
 
   /* Shadows & Radius */
   --radius-lg: 20px;
@@ -580,6 +556,8 @@ body.mapbox-preview-active .filter-menu {
   box-shadow: 0 12px 30px rgba(11, 37, 69, 0.14);
   transform-origin: top right;
   transition: opacity 200ms var(--ease-smooth), transform 200ms var(--ease-smooth), box-shadow 200ms var(--ease-smooth);
+  max-height: min(74vh, 720px);
+  overflow: hidden;
 }
 
 .map-legend.collapsed {
@@ -598,8 +576,13 @@ body.mapbox-preview-active .filter-menu {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  max-height: min(58vh, 560px);
+  max-height: min(68vh, 640px);
   overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
   opacity: 1;
   transform: translateY(0);
   transition: max-height 200ms var(--ease-smooth), opacity 180ms var(--ease-smooth), transform 180ms var(--ease-smooth);
