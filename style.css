@@ -464,6 +464,7 @@ body::before {
   inset: 0;
   border-radius: inherit;
   overflow: hidden;
+  transition: opacity 180ms ease;
 }
 
 #mapbox-map .mapboxgl-canvas-container,

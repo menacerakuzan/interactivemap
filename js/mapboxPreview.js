@@ -49,6 +49,7 @@ const ZOOM_SWITCH = {
   svgExit: 12.85,
 };
 let map = null;
+let mapInitialStyleReady = false;
 let pointsLoaded = false;
 let is3DMode = false;
 let allPoints = [];
@@ -309,6 +310,13 @@ function isPointTypeHidden(point) {
 
 function getVisiblePoints() {
   return (Array.isArray(allPoints) ? allPoints : []).filter((point) => !isPointTypeHidden(point));
+}
+
+function normalizeHexColor(value, fallback = '#E7C769') {
+  const raw = String(value || '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return raw;
+  if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw}`;
+  return fallback;
 }
 
 function resolvePointMarkerFileName(point) {
@@ -824,13 +832,15 @@ function updateDomMarkerVisualScale() {
   let nextMode = prevMode;
 
   if (prevMode === 'cluster') {
-    nextMode = z >= ZOOM_SWITCH.clusterExit ? 'dot' : 'cluster';
+    if (z >= ZOOM_SWITCH.svgEnter) nextMode = 'svg';
+    else nextMode = z >= ZOOM_SWITCH.clusterExit ? 'dot' : 'cluster';
   } else if (prevMode === 'dot') {
     if (z <= ZOOM_SWITCH.clusterEnter) nextMode = 'cluster';
     else if (z >= ZOOM_SWITCH.svgEnter) nextMode = 'svg';
     else nextMode = 'dot';
   } else {
-    nextMode = z <= ZOOM_SWITCH.svgExit ? 'dot' : 'svg';
+    if (z <= ZOOM_SWITCH.clusterEnter) nextMode = 'cluster';
+    else nextMode = z <= ZOOM_SWITCH.svgExit ? 'dot' : 'svg';
   }
 
   markerVisualMode = nextMode;
@@ -1119,7 +1129,7 @@ function resolveRoutePathVertices(route) {
               lat,
               lng,
               edgeStyle: 'dashed',
-              edgeColor: route?.routeColor || '#E7C769',
+              edgeColor: normalizeHexColor(route?.routeColor, '#E7C769'),
               edgeCurve: false,
             };
           }
@@ -1131,10 +1141,7 @@ function resolveRoutePathVertices(route) {
             lat,
             lng,
             edgeStyle: ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed',
-            edgeColor:
-              typeof vertex.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(vertex.edgeColor)
-                ? vertex.edgeColor
-                : route?.routeColor || '#E7C769',
+            edgeColor: normalizeHexColor(vertex.edgeColor, normalizeHexColor(route?.routeColor, '#E7C769')),
             edgeCurve: Boolean(vertex.edgeCurve),
           };
         })
@@ -1152,7 +1159,7 @@ function resolveRoutePathVertices(route) {
         lat,
         lng,
         edgeStyle: 'dashed',
-        edgeColor: route?.routeColor || '#E7C769',
+        edgeColor: normalizeHexColor(route?.routeColor, '#E7C769'),
         edgeCurve: false,
       };
     })
@@ -1167,6 +1174,7 @@ function buildRouteFeatureCollection() {
     return status !== 'draft' && status !== 'archived';
   });
   routes.forEach((route) => {
+    const routeColor = normalizeHexColor(route?.routeColor, '#E7C769');
     const vertices = resolveRoutePathVertices(route);
     if (vertices.length < 2) return;
     for (let index = 1; index < vertices.length; index += 1) {
@@ -1186,10 +1194,7 @@ function buildRouteFeatureCollection() {
           routeId: Number(route.id) || null,
           routeName: String(route.name || ''),
           edgeStyle: ['solid', 'dashed', 'dashdot'].includes(next.edgeStyle) ? next.edgeStyle : 'dashed',
-          edgeColor:
-            typeof next.edgeColor === 'string' && /^#[0-9a-f]{6}$/i.test(next.edgeColor)
-              ? next.edgeColor
-              : route?.routeColor || '#E7C769',
+          edgeColor: normalizeHexColor(next.edgeColor, routeColor),
         },
         geometry: { type: 'LineString', coordinates: coords },
       });
@@ -1662,6 +1667,8 @@ export async function ensureMapboxPreview() {
   bindPointsBridge();
 
   if (!map) {
+    mapInitialStyleReady = false;
+    container.style.opacity = '0';
     map = new mapboxgl.Map({
       container,
       style: MAPBOX_STYLES[currentStyleKey],
@@ -1680,6 +1687,10 @@ export async function ensureMapboxPreview() {
 
     map.on('style.load', () => {
       routeRenderRetryCount = 0;
+      if (!mapInitialStyleReady) {
+        mapInitialStyleReady = true;
+        container.style.opacity = '1';
+      }
       handleStyleReady().catch(() => null);
     });
     map.on('styledata', () => {
@@ -1708,6 +1719,8 @@ export async function ensureMapboxPreview() {
       maybeSnapBearingToNorth();
     });
     map.on('remove', () => {
+      mapInitialStyleReady = false;
+      container.style.opacity = '0';
       clearDomPointMarkers();
       draw = null;
       drawBound = false;

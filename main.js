@@ -4407,7 +4407,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       return;
     }
-    await setMapboxStyle('custom');
     setMapboxPerspective(true);
     setMapboxPoints(pointsForMapbox);
     setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
