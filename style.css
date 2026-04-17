@@ -1,4 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600&family=JetBrains+Mono:wght@400&display=swap');
+@font-face {
+  font-family: 'Odesa Region Type';
+  src: url('./assets/fonts/OdesaRegionType-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Odesa Region Type';
+  src: url('./assets/fonts/OdesaRegionType-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Odesa Region Type';
+  src: url('./assets/fonts/OdesaRegionType-Semi.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Odesa Region Type';
+  src: url('./assets/fonts/OdesaRegionType-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Odesa Region Type';
+  src: url('./assets/fonts/OdesaRegionType-Heavy.otf') format('opentype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   /* Core Luxury Palette - Modern Coastal */
@@ -22,10 +60,10 @@
   --c-pearl: #FFFFFF;
 
   /* Typography */
-  --font-display: 'Playfair Display', serif;
-  --font-ui: 'Montserrat', sans-serif;
-  --font-data: 'JetBrains Mono', monospace;
-  --font-nav: 'Montserrat', sans-serif;
+  --font-display: 'Odesa Region Type', sans-serif;
+  --font-ui: 'Odesa Region Type', sans-serif;
+  --font-data: 'Odesa Region Type', sans-serif;
+  --font-nav: 'Odesa Region Type', sans-serif;
 
   /* Shadows & Radius */
   --radius-lg: 20px;
