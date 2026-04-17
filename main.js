@@ -1435,7 +1435,8 @@ function setActiveSpecialistTab(tabName) {
     }
   }
 
-  const showRouteLineToolbar = action === 'route-editor' || action === 'edit-route';
+  const canUseRouteTools = Boolean(authUser && ['admin', 'specialist'].includes(authUser.role));
+  const showRouteLineToolbar = canUseRouteTools && (action === 'route-editor' || action === 'edit-route');
   const routeLineToolbar = document.getElementById('route-line-toolbar');
   const mapView = document.querySelector('.map-view');
   if (routeLineToolbar) {
@@ -2759,6 +2760,9 @@ function bindAuthFlow() {
       setSpecialistSuccess('Сесію завершено');
     });
   }
+
+  // Ensure UI reflects persisted auth state on initial load.
+  setAuthState(authToken, authUser, authSession);
 }
 
 function bindFilterMenu() {
@@ -4043,6 +4047,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const appInterface = document.querySelector('.app-interface');
   let isTransitioning = false;
   let mapToolsInitialized = false;
+  const forceMapboxResizeBurst = () => {
+    if (currentMapEngine !== 'mapbox') return;
+    resizeMapboxPreview();
+    requestAnimationFrame(() => resizeMapboxPreview());
+    setTimeout(() => resizeMapboxPreview(), 80);
+    setTimeout(() => resizeMapboxPreview(), 220);
+    setTimeout(() => resizeMapboxPreview(), 420);
+  };
 
   const scrollToInterfaceSection = (targetId) => {
     const target = targetId ? document.getElementById(targetId) : null;
@@ -4148,10 +4160,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         await initMapAndTools();
         window.dispatchEvent(new Event('resize'));
+        forceMapboxResizeBurst();
         // Extra refresh passes prevent occasional marker drop after first transition.
         await mapController?.refresh?.();
         setTimeout(() => {
           window.dispatchEvent(new Event('resize'));
+          forceMapboxResizeBurst();
           mapController?.refresh?.().catch(() => null);
         }, 260);
         setTimeout(() => scrollToInterfaceSection(targetId), 60);
@@ -4387,12 +4401,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     setMapboxPoints(pointsForMapbox);
     setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
     setMapboxPublishedRoutes(dashboardRoutes || []);
-    setTimeout(() => {
-      resizeMapboxPreview();
-    }, 60);
+    forceMapboxResizeBurst();
     setTimeout(() => {
       setMapboxPoints(pointsForMapbox);
       setMapboxPublishedRoutes((dashboardRoutes || []).filter((r) => r.status === 'published'));
+      forceMapboxResizeBurst();
     }, 180);
 
     syncMapEngineButton();
