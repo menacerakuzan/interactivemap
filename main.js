@@ -395,7 +395,7 @@ function getRouteColor(routeId) {
 function setRouteColor(routeId, color) {
   if (!routeId || !color) return;
   const colors = loadRouteColors();
-  colors[String(routeId)] = color;
+  colors[String(routeId)] = normalizeHexRouteColor(color, DEFAULT_ROUTE_COLOR);
   saveRouteColors(colors);
 }
 
@@ -548,6 +548,30 @@ function normalizePointRecord(point) {
       labelEn: meta.labelEn,
       color: meta.color,
     },
+  };
+}
+
+function normalizeHexRouteColor(value, fallback = DEFAULT_ROUTE_COLOR) {
+  const raw = String(value || '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return raw;
+  if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw}`;
+  if (/^#[0-9a-f]{3}$/i.test(raw)) {
+    const [r, g, b] = raw.slice(1).split('');
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
+  return fallback;
+}
+
+function normalizeRouteRecord(route) {
+  const id = Number(route?.id);
+  const persistedColor = normalizeHexRouteColor(route?.routeColor || route?.route_color || '', '');
+  const localColor = Number.isFinite(id) ? getRouteColor(id) : DEFAULT_ROUTE_COLOR;
+  const routeColor = persistedColor || localColor || DEFAULT_ROUTE_COLOR;
+  return {
+    ...route,
+    routeColor,
+    transportModes: normalizeTransportModes(route?.transportModes || route?.transport_modes || []),
+    pathJson: route?.pathJson ?? route?.path_json ?? [],
   };
 }
 
@@ -2010,11 +2034,7 @@ async function refreshDashboardData() {
   }
   setMapboxPoints(dashboardPoints);
   setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
-  dashboardRoutes = (routeRows || []).map((r) => ({
-    ...r,
-    routeColor: r.routeColor || getRouteColor(r.id),
-    transportModes: normalizeTransportModes(r.transportModes),
-  }));
+  dashboardRoutes = (routeRows || []).map((r) => normalizeRouteRecord(r));
   setMapboxPublishedRoutes(dashboardRoutes);
   dashboardProposals = proposals || [];
   mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
@@ -2050,11 +2070,7 @@ async function refreshPublicData() {
     }
     setMapboxPoints(dashboardPoints);
     setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
-    dashboardRoutes = (routeRows || []).map((r) => ({
-      ...r,
-      routeColor: r.routeColor || getRouteColor(r.id),
-      transportModes: normalizeTransportModes(r.transportModes),
-    }));
+    dashboardRoutes = (routeRows || []).map((r) => normalizeRouteRecord(r));
     setMapboxPublishedRoutes(dashboardRoutes);
     mapController?.setPublishedRoutes?.(dashboardRoutes.filter((r) => r.status === 'published'));
     mapController?.setHiddenPointTypes?.(Array.from(hiddenPointTypeCodes));

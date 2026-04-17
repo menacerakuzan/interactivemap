@@ -50,6 +50,7 @@ const ZOOM_SWITCH = {
 };
 let map = null;
 let mapInitialStyleReady = false;
+let mapRevealPending = false;
 let pointsLoaded = false;
 let is3DMode = false;
 let allPoints = [];
@@ -315,7 +316,16 @@ function getVisiblePoints() {
 function normalizeHexColor(value, fallback = '#E7C769') {
   const raw = String(value || '').trim();
   if (/^#[0-9a-f]{6}$/i.test(raw)) return raw;
+  if (/^#[0-9a-f]{3}$/i.test(raw)) {
+    const [r, g, b] = raw.slice(1).split('');
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
   if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw}`;
+  const rgbMatch = raw.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(0|0?\.\d+|1(?:\.0+)?))?\s*\)$/i);
+  if (rgbMatch) {
+    const toHex = (n) => Math.max(0, Math.min(255, Number(n) || 0)).toString(16).padStart(2, '0');
+    return `#${toHex(rgbMatch[1])}${toHex(rgbMatch[2])}${toHex(rgbMatch[3])}`.toUpperCase();
+  }
   return fallback;
 }
 
@@ -1609,6 +1619,7 @@ async function handleStyleReady() {
     // noop
   }
   syncDomPointMarkers();
+  scheduleDomMarkerVisualScale();
   try {
     ensureDraw();
     bindDrawEvents();
@@ -1647,6 +1658,9 @@ export async function setMapboxStyle(styleKey = 'custom') {
   const nextKey = MAPBOX_STYLES[styleKey] ? styleKey : 'custom';
   if (currentStyleKey === nextKey) return true;
   currentStyleKey = nextKey;
+  const container = map.getContainer?.();
+  if (container) container.style.opacity = '0';
+  mapRevealPending = true;
   pointsLoaded = false;
   map.setStyle(MAPBOX_STYLES[nextKey]);
   return true;
@@ -1668,6 +1682,7 @@ export async function ensureMapboxPreview() {
 
   if (!map) {
     mapInitialStyleReady = false;
+    mapRevealPending = true;
     container.style.opacity = '0';
     map = new mapboxgl.Map({
       container,
@@ -1689,7 +1704,6 @@ export async function ensureMapboxPreview() {
       routeRenderRetryCount = 0;
       if (!mapInitialStyleReady) {
         mapInitialStyleReady = true;
-        container.style.opacity = '1';
       }
       handleStyleReady().catch(() => null);
     });
@@ -1697,6 +1711,11 @@ export async function ensureMapboxPreview() {
       scheduleRoutesOverlayRender();
     });
     map.on('idle', () => {
+      if (mapRevealPending) {
+        mapRevealPending = false;
+        const targetContainer = map?.getContainer?.();
+        if (targetContainer) targetContainer.style.opacity = '1';
+      }
       scheduleRoutesOverlayRender();
     });
     map.on('click', (event) => {
@@ -1720,6 +1739,7 @@ export async function ensureMapboxPreview() {
     });
     map.on('remove', () => {
       mapInitialStyleReady = false;
+      mapRevealPending = false;
       container.style.opacity = '0';
       clearDomPointMarkers();
       draw = null;
