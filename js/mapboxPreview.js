@@ -1147,12 +1147,13 @@ function resolveRoutePathVertices(route) {
           const lat = Number(vertex.lat ?? vertex.latitude);
           const lng = Number(vertex.lng ?? vertex.lon ?? vertex.longitude);
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          const edgeStyleRaw = String(vertex.edgeStyle ?? vertex.edge_style ?? '').trim().toLowerCase();
           return {
             lat,
             lng,
-            edgeStyle: ['solid', 'dashed', 'dashdot'].includes(vertex.edgeStyle) ? vertex.edgeStyle : 'dashed',
-            edgeColor: normalizeHexColor(vertex.edgeColor, normalizeHexColor(route?.routeColor, '#E7C769')),
-            edgeCurve: Boolean(vertex.edgeCurve),
+            edgeStyle: ['solid', 'dashed', 'dashdot'].includes(edgeStyleRaw) ? edgeStyleRaw : 'dashed',
+            edgeColor: normalizeHexColor(vertex.edgeColor ?? vertex.edge_color, normalizeHexColor(route?.routeColor, '#E7C769')),
+            edgeCurve: Boolean(vertex.edgeCurve ?? vertex.edge_curve),
           };
         })
         .filter(Boolean)

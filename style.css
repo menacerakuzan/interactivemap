@@ -456,7 +456,7 @@ body::before {
   border-radius: inherit;
   overflow: hidden;
   z-index: 1;
-  background: #f6f8fb;
+  background: #0d1726;
 }
 
 #mapbox-map {
