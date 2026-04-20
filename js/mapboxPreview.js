@@ -63,6 +63,7 @@ let markerBlendValue = 0;
 let markerBlendTarget = 0;
 let markerBlendRaf = 0;
 let unclusteredClickBound = false;
+let currentMapLanguage = 'uk';
 let draw = null;
 let drawBound = false;
 let drawVisible = false;
@@ -1558,6 +1559,50 @@ function applyTimePreset() {
   }
 }
 
+function applyMapLanguage() {
+  if (!map || !map.isStyleLoaded()) return;
+  const lang = currentMapLanguage === 'en' ? 'en' : 'uk';
+
+  if (typeof map.setConfigProperty === 'function') {
+    try {
+      map.setConfigProperty('basemap', 'language', lang);
+    } catch (_e) {
+      // fallback below for non-standard styles
+    }
+  }
+
+  const styleLayers = map.getStyle?.()?.layers || [];
+  styleLayers.forEach((layer) => {
+    if (!layer || layer.type !== 'symbol') return;
+    const layerId = String(layer.id || '');
+    if (!layerId) return;
+    if (
+      layerId.startsWith('preview-') ||
+      layerId.startsWith('gl-draw-') ||
+      layerId.startsWith('mapbox-gl-draw')
+    ) {
+      return;
+    }
+
+    const textField = layer.layout?.['text-field'];
+    if (textField == null) return;
+
+    const serialized = JSON.stringify(textField);
+    if (!/(\"name|\\{name)/i.test(serialized)) return;
+
+    const localizedTextField =
+      lang === 'uk'
+        ? ['coalesce', ['get', 'name_uk'], ['get', 'name:uk'], ['get', 'name'], ['get', 'name_en'], ['get', 'name:en']]
+        : ['coalesce', ['get', 'name_en'], ['get', 'name:en'], ['get', 'name'], ['get', 'name_uk'], ['get', 'name:uk']];
+
+    try {
+      map.setLayoutProperty(layerId, 'text-field', localizedTextField);
+    } catch (_e) {
+      // some style layers are immutable, skip silently
+    }
+  });
+}
+
 export function setMapboxPoints(points = []) {
   allPoints = (Array.isArray(points) ? points : []).map(normalizeApiPoint);
   if (typeof window !== 'undefined') {
@@ -1588,11 +1633,21 @@ export function setMapboxHiddenPointTypes(codes = []) {
   }
 }
 
+export function setMapboxLanguage(lang = 'uk') {
+  currentMapLanguage = lang === 'en' ? 'en' : 'uk';
+  applyMapLanguage();
+}
+
 async function handleStyleReady() {
   if (!map || !map.isStyleLoaded()) return;
   setStatus('Mapbox: style loaded');
   try {
     applyTimePreset();
+  } catch (_e) {
+    // noop
+  }
+  try {
+    applyMapLanguage();
   } catch (_e) {
     // noop
   }

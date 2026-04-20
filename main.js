@@ -14,6 +14,7 @@ import {
   setMapboxPublishedRoutes,
   setMapboxStyle,
   getMapboxStyleKey,
+  setMapboxLanguage,
   setMapboxLineToolVisible,
   setMapboxLineToolMode,
   setMapboxLineToolSnapEnabled,
@@ -686,6 +687,7 @@ function updateLanguage(lang) {
     }
   });
   document.body.setAttribute('lang', lang);
+  setMapboxLanguage?.(lang);
   populateCommunitiesSelect();
   syncMapEngineButton();
 }
