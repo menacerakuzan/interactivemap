@@ -4462,7 +4462,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
       return;
     }
-    setMapboxPerspective(true);
+    setMapboxPerspective(false);
     setMapboxPoints(pointsForMapbox);
     setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
     setMapboxPublishedRoutes(dashboardRoutes || []);

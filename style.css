@@ -464,7 +464,7 @@ body::before {
   border-radius: inherit;
   overflow: hidden;
   z-index: 1;
-  background: #0d1726;
+  background: #eef2f6;
 }
 
 #mapbox-map {
@@ -472,7 +472,7 @@ body::before {
   inset: 0;
   border-radius: inherit;
   overflow: hidden;
-  transition: opacity 180ms ease;
+  transition: none;
 }
 
 #mapbox-map .mapboxgl-canvas-container,
