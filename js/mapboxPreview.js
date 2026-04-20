@@ -5,7 +5,6 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
 const ODESA_START = { lng: 30.7233, lat: 46.4825, zoom: 10.8 };
 const MAPBOX_STYLES = {
-  custom: 'mapbox://styles/menacerakuzan/cmnfv8tm5004y01s743klc24x',
   standard: 'mapbox://styles/mapbox/standard',
   light: 'mapbox://styles/mapbox/light-v11',
   streets: 'mapbox://styles/mapbox/streets-v12',
@@ -54,7 +53,7 @@ let mapRevealPending = false;
 let pointsLoaded = false;
 let is3DMode = false;
 let allPoints = [];
-let currentStyleKey = 'light';
+let currentStyleKey = 'streets';
 let pointsBridgeBound = false;
 const domPointMarkers = new Map();
 let markerVisualBound = false;
@@ -68,7 +67,7 @@ let draw = null;
 let drawBound = false;
 let drawVisible = false;
 let drawMode = 'cursor';
-let drawSnapEnabled = true;
+let drawSnapEnabled = false;
 let drawLineStyle = 'dashed';
 let drawLineColor = '#E7C769';
 let drawHistory = [];
@@ -1654,9 +1653,9 @@ async function handleStyleReady() {
   }
 }
 
-export async function setMapboxStyle(styleKey = 'light') {
+export async function setMapboxStyle(styleKey = 'streets') {
   if (!map) return false;
-  const nextKey = MAPBOX_STYLES[styleKey] ? styleKey : 'light';
+  const nextKey = MAPBOX_STYLES[styleKey] ? styleKey : 'streets';
   if (currentStyleKey === nextKey) return true;
   currentStyleKey = nextKey;
   const container = map.getContainer?.();

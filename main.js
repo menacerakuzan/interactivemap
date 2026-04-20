@@ -1,5 +1,4 @@
 import { initLenis, initInteractions } from './js/globalEffects.js';
-import { initMap } from './js/mapInit.js';
 import {
   ensureMapboxPreview,
   resizeMapboxPreview,
@@ -30,6 +29,7 @@ import {
 } from './js/mapboxPreview.js';
 import { dataService } from './js/dataService.js';
 import { COMMUNITIES_BY_DISTRICT, DISTRICT_CENTERS } from './js/communities.js';
+const initMap = async () => null;
 
 const translations = {
   uk: {
@@ -3154,7 +3154,7 @@ function bindSpecialistTools() {
     });
   }
 
-  let lineSnapEnabled = true;
+  let lineSnapEnabled = false;
   const canUseLineTools = Boolean(authUser && ['admin', 'specialist'].includes(authUser.role));
 
   const setLineToolButtonState = (mode) => {
@@ -3278,7 +3278,7 @@ function bindSpecialistTools() {
       setLineToolButtonState('draw');
       lineSetVisible(true);
       lineSetMode('draw');
-      setSpecialistMessage('Перо: клік по карті додає вершину. Alt = тимчасово без snap.');
+      setSpecialistMessage('Перо: клік по карті додає вершину.');
     });
   }
 
@@ -4493,12 +4493,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   const styleButtons = [
-    { key: 'custom', node: btnMapboxStyleStreets },
+    { key: 'streets', node: btnMapboxStyleStreets },
     { key: 'light', node: btnMapboxStyleLight },
     { key: 'dark', node: btnMapboxStyleDark },
   ];
   const syncStyleButtons = () => {
-    const activeKey = getMapboxStyleKey?.() || 'light';
+    const activeKey = getMapboxStyleKey?.() || 'streets';
     styleButtons.forEach(({ key, node }) => {
       if (!node) return;
       node.style.opacity = activeKey === key ? '1' : '0.65';
