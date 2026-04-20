@@ -3027,6 +3027,20 @@ function bindFloatingUiControls() {
     mapView.classList.toggle('specialist-open', specialistOpen);
   };
 
+  const applyResponsiveOverlayDefaults = () => {
+    const isMobile = window.matchMedia?.('(max-width: 960px)')?.matches;
+    if (!isMobile) return;
+    if (legendWrap && !legendWrap.dataset.mobileInit) {
+      legendWrap.classList.add('collapsed');
+      if (btnToggleLegend) btnToggleLegend.textContent = '⟩';
+      legendWrap.dataset.mobileInit = '1';
+    }
+    if (routeLineToolbar && !routeLineToolbar.dataset.mobileInit) {
+      routeLineToolbar.classList.add('compact');
+      routeLineToolbar.dataset.mobileInit = '1';
+    }
+  };
+
   if (btnHideSpecialist && specialistPanel) {
     btnHideSpecialist.addEventListener('click', () => {
       const isCollapsed = specialistPanel.classList.toggle('collapsed');
@@ -3047,6 +3061,8 @@ function bindFloatingUiControls() {
   routeLineToolbar?.classList.remove('ui-hidden');
   specialistPanel?.classList.remove('ui-hidden');
   syncMapOverlayLayout();
+  applyResponsiveOverlayDefaults();
+  window.addEventListener('resize', applyResponsiveOverlayDefaults, { passive: true });
 }
 
 function bindSpecialistTools() {
