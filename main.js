@@ -828,6 +828,51 @@ function setSpecialistSuccess(text) {
   setSpecialistMessage(text, false, 'success');
 }
 
+function getReadableErrorMessage(error) {
+  const message = String(error?.message || error || 'Unknown error');
+  const lower = message.toLowerCase();
+  if (lower.includes('row-level security') || lower.includes('rls')) {
+    return 'Недостатньо прав доступу (RLS policy). Перевірте роль профілю specialist/admin у Supabase.';
+  }
+  if (lower.includes('auth session missing') || lower.includes('jwt') || lower.includes('unauthorized')) {
+    return 'Сесія авторизації втрачена. Вийдіть та увійдіть знову.';
+  }
+  if (lower.includes('failed to fetch') || lower.includes('network')) {
+    return 'Проблема мережі під час запиту. Спробуйте ще раз через кілька секунд.';
+  }
+  return message;
+}
+
+async function refreshUiAfterPointMutation({
+  createdPoint = null,
+  deletedPointId = null,
+} = {}) {
+  let refreshError = null;
+  try {
+    await mapController?.refresh?.();
+    await refreshDashboardData();
+    await refreshPublicData();
+    return;
+  } catch (error) {
+    refreshError = error;
+  }
+
+  // Fallback: keep local UI consistent even if full refresh failed.
+  if (createdPoint && Number.isFinite(Number(createdPoint.id))) {
+    const normalized = normalizePointRecord(createdPoint);
+    dashboardPoints = [normalized, ...dashboardPoints.filter((p) => Number(p.id) !== Number(normalized.id))];
+  }
+  if (Number.isFinite(Number(deletedPointId))) {
+    dashboardPoints = dashboardPoints.filter((p) => Number(p.id) !== Number(deletedPointId));
+  }
+  renderLegend();
+  renderDashboard(dashboardPoints, dashboardRoutes);
+  setMapboxPoints(dashboardPoints);
+  setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
+
+  throw refreshError;
+}
+
 function setSpecialistGuide(action) {
   const guide = document.getElementById('specialist-action-guide');
   if (!guide) return;
@@ -3500,10 +3545,13 @@ function bindSpecialistTools() {
             }
           }
           payload.sections = await collectPointSectionsPayload(pointSectionsList);
-          await apiRequest('/api/points', { method: 'POST', body: JSON.stringify(payload) });
-          await mapController.refresh();
-          await refreshDashboardData();
-          await refreshPublicData();
+          const createdPoint = await apiRequest('/api/points', { method: 'POST', body: JSON.stringify(payload) });
+          let refreshWarning = '';
+          try {
+            await refreshUiAfterPointMutation({ createdPoint });
+          } catch (refreshError) {
+            refreshWarning = ` (оновлення списку із затримкою: ${getReadableErrorMessage(refreshError)})`;
+          }
           document.getElementById('point-title').value = '';
           document.getElementById('point-lat').value = '';
           document.getElementById('point-lng').value = '';
@@ -3513,9 +3561,9 @@ function bindSpecialistTools() {
           document.getElementById('point-photo-file').value = '';
           renderPointPhotoPreview('point-photo-preview');
           renderPointSectionsEditor(pointSectionsList, []);
-          setSpecialistSuccess('Точку додано');
+          setSpecialistSuccess(`Точку додано${refreshWarning}`);
         } catch (error) {
-          setSpecialistMessage(error.message, true);
+          setSpecialistMessage(getReadableErrorMessage(error), true);
         }
       });
     });
@@ -3795,6 +3843,7 @@ function bindSpecialistTools() {
       await runWithButtonState(btnDeletePoint, 'Видалення...', async () => {
         try {
           const prevAction = currentSpecialistAction;
+          const deletingPointId = editingPointId;
           if (point?.photoUrl) {
             try {
               await dataService.deletePointPhoto(point.photoUrl);
@@ -3816,13 +3865,16 @@ function bindSpecialistTools() {
           renderPointPhotoPreview('edit-point-photo-preview');
           renderPointSectionsEditor(editPointSectionsList, []);
           renderTypePreview('edit-point-type', 'edit-point-type-preview');
-          await mapController.refresh();
-          await refreshDashboardData();
-          await refreshPublicData();
+          let refreshWarning = '';
+          try {
+            await refreshUiAfterPointMutation({ deletedPointId: deletingPointId });
+          } catch (refreshError) {
+            refreshWarning = ` (оновлення списку із затримкою: ${getReadableErrorMessage(refreshError)})`;
+          }
           setActiveSpecialistTab(prevAction || 'edit-point');
-          setSpecialistSuccess('Точку видалено');
+          setSpecialistSuccess(`Точку видалено${refreshWarning}`);
         } catch (error) {
-          setSpecialistMessage(error.message, true);
+          setSpecialistMessage(getReadableErrorMessage(error), true);
         }
       });
     });
