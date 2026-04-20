@@ -293,6 +293,11 @@ function bindPointInteraction(layer, point, lat, lng) {
       easeLinearity: 0.25,
     });
     showInfoCard(point);
+    window.dispatchEvent(
+      new CustomEvent('map:point-click', {
+        detail: { pointId: Number(point?.id) || null },
+      })
+    );
   });
 }
 
@@ -1153,6 +1158,13 @@ function setPublishedRoutes(routes = []) {
             className: 'route-order-label',
           });
         }
+        segment.on('click', () => {
+          window.dispatchEvent(
+            new CustomEvent('map:route-click', {
+              detail: { routeId: Number(route?.id) || null },
+            })
+          );
+        });
       }
     }
 
@@ -1168,6 +1180,13 @@ function setPublishedRoutes(routes = []) {
         fillOpacity: 1,
         weight: 2,
       }).addTo(publishedRouteLayer);
+      marker.on('click', () => {
+        window.dispatchEvent(
+          new CustomEvent('map:route-click', {
+            detail: { routeId: Number(route?.id) || null },
+          })
+        );
+      });
     });
   });
 }

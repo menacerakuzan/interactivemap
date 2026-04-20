@@ -63,6 +63,7 @@ let markerBlendValue = 0;
 let markerBlendTarget = 0;
 let markerBlendRaf = 0;
 let unclusteredClickBound = false;
+let routeClickBound = false;
 let currentMapLanguage = 'uk';
 let draw = null;
 let drawBound = false;
@@ -1259,6 +1260,29 @@ function ensureRoutesLayer() {
   }
   const source = map.getSource('preview-routes');
   if (source?.setData) source.setData(routeCollection);
+
+  if (!routeClickBound && map.getLayer('preview-routes-line')) {
+    routeClickBound = true;
+    map.on('click', 'preview-routes-line', (event) => {
+      const feature = event?.features?.[0];
+      const routeId = Number(feature?.properties?.routeId);
+      window.dispatchEvent(
+        new CustomEvent('mapbox:route-click', {
+          detail: { routeId: Number.isFinite(routeId) ? routeId : null },
+        })
+      );
+    });
+    map.on('mouseenter', 'preview-routes-line', () => {
+      if (map?.getCanvas?.()) {
+        map.getCanvas().style.cursor = 'pointer';
+      }
+    });
+    map.on('mouseleave', 'preview-routes-line', () => {
+      if (map?.getCanvas?.()) {
+        map.getCanvas().style.cursor = '';
+      }
+    });
+  }
 }
 
 function renderRoutesOverlayNow() {
@@ -1511,6 +1535,31 @@ export function focusMapboxBoundary({ maxZoom = 12, padding = 44 } = {}) {
 export function focusMapboxLocation(lat, lng, zoom = 12) {
   if (!map || !Number.isFinite(lat) || !Number.isFinite(lng)) return false;
   map.easeTo({ center: [lng, lat], zoom, duration: 380, essential: true });
+  return true;
+}
+
+export function focusMapboxRoute(route, { maxZoom = 14, padding = 60 } = {}) {
+  if (!map || !route) return false;
+  const vertices = resolveRoutePathVertices(route);
+  if (!vertices.length) return false;
+  if (vertices.length === 1) {
+    return focusMapboxLocation(vertices[0].lat, vertices[0].lng, maxZoom);
+  }
+  const bounds = new mapboxgl.LngLatBounds();
+  vertices.forEach((vertex) => {
+    if (!vertex) return;
+    const lat = Number(vertex.lat);
+    const lng = Number(vertex.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    bounds.extend([lng, lat]);
+  });
+  if (bounds.isEmpty()) return false;
+  map.fitBounds(bounds, {
+    padding,
+    maxZoom,
+    duration: 420,
+    essential: true,
+  });
   return true;
 }
 

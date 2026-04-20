@@ -6,6 +6,7 @@ import {
   clearMapboxFocusBoundary,
   focusMapboxBoundary,
   focusMapboxLocation,
+  focusMapboxRoute,
   resetMapboxView,
   setMapboxPerspective,
   getMapboxPerspective,
@@ -2423,6 +2424,26 @@ function resetRouteEditor() {
   saveUiState();
 }
 
+function focusPointOnCurrentMap(point, zoom = 16) {
+  const lat = Number(point?.lat);
+  const lng = Number(point?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  if (isMapboxEngineActive()) {
+    return focusMapboxLocation(lat, lng, zoom);
+  }
+  mapController?.focusLocation?.(lat, lng, zoom);
+  return true;
+}
+
+function focusRouteOnCurrentMap(route) {
+  if (!route) return false;
+  if (isMapboxEngineActive()) {
+    return focusMapboxRoute(route, { maxZoom: 14, padding: 64 });
+  }
+  mapController?.highlightRoute?.(route);
+  return true;
+}
+
 function openRouteInEditor(routeId, options = {}) {
   const route = dashboardRoutes.find((r) => r.id === Number(routeId));
   if (!route) return;
@@ -2458,7 +2479,9 @@ function openRouteInEditor(routeId, options = {}) {
   lineSetMode('draw');
   lineSetVisible(true);
   renderRoutePointOrder();
-  mapController?.highlightRoute?.(route);
+  if (options.focusMap !== false) {
+    focusRouteOnCurrentMap(route);
+  }
   setActiveSpecialistTab(options.tab || 'edit-route');
   if (!options.silent) {
     setSpecialistMessage(`Редагування маршруту: ${route.name}`);
@@ -2467,7 +2490,7 @@ function openRouteInEditor(routeId, options = {}) {
   saveUiState();
 }
 
-function openPointInEditor(pointId) {
+function openPointInEditor(pointId, options = {}) {
   const point = dashboardPoints.find((p) => p.id === Number(pointId));
   if (!point) return;
   const normalizedTypeCode = normalizePointTypeCode(point?.pointType?.code, point?.title, point?.district);
@@ -2495,8 +2518,15 @@ function openPointInEditor(pointId) {
     editPointSelect.value = String(point.id);
   }
   renderTypePreview('edit-point-type', 'edit-point-type-preview');
-  setActiveSpecialistTab('edit-point');
-  setSpecialistMessage(`Редагування точки: ${point.title}`);
+  if (options.focusMap !== false) {
+    focusPointOnCurrentMap(point, options.zoom || 16);
+  }
+  if (options.setTab !== false) {
+    setActiveSpecialistTab('edit-point');
+  }
+  if (!options.silent) {
+    setSpecialistMessage(`Редагування точки: ${point.title}`);
+  }
   saveUiState();
 }
 
@@ -4546,12 +4576,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncMapEngineButton();
     syncStyleButtons();
   };
-  window.addEventListener('mapbox:point-click', (event) => {
-    const pointId = Number(event?.detail?.pointId);
-    if (!Number.isFinite(pointId)) return;
-    const point = (dashboardPoints || []).find((row) => Number(row?.id) === pointId);
+  const handlePointClickFromMap = (pointId) => {
+    const numericId = Number(pointId);
+    if (!Number.isFinite(numericId)) return;
+    const point = (dashboardPoints || []).find((row) => Number(row?.id) === numericId);
     if (!point) return;
-    mapController?.showPointDetails?.(point, { pan: false });
+    // Always open right-side point card.
+    mapController?.showPointDetails?.(point, { pan: true });
+    // If specialist is logged in, sync to point editor selection too.
+    if (authUser && ['admin', 'specialist'].includes(authUser.role)) {
+      openPointInEditor(numericId, { focusMap: true, setTab: true, silent: true, zoom: 16 });
+    }
+  };
+
+  const handleRouteClickFromMap = (routeId) => {
+    const numericId = Number(routeId);
+    if (!Number.isFinite(numericId)) return;
+    const route = (dashboardRoutes || []).find((row) => Number(row?.id) === numericId);
+    if (!route) return;
+    if (authUser && ['admin', 'specialist'].includes(authUser.role)) {
+      openRouteInEditor(numericId, { tab: 'edit-route', silent: true, focusMap: true });
+      return;
+    }
+    focusRouteOnCurrentMap(route);
+  };
+
+  window.addEventListener('mapbox:point-click', (event) => {
+    handlePointClickFromMap(event?.detail?.pointId);
+  });
+  window.addEventListener('map:point-click', (event) => {
+    handlePointClickFromMap(event?.detail?.pointId);
+  });
+  window.addEventListener('mapbox:route-click', (event) => {
+    handleRouteClickFromMap(event?.detail?.routeId);
+  });
+  window.addEventListener('map:route-click', (event) => {
+    handleRouteClickFromMap(event?.detail?.routeId);
   });
   if (btnMapbox3DToggle) {
     btnMapbox3DToggle.addEventListener('click', (event) => {
