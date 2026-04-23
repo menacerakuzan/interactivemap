@@ -447,17 +447,6 @@ body::before {
   transition: transform var(--t-fast) var(--ease-smooth);
 }
 
-.map-view.map-engine-mapbox .leaflet-pane,
-.map-view.map-engine-mapbox .leaflet-control-container,
-.map-view.map-engine-mapbox .leaflet-marker-pane,
-.map-view.map-engine-mapbox .leaflet-shadow-pane,
-.map-view.map-engine-mapbox .leaflet-overlay-pane,
-.map-view.map-engine-mapbox .leaflet-tooltip-pane,
-.map-view.map-engine-mapbox .leaflet-popup-pane {
-  opacity: 0;
-  pointer-events: none;
-}
-
 .mapbox-preview-wrap {
   position: absolute;
   inset: 0;
@@ -1237,40 +1226,16 @@ body.context-open #btn-show-partners {
 }
 
 /* Map Overrides */
-.leaflet-container {
+#mapbox-map {
   background: var(--c-bg) !important;
   font-family: var(--font-ui) !important;
   overscroll-behavior: contain;
   --map-zoom: 12;
 }
 
-.leaflet-tile-pane {
-  /* Keep tile pane unfiltered to avoid mobile pinch-zoom flicker/disappear. */
-  filter: none;
-}
-
-.leaflet-control-zoom {
-  border: none !important;
-  box-shadow: var(--shadow-float) !important;
-  margin: 24px !important;
-}
-
-.leaflet-control-zoom a {
-  background: var(--c-surface) !important;
-  backdrop-filter: blur(12px) !important;
-  color: var(--c-admiralty) !important;
-  border-bottom: 1px solid var(--c-divider) !important;
-}
-
 .custom-map-marker {
   background: transparent !important;
   border: none !important;
-}
-
-.leaflet-marker-icon,
-.leaflet-marker-shadow {
-  transition: none !important;
-  will-change: auto;
 }
 
 .map-marker-wrap {
@@ -1359,24 +1324,23 @@ body.context-open #btn-show-partners {
   pointer-events: none;
 }
 
-.leaflet-container.point-pick {
-  cursor: crosshair;
-}
-
 #mapbox-map.point-pick .mapboxgl-canvas,
 #mapbox-map.point-pick .mapboxgl-canvas-container {
-  cursor: crosshair !important;
-}
-
-.leaflet-container.line-tool-active {
   cursor: crosshair;
 }
 
-.leaflet-container.line-tool-active.line-tool-erase {
+#mapbox-map.line-tool-active .mapboxgl-canvas,
+#mapbox-map.line-tool-active .mapboxgl-canvas-container {
+  cursor: crosshair;
+}
+
+#mapbox-map.line-tool-active.line-tool-erase .mapboxgl-canvas,
+#mapbox-map.line-tool-active.line-tool-erase .mapboxgl-canvas-container {
   cursor: not-allowed;
 }
 
-.leaflet-container.line-tool-active.line-tool-edit {
+#mapbox-map.line-tool-active.line-tool-edit .mapboxgl-canvas,
+#mapbox-map.line-tool-active.line-tool-edit .mapboxgl-canvas-container {
   cursor: grab;
 }
 
@@ -1685,15 +1649,17 @@ body.context-open #btn-show-partners {
   animation: pointDragIdle 1.4s ease-in-out infinite;
 }
 
-.leaflet-container.point-drag {
+#mapbox-map.point-drag .mapboxgl-canvas,
+#mapbox-map.point-drag .mapboxgl-canvas-container {
   cursor: grab;
 }
 
-.leaflet-container.point-drag.point-drag-active {
+#mapbox-map.point-drag.point-drag-active .mapboxgl-canvas,
+#mapbox-map.point-drag.point-drag-active .mapboxgl-canvas-container {
   cursor: grabbing;
 }
 
-.leaflet-container.point-drag.point-drag-active .point-drag-marker {
+#mapbox-map.point-drag.point-drag-active .point-drag-marker {
   animation: pointDragActive 0.6s ease-out infinite;
 }
 

@@ -31,7 +31,6 @@ import {
 } from './js/mapboxPreview.js';
 import { dataService } from './js/dataService.js';
 import { COMMUNITIES_BY_DISTRICT, DISTRICT_CENTERS } from './js/communities.js';
-const initMap = async () => null;
 
 const translations = {
   uk: {
@@ -67,7 +66,6 @@ const translations = {
     hide_partners: 'ПРИХОВАТИ',
     community_all: 'Усі громади',
     mapbox_preview_btn: 'MAPBOX MODE',
-    leaflet_mode_btn: 'LEAFLET MODE',
     mapbox_3d_btn: '3D',
     mapbox_2d_btn: '2D',
   },
@@ -104,7 +102,6 @@ const translations = {
     hide_partners: 'HIDE',
     community_all: 'All communities',
     mapbox_preview_btn: 'MAPBOX MODE',
-    leaflet_mode_btn: 'LEAFLET MODE',
     mapbox_3d_btn: '3D',
     mapbox_2d_btn: '2D',
   },
@@ -151,7 +148,7 @@ let legendPointsSyncBound = false;
 const hiddenPointTypeCodes = new Set();
 let communityCentersIndexPromise = null;
 let boundaryGeoIndexPromise = null;
-let currentMapEngine = 'leaflet';
+let currentMapEngine = 'mapbox';
 if (typeof window !== 'undefined' && !Array.isArray(window.__ODESA_POINTS_CACHE)) {
   window.__ODESA_POINTS_CACHE = [];
 }
@@ -710,33 +707,18 @@ function isMapboxEngineActive() {
 }
 
 function lineToolsApi() {
-  if (isMapboxEngineActive()) {
-    return {
-      setLineToolVisible: setMapboxLineToolVisible,
-      setLineToolMode: setMapboxLineToolMode,
-      setLineToolSnapEnabled: setMapboxLineToolSnapEnabled,
-      setLineToolStyle: setMapboxLineToolStyle,
-      setLineToolColor: setMapboxLineToolColor,
-      undoLineDraft: undoMapboxLineDraft,
-      clearLineDraft: clearMapboxLineDraft,
-      setLineDraftFromPoints: setMapboxLineDraftFromPoints,
-      getLineDraftSnapshot: getMapboxLineDraftSnapshot,
-      applyLineDraftToRoute: applyMapboxLineDraftToRoute,
-      stopPointDrag: () => {},
-    };
-  }
   return {
-    setLineToolVisible: mapController?.setLineToolVisible?.bind(mapController),
-    setLineToolMode: mapController?.setLineToolMode?.bind(mapController),
-    setLineToolSnapEnabled: mapController?.setLineToolSnapEnabled?.bind(mapController),
-    setLineToolStyle: mapController?.setLineToolStyle?.bind(mapController),
-    setLineToolColor: mapController?.setLineToolColor?.bind(mapController),
-    undoLineDraft: mapController?.undoLineDraft?.bind(mapController),
-    clearLineDraft: mapController?.clearLineDraft?.bind(mapController),
-    setLineDraftFromPoints: mapController?.setLineDraftFromPoints?.bind(mapController),
-    getLineDraftSnapshot: mapController?.getLineDraftSnapshot?.bind(mapController),
-    applyLineDraftToRoute: mapController?.applyLineDraftToRoute?.bind(mapController),
-    stopPointDrag: mapController?.stopPointDrag?.bind(mapController),
+    setLineToolVisible: setMapboxLineToolVisible,
+    setLineToolMode: setMapboxLineToolMode,
+    setLineToolSnapEnabled: setMapboxLineToolSnapEnabled,
+    setLineToolStyle: setMapboxLineToolStyle,
+    setLineToolColor: setMapboxLineToolColor,
+    undoLineDraft: undoMapboxLineDraft,
+    clearLineDraft: clearMapboxLineDraft,
+    setLineDraftFromPoints: setMapboxLineDraftFromPoints,
+    getLineDraftSnapshot: getMapboxLineDraftSnapshot,
+    applyLineDraftToRoute: applyMapboxLineDraftToRoute,
+    stopPointDrag: () => {},
   };
 }
 
@@ -975,6 +957,88 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function closePointContextCard() {
+  const panel = document.getElementById('context-panel');
+  if (!panel) return;
+  panel.classList.remove('active');
+  panel.style.opacity = '0';
+  document.body.classList.remove('context-open');
+  document.querySelector('.map-view')?.classList.remove('panel-open');
+}
+
+function renderPointContextCard(point) {
+  const panel = document.getElementById('context-panel');
+  if (!panel || !point) return;
+  const sections = Array.isArray(point.sections) ? point.sections : [];
+  const lat = Number(point.lat);
+  const lng = Number(point.lng);
+  const safeLat = Number.isFinite(lat) ? lat.toFixed(5) : '-';
+  const safeLng = Number.isFinite(lng) ? lng.toFixed(5) : '-';
+  const sectionsMarkup = sections.length
+    ? `
+      <hr style="border: 0; border-top: 1px solid var(--c-divider);">
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div class="t-label text-muted">Детальні пункти</div>
+        ${sections
+          .map((section, idx) => {
+            const photo = section?.photoUrl
+              ? `<div style="height:120px;border-radius:10px;background:url('${escapeHtml(section.photoUrl)}') center/cover;border:1px solid var(--c-divider);"></div>`
+              : '';
+            return `
+              <article style="border:1px solid var(--c-divider); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px;">
+                <div class="t-data text-muted">Пункт ${idx + 1}</div>
+                ${section?.title ? `<div class="t-body"><strong>${escapeHtml(section.title)}</strong></div>` : ''}
+                ${section?.description ? `<div class="t-body">${escapeHtml(section.description)}</div>` : ''}
+                ${photo}
+              </article>
+            `;
+          })
+          .join('')}
+      </div>
+    `
+    : '';
+
+  panel.classList.add('active');
+  panel.style.opacity = '1';
+  document.body.classList.add('context-open');
+  document.querySelector('.map-view')?.classList.add('panel-open');
+
+  panel.innerHTML = `
+    <div class="card card-3d" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; position: relative;">
+      <button id="btn-close-context-panel" class="btn-flat context-close-btn" type="button">Закрити</button>
+      <div style="height: 160px; background: ${
+        point.photoUrl
+          ? `url('${escapeHtml(point.photoUrl)}') center/cover`
+          : 'linear-gradient(130deg, #dbeafe 0%, #f8fafc 100%)'
+      }; border-radius: var(--radius-md);"></div>
+      <div>
+        <h2 class="t-h2" style="display: flex; align-items: center;">${escapeHtml(point.title || '')}</h2>
+        <div class="t-label text-muted" style="margin-top: 4px;">${escapeHtml(point.district || 'Одеська область')}</div>
+      </div>
+      <hr style="border: 0; border-top: 1px solid var(--c-divider);">
+      <div>
+        <div class="t-data text-muted" style="margin-bottom: 8px;">ТИП ТОЧКИ:</div>
+        <div class="t-body">${escapeHtml(point?.pointType?.labelUk || point?.pointType?.labelEn || '-')}</div>
+      </div>
+      <hr style="border: 0; border-top: 1px solid var(--c-divider);">
+      <div>
+        <div class="t-label text-muted" style="margin-bottom: 4px;">Коментар:</div>
+        <div class="t-body">${escapeHtml(point.description || 'Без коментаря')}</div>
+      </div>
+      ${sectionsMarkup}
+      <hr style="border: 0; border-top: 1px solid var(--c-divider);">
+      <div style="display:flex; flex-direction: column; gap: 4px;">
+        <div class="t-data">Координати: ${safeLat}, ${safeLng}</div>
+        <div class="t-data text-muted">Додано: ${point.createdAt ? String(point.createdAt).slice(0, 10) : '-'}</div>
+      </div>
+    </div>
+  `;
+
+  panel.querySelector('#btn-close-context-panel')?.addEventListener('click', () => {
+    closePointContextCard();
+  });
 }
 
 function normalizeGeoText(value) {
@@ -2407,7 +2471,7 @@ function resetRouteEditor() {
   lineSetDraft([]);
   lineSetMode('draw');
   lineSetVisible(false);
-  lineSetSnap(true);
+  lineSetSnap(false);
   if (isMapboxEngineActive()) {
     ensureMapboxPreview()
       .then(() => {
@@ -2693,7 +2757,7 @@ function bindDashboardActions() {
         const proposalId = Number(button.dataset.proposalId);
         const proposal = dashboardProposals.find((p) => p.id === proposalId);
         if (!proposal) return;
-        mapController?.focusLocation?.(Number(proposal.lat), Number(proposal.lng), 16);
+        focusMapboxLocation(Number(proposal.lat), Number(proposal.lng), 16);
         setSpecialistSuccess(`Фокус на заявці "${proposal.name}"`);
       }
 
@@ -2931,13 +2995,11 @@ function bindFilterMenu() {
         filterMenu.querySelectorAll('.btn-flat[data-filter]').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         filterMenu.classList.remove('active');
-        if (!mapController) return;
         selectedDistrict = '';
         selectedCommunity = '';
         if (communitySelect) communitySelect.value = '';
-        mapController.clearFocusBoundary?.();
-        mapController.focusLocation?.(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
-        await mapController.setFilter({ type: 'all', certified: false, district: '', community: '' });
+        clearMapboxFocusBoundary();
+        focusMapboxLocation(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
         setSpecialistMessage('Точки не приховуються: фільтр використовується для навігації.');
         saveUiState();
       });
@@ -2951,17 +3013,9 @@ function bindFilterMenu() {
       selectedDistrict = '';
       selectedCommunity = '';
 
-      if (!mapController) return;
-
       if (!value) {
-        if (currentMapEngine === 'mapbox') {
-          clearMapboxFocusBoundary();
-          resetMapboxView();
-        } else {
-          mapController.clearFocusBoundary?.();
-          mapController.focusLocation?.(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
-          await mapController.setFilter({ type: 'all', certified: false, district: '', community: '' });
-        }
+        clearMapboxFocusBoundary();
+        resetMapboxView();
         setSpecialistMessage(currentLang === 'uk' ? 'Фокус на Одесі' : 'Focus set to Odesa');
         saveUiState();
         return;
@@ -2970,41 +3024,20 @@ function bindFilterMenu() {
       if (value.startsWith('district::')) {
         const district = value.split('::')[1];
         selectedDistrict = district;
-        if (currentMapEngine !== 'mapbox') {
-          await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: '' });
-        }
         const boundaryIndex = await loadBoundaryGeoIndex();
         const districtGeo =
           boundaryIndex?.districtByName?.get(normalizeGeoText(district))
           || (await geocodeDistrict(district));
         if (requestId !== locationFocusRequestId) return;
-        if (currentMapEngine === 'mapbox') {
-          const hasBoundary = districtGeo?.geojson ? setMapboxFocusBoundary(districtGeo.geojson) : false;
-          if (!hasBoundary) clearMapboxFocusBoundary();
-          if (districtGeo && hasBoundary) {
-            focusMapboxBoundary({ maxZoom: 11 });
-          } else if (districtGeo) {
-            focusMapboxLocation(districtGeo.lat, districtGeo.lng, districtGeo.zoom || 11);
-          } else {
-            const center = DISTRICT_CENTERS[district];
-            if (center) focusMapboxLocation(center.lat, center.lng, center.zoom || 11);
-          }
+        const hasBoundary = districtGeo?.geojson ? setMapboxFocusBoundary(districtGeo.geojson) : false;
+        if (!hasBoundary) clearMapboxFocusBoundary();
+        if (districtGeo && hasBoundary) {
+          focusMapboxBoundary({ maxZoom: 11 });
+        } else if (districtGeo) {
+          focusMapboxLocation(districtGeo.lat, districtGeo.lng, districtGeo.zoom || 11);
         } else {
-          const hasBoundary = districtGeo?.geojson ? mapController.setFocusBoundary?.(districtGeo.geojson) : false;
-          if (!hasBoundary) mapController.clearFocusBoundary?.();
-          const districtNeedle = normalizeGeoText(district);
-          const points = dashboardPoints.filter((p) =>
-            normalizeGeoText(p.district).includes(districtNeedle)
-          );
-          const focusedByPoints = mapController.focusPoints?.(points, { maxZoom: 11, singleZoom: 11 });
-          if (districtGeo && hasBoundary) {
-            mapController.focusBoundary?.({ maxZoom: 11 });
-          } else if (districtGeo) {
-            mapController.focusLocation?.(districtGeo.lat, districtGeo.lng, districtGeo.zoom || 11);
-          } else if (!focusedByPoints) {
-            const center = DISTRICT_CENTERS[district];
-            if (center) mapController.focusLocation?.(center.lat, center.lng, center.zoom || 11);
-          }
+          const center = DISTRICT_CENTERS[district];
+          if (center) focusMapboxLocation(center.lat, center.lng, center.zoom || 11);
         }
         setSpecialistMessage(
           currentLang === 'uk' ? `Фокус на: ${district}` : `Focused on district: ${district}`
@@ -3015,9 +3048,6 @@ function bindFilterMenu() {
         const [, district, community] = value.split('::');
         selectedDistrict = district;
         selectedCommunity = community;
-        if (currentMapEngine !== 'mapbox') {
-          await mapController.setFilter({ type: 'all', certified: false, district: selectedDistrict, community: selectedCommunity });
-        }
 
         const boundaryIndex = await loadBoundaryGeoIndex();
         const districtKey = normalizeGeoText(district);
@@ -3028,48 +3058,17 @@ function bindFilterMenu() {
         const geo = boundaryGeo || (await geocodeCommunity(district, community));
         if (requestId !== locationFocusRequestId) return;
         let hasBoundary = false;
-        if (currentMapEngine === 'mapbox') {
-          hasBoundary = geo?.geojson ? setMapboxFocusBoundary(geo.geojson) : false;
-          if (!hasBoundary) clearMapboxFocusBoundary();
-          if (geo && hasBoundary) {
-            focusMapboxBoundary({ maxZoom: 13 });
-          } else if (geo) {
-            focusMapboxLocation(geo.lat, geo.lng, geo.zoom || 13);
-          } else if (DISTRICT_CENTERS[district]) {
-            const center = DISTRICT_CENTERS[district];
-            focusMapboxLocation(center.lat, center.lng, center.zoom || 11);
-          }
+        hasBoundary = geo?.geojson ? setMapboxFocusBoundary(geo.geojson) : false;
+        if (!hasBoundary) clearMapboxFocusBoundary();
+        if (geo && hasBoundary) {
+          focusMapboxBoundary({ maxZoom: 13 });
+        } else if (geo) {
+          focusMapboxLocation(geo.lat, geo.lng, geo.zoom || 13);
+        } else if (DISTRICT_CENTERS[district]) {
+          const center = DISTRICT_CENTERS[district];
+          focusMapboxLocation(center.lat, center.lng, center.zoom || 11);
         } else {
-          const districtNeedle = normalizeGeoText(district);
-          const communityNeedle = normalizeGeoText(community);
-          const strictCommunityPoints = dashboardPoints.filter((p) => {
-            const districtValue = normalizeGeoText(p.district);
-            const communityValue = normalizeGeoText(p.community);
-            return (
-              districtValue.includes(districtNeedle) &&
-              communityValue &&
-              communityValue.includes(communityNeedle)
-            );
-          });
-          const districtOnlyPoints = dashboardPoints.filter((p) =>
-            normalizeGeoText(p.district).includes(districtNeedle)
-          );
-          const pointsForFocus = strictCommunityPoints.length ? strictCommunityPoints : districtOnlyPoints;
-          const focusedByPoints = mapController.focusPoints?.(pointsForFocus, { maxZoom: 13, singleZoom: 13 });
-
-          hasBoundary = geo?.geojson ? mapController.setFocusBoundary?.(geo.geojson) : false;
-          if (!hasBoundary) mapController.clearFocusBoundary?.();
-
-          if (geo && hasBoundary) {
-            mapController.focusBoundary?.({ maxZoom: 13 });
-          } else if (geo) {
-            mapController.focusLocation?.(geo.lat, geo.lng, geo.zoom || 13);
-          } else if (focusedByPoints) {
-            // already focused by local points for selected district/community
-          } else if (DISTRICT_CENTERS[district]) {
-            const center = DISTRICT_CENTERS[district];
-            mapController.focusLocation?.(center.lat, center.lng, center.zoom || 11);
-          }
+          clearMapboxFocusBoundary();
         }
         setSpecialistMessage(
           hasBoundary
@@ -3337,23 +3336,16 @@ function bindSpecialistTools() {
 
   if (btnPickOnMap) {
     btnPickOnMap.addEventListener('click', () => {
-      if (!mapController && currentMapEngine !== 'mapbox') {
-        setSpecialistMessage('Карта ще не готова', true);
-        return;
-      }
+      if (currentMapEngine !== 'mapbox') return;
       setSpecialistMessage('Клікніть на карті для вибору координат');
       const onPicked = ({ lat, lng }) => {
         document.getElementById('point-lat').value = lat.toFixed(6);
         document.getElementById('point-lng').value = lng.toFixed(6);
         setSpecialistSuccess('Координати вибрано');
       };
-      if (currentMapEngine === 'mapbox') {
-        lineSetVisible(false);
-        disableMapboxPointPicking();
-        enableMapboxPointPicking(onPicked);
-      } else {
-        mapController.enablePointPicking(onPicked);
-      }
+      lineSetVisible(false);
+      disableMapboxPointPicking();
+      enableMapboxPointPicking(onPicked);
     });
   }
 
@@ -3823,7 +3815,6 @@ function bindSpecialistTools() {
               // ignore storage cleanup errors
             }
           }
-          await mapController.refresh();
           await refreshDashboardData();
           await refreshPublicData();
           openPointInEditor(editingPointId);
@@ -4223,19 +4214,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const initMapAndTools = async () => {
     if (!mapToolsInitialized) {
-      mapController = await initMap({
-        fetchPoints: async (filter) => {
-          const query = new URLSearchParams();
-          if (filter.type && filter.type !== 'all') {
-            query.set('type', filter.type);
-          }
-          if (filter.certified) {
-            query.set('certified', 'true');
-          }
-          const points = await apiRequest(`/api/points${query.toString() ? `?${query.toString()}` : ''}`);
-          return (points || []).map((point) => normalizePointRecord(point));
-        },
-      });
       const filterMenuNode = document.getElementById('filter-menu');
       const mapViewNode = document.querySelector('.map-view');
       if (filterMenuNode && mapViewNode && filterMenuNode.parentElement !== mapViewNode) {
@@ -4260,8 +4238,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await refreshPublicData();
 
     if (!selectedDistrict && !selectedCommunity) {
-      mapController?.clearFocusBoundary?.();
-      mapController?.focusLocation?.(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
+      clearMapboxFocusBoundary();
+      focusMapboxLocation(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
       const communitySelect = document.getElementById('community-select');
       if (communitySelect) communitySelect.value = '';
     }
@@ -4278,15 +4256,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (selectedDistrict || selectedCommunity) {
       if (selectedCommunity) {
         const geo = await geocodeCommunity(selectedDistrict, selectedCommunity);
-        const hasBoundary = geo?.geojson ? mapController?.setFocusBoundary?.(geo.geojson) : false;
+        const hasBoundary = geo?.geojson ? setMapboxFocusBoundary(geo.geojson) : false;
         if (geo && hasBoundary) {
-          mapController?.focusBoundary?.({ maxZoom: 13 });
+          focusMapboxBoundary({ maxZoom: 13 });
         } else if (geo) {
-          mapController?.focusLocation?.(geo.lat, geo.lng, geo.zoom || 13);
+          focusMapboxLocation(geo.lat, geo.lng, geo.zoom || 13);
         }
       } else if (selectedDistrict && DISTRICT_CENTERS[selectedDistrict]) {
         const center = DISTRICT_CENTERS[selectedDistrict];
-        mapController?.focusLocation?.(center.lat, center.lng, center.zoom || 11);
+        focusMapboxLocation(center.lat, center.lng, center.zoom || 11);
       }
       populateCommunitiesSelect();
     }
@@ -4323,11 +4301,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.dispatchEvent(new Event('resize'));
         forceMapboxResizeBurst();
         // Extra refresh passes prevent occasional marker drop after first transition.
-        await mapController?.refresh?.();
+        setMapboxPoints(Array.isArray(dashboardPoints) ? dashboardPoints : []);
         setTimeout(() => {
           window.dispatchEvent(new Event('resize'));
           forceMapboxResizeBurst();
-          mapController?.refresh?.().catch(() => null);
+          setMapboxPoints(Array.isArray(dashboardPoints) ? dashboardPoints : []);
         }, 260);
         setTimeout(() => scrollToInterfaceSection(targetId), 60);
       } finally {
@@ -4474,18 +4452,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnMapboxStyleDark = document.getElementById('btn-mapbox-style-dark');
   const btnNewsScroll = document.getElementById('btn-news-scroll');
   const btnProposalScroll = document.getElementById('btn-proposal-scroll');
-  const leafletMapView = document.getElementById('map');
+  const mapHostView = document.getElementById('map');
   const mapboxPreviewWrap = document.getElementById('mapbox-preview-wrap');
   const contextPanel = document.getElementById('context-panel');
 
   const ensureMapboxControlDock = () => {
-    if (!leafletMapView) return;
+    if (!mapHostView) return;
     let dock = document.getElementById('mapbox-control-dock');
     if (!dock) {
       dock = document.createElement('div');
       dock.id = 'mapbox-control-dock';
       dock.className = 'mapbox-control-dock';
-      leafletMapView.appendChild(dock);
+      mapHostView.appendChild(dock);
     }
     const nodes = [
       btnMapbox3DToggle,
@@ -4514,9 +4492,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentMapEngine = 'mapbox';
     const isMapbox = true;
     document.body.classList.toggle('mapbox-preview-active', isMapbox);
-    if (leafletMapView) leafletMapView.classList.toggle('map-engine-mapbox', isMapbox);
+    if (mapHostView) mapHostView.classList.toggle('map-engine-mapbox', isMapbox);
 
-    if (leafletMapView) leafletMapView.style.display = 'block';
+    if (mapHostView) mapHostView.style.display = 'block';
     if (mapboxPreviewWrap) mapboxPreviewWrap.style.display = isMapbox ? 'block' : 'none';
     if (contextPanel) contextPanel.style.display = '';
     if (btnMapbox3DToggle) btnMapbox3DToggle.style.display = isMapbox ? 'inline-flex' : 'none';
@@ -4525,15 +4503,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (btnMapboxStyleDark) btnMapboxStyleDark.style.display = isMapbox ? 'inline-flex' : 'none';
 
     let pointsForMapbox = [];
-    try {
-      const refreshed = await mapController?.refresh?.();
-      if (Array.isArray(refreshed) && refreshed.length) {
-        pointsForMapbox = refreshed.map((point) => normalizePointRecord(point));
-      }
-    } catch (_e) {
-      // keep fallback path below
-    }
-
     if (!pointsForMapbox.length) {
       pointsForMapbox = Array.isArray(dashboardPoints) ? dashboardPoints : [];
     }
@@ -4581,11 +4550,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!Number.isFinite(numericId)) return;
     const point = (dashboardPoints || []).find((row) => Number(row?.id) === numericId);
     if (!point) return;
-    // Always open right-side point card.
-    mapController?.showPointDetails?.(point, { pan: true });
+    renderPointContextCard(point);
+    focusPointOnCurrentMap(point, 16);
     // If specialist is logged in, sync to point editor selection too.
     if (authUser && ['admin', 'specialist'].includes(authUser.role)) {
-      openPointInEditor(numericId, { focusMap: true, setTab: true, silent: true, zoom: 16 });
+      openPointInEditor(numericId, { focusMap: false, setTab: true, silent: true, zoom: 16 });
     }
   };
 
@@ -4604,13 +4573,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('mapbox:point-click', (event) => {
     handlePointClickFromMap(event?.detail?.pointId);
   });
-  window.addEventListener('map:point-click', (event) => {
-    handlePointClickFromMap(event?.detail?.pointId);
-  });
   window.addEventListener('mapbox:route-click', (event) => {
-    handleRouteClickFromMap(event?.detail?.routeId);
-  });
-  window.addEventListener('map:route-click', (event) => {
     handleRouteClickFromMap(event?.detail?.routeId);
   });
   if (btnMapbox3DToggle) {

@@ -556,7 +556,7 @@ function captureDrawSnapshot() {
         const lng = Number(pair?.[0]);
         const lat = Number(pair?.[1]);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-        const snap = nearestPointFor(lat, lng, 24);
+        const snap = drawSnapEnabled ? nearestPointFor(lat, lng, 24) : null;
         return {
           lat,
           lng,

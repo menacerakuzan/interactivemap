@@ -12,7 +12,7 @@ export function initLenis() {
             if (!node || typeof node.closest !== 'function') return false;
             return Boolean(
                 node.closest(
-                    '.leaflet-container, .map-view, .map-container, .context-panel, .specialist-panel, .filter-options'
+                    '.mapboxgl-map, .map-view, .map-container, .context-panel, .specialist-panel, .filter-options'
                 )
             );
         },
