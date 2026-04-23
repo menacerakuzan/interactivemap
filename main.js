@@ -958,6 +958,12 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function formatStructuredText(value) {
+  const text = String(value || '').replace(/\r\n/g, '\n').trim();
+  if (!text) return '';
+  return escapeHtml(text).replace(/\n/g, '<br>');
+}
+
 function closePointContextCard() {
   const panel = document.getElementById('context-panel');
   if (!panel) return;
@@ -989,7 +995,7 @@ function renderPointContextCard(point) {
               <article style="border:1px solid var(--c-divider); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px;">
                 <div class="t-data text-muted">Пункт ${idx + 1}</div>
                 ${section?.title ? `<div class="t-body"><strong>${escapeHtml(section.title)}</strong></div>` : ''}
-                ${section?.description ? `<div class="t-body">${escapeHtml(section.description)}</div>` : ''}
+                ${section?.description ? `<div class="t-body">${formatStructuredText(section.description)}</div>` : ''}
                 ${photo}
               </article>
             `;
@@ -1024,7 +1030,7 @@ function renderPointContextCard(point) {
       <hr style="border: 0; border-top: 1px solid var(--c-divider);">
       <div>
         <div class="t-label text-muted" style="margin-bottom: 4px;">Коментар:</div>
-        <div class="t-body">${escapeHtml(point.description || 'Без коментаря')}</div>
+        <div class="t-body">${formatStructuredText(point.description || 'Без коментаря')}</div>
       </div>
       ${sectionsMarkup}
       <hr style="border: 0; border-top: 1px solid var(--c-divider);">
