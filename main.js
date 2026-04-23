@@ -832,7 +832,6 @@ async function refreshUiAfterPointMutation({
 } = {}) {
   let refreshError = null;
   try {
-    await mapController?.refresh?.();
     await refreshDashboardData();
     await refreshPublicData();
     return;
