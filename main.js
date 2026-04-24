@@ -1301,13 +1301,47 @@ function makePointSectionMarkup(section = {}, idx = 0) {
   `;
 }
 
+const sectionPreviewObjectUrls = new WeakMap();
+
+function clearSectionPreviewObjectUrl(previewEl) {
+  if (!previewEl) return;
+  const prev = sectionPreviewObjectUrls.get(previewEl);
+  if (prev) {
+    try {
+      URL.revokeObjectURL(prev);
+    } catch (_e) {
+      // ignore revoke errors
+    }
+    sectionPreviewObjectUrls.delete(previewEl);
+  }
+}
+
+function setSectionPreviewBackground(previewEl, url) {
+  if (!previewEl) return;
+  if (!url) {
+    previewEl.style.backgroundImage = '';
+    return;
+  }
+  const safe = String(url).replace(/"/g, '\\"');
+  previewEl.style.backgroundImage = `url("${safe}")`;
+}
+
 function updateSectionPreview(item) {
   if (!item) return;
   const preview = item.querySelector('.point-section-preview');
   const urlInput = item.querySelector('[data-field="photo-url"]');
+  const fileInput = item.querySelector('[data-field="photo-file"]');
   if (!preview || !urlInput) return;
-  const url = (urlInput.value || '').trim();
-  preview.style.backgroundImage = url ? `url('${url}')` : '';
+  clearSectionPreviewObjectUrl(preview);
+  const directUrl = (urlInput.value || '').trim();
+  const file = fileInput?.files?.[0];
+  if (file && file.type?.startsWith('image/')) {
+    const objectUrl = URL.createObjectURL(file);
+    sectionPreviewObjectUrls.set(preview, objectUrl);
+    setSectionPreviewBackground(preview, objectUrl);
+    return;
+  }
+  setSectionPreviewBackground(preview, directUrl);
 }
 
 function renumberPointSections(listEl) {
@@ -1321,9 +1355,11 @@ function renumberPointSections(listEl) {
 
 function renderPointSectionsEditor(listEl, sections = []) {
   if (!listEl) return;
+  listEl.querySelectorAll('.point-section-preview').forEach((preview) => clearSectionPreviewObjectUrl(preview));
   const rows = sections.length ? sections : [{}];
   listEl.innerHTML = rows.slice(0, MAX_POINT_SECTION_COUNT).map((section, idx) => makePointSectionMarkup(section, idx)).join('');
   renumberPointSections(listEl);
+  listEl.querySelectorAll('.point-section-item').forEach((item) => updateSectionPreview(item));
 }
 
 function bindPointSectionsEditor(listEl, addBtn) {
@@ -1344,6 +1380,8 @@ function bindPointSectionsEditor(listEl, addBtn) {
     if (!removeBtn) return;
     const item = removeBtn.closest('.point-section-item');
     if (!item) return;
+    const preview = item.querySelector('.point-section-preview');
+    clearSectionPreviewObjectUrl(preview);
     item.remove();
     if (!listEl.querySelector('.point-section-item')) {
       listEl.insertAdjacentHTML('beforeend', makePointSectionMarkup({}, 0));
@@ -1352,6 +1390,11 @@ function bindPointSectionsEditor(listEl, addBtn) {
   });
   listEl.addEventListener('input', (e) => {
     if (e.target.matches('[data-field="photo-url"]')) {
+      updateSectionPreview(e.target.closest('.point-section-item'));
+    }
+  });
+  listEl.addEventListener('change', (e) => {
+    if (e.target.matches('[data-field="photo-file"]')) {
       updateSectionPreview(e.target.closest('.point-section-item'));
     }
   });
@@ -1379,6 +1422,9 @@ async function collectPointSectionsPayload(listEl) {
         throw new Error(`Розділ ${i + 1}: фото завелике (макс 8MB)`);
       }
       photoUrl = await dataService.uploadPointPhoto(file);
+      const urlField = row.querySelector('[data-field="photo-url"]');
+      if (urlField) urlField.value = photoUrl;
+      updateSectionPreview(row);
     }
 
     if (!title && !description && !photoUrl) continue;
