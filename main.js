@@ -592,6 +592,11 @@ function normalizeRoutePathForUi(value) {
         edgeStyle,
         edgeColor,
         edgeCurve: Boolean(vertex.edgeCurve ?? vertex.edge_curve),
+        segmentId:
+          typeof (vertex.segmentId ?? vertex.segment_id) === 'string'
+            ? String(vertex.segmentId ?? vertex.segment_id).trim()
+            : '',
+        segmentStart: Boolean(vertex.segmentStart ?? vertex.segment_start),
       };
     })
     .filter(Boolean)
@@ -921,6 +926,8 @@ function buildValidatedRoutePath(path = []) {
         edgeStyle,
         edgeColor,
         edgeCurve: Boolean(vertex.edgeCurve),
+        segmentId: typeof vertex.segmentId === 'string' ? vertex.segmentId.trim() : '',
+        segmentStart: Boolean(vertex.segmentStart),
       };
     })
     .filter(Boolean)
@@ -3462,7 +3469,9 @@ function bindSpecialistTools() {
       const ok = lineUndo();
       if (!ok) {
         setSpecialistMessage('Немає точок для скасування', true);
+        return;
       }
+      setSpecialistSuccess('Останню дію скасовано');
     });
   }
 

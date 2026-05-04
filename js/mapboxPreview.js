@@ -546,13 +546,14 @@ function eraseNearestVertexAt(point, pixelThreshold = 16) {
 
 function captureDrawSnapshot() {
   const lines = getDrawLineFeatures();
-  const snapshots = lines.map((feature) => {
+  const snapshots = lines.map((feature, lineIndex) => {
     const coords = Array.isArray(feature?.geometry?.coordinates) ? feature.geometry.coordinates : [];
     const edgeStyle = feature?.properties?.edgeStyle || drawLineStyle;
     const edgeColor = feature?.properties?.edgeColor || drawLineColor;
     const edgeCurve = Boolean(feature?.properties?.edgeCurve);
+    const segmentId = String(feature?.id || `segment-${lineIndex + 1}`);
     return coords
-      .map((pair) => {
+      .map((pair, coordIndex) => {
         const lng = Number(pair?.[0]);
         const lat = Number(pair?.[1]);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
@@ -565,11 +566,46 @@ function captureDrawSnapshot() {
           edgeStyle,
           edgeColor,
           edgeCurve,
+          segmentId,
+          segmentStart: coordIndex === 0,
         };
       })
       .filter(Boolean);
   });
   return snapshots.flat();
+}
+
+function splitSnapshotIntoSegments(snapshot = []) {
+  const vertices = Array.isArray(snapshot) ? snapshot : [];
+  const segments = [];
+  const byId = new Map();
+  vertices.forEach((vertex, idx) => {
+    if (!vertex || typeof vertex !== 'object') return;
+    const lng = Number(vertex.lng);
+    const lat = Number(vertex.lat);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+    const explicitId = typeof vertex.segmentId === 'string' && vertex.segmentId.trim() ? vertex.segmentId.trim() : null;
+    if (explicitId) {
+      if (!byId.has(explicitId)) {
+        const segment = { id: explicitId, vertices: [] };
+        byId.set(explicitId, segment);
+        segments.push(segment);
+      }
+      byId.get(explicitId).vertices.push(vertex);
+      return;
+    }
+    if (vertex.segmentStart || !segments.length) {
+      segments.push({ id: `legacy-${idx}`, vertices: [vertex] });
+      return;
+    }
+    segments[segments.length - 1].vertices.push(vertex);
+  });
+  return segments
+    .map((segment) => ({
+      ...segment,
+      vertices: (segment.vertices || []).filter((vertex) => Number.isFinite(Number(vertex?.lat)) && Number.isFinite(Number(vertex?.lng))),
+    }))
+    .filter((segment) => segment.vertices.length >= 2);
 }
 
 function pushDrawHistory() {
@@ -1155,6 +1191,11 @@ function resolveRoutePathVertices(route) {
             edgeStyle: ['solid', 'dashed', 'dashdot'].includes(edgeStyleRaw) ? edgeStyleRaw : 'dashed',
             edgeColor: normalizeHexColor(vertex.edgeColor ?? vertex.edge_color, normalizeHexColor(route?.routeColor, '#E7C769')),
             edgeCurve: Boolean(vertex.edgeCurve ?? vertex.edge_curve),
+            segmentId:
+              typeof (vertex.segmentId ?? vertex.segment_id) === 'string'
+                ? String(vertex.segmentId ?? vertex.segment_id).trim()
+                : '',
+            segmentStart: Boolean(vertex.segmentStart ?? vertex.segment_start),
           };
         })
         .filter(Boolean)
@@ -1189,28 +1230,48 @@ function buildRouteFeatureCollection() {
     const routeColor = normalizeHexColor(route?.routeColor, '#E7C769');
     const vertices = resolveRoutePathVertices(route);
     if (vertices.length < 2) return;
-    for (let index = 1; index < vertices.length; index += 1) {
-      const prev = vertices[index - 1];
-      const next = vertices[index];
-      const coords =
-        next.edgeCurve && vertices.length > 2
-          ? buildCurvedSegmentCoords(vertices, index - 1)
-          : [
-              [prev.lng, prev.lat],
-              [next.lng, next.lat],
-            ];
-      if (coords.length < 2) continue;
-      features.push({
-        type: 'Feature',
-        properties: {
-          routeId: Number(route.id) || null,
-          routeName: String(route.name || ''),
-          edgeStyle: ['solid', 'dashed', 'dashdot'].includes(next.edgeStyle) ? next.edgeStyle : 'dashed',
-          edgeColor: normalizeHexColor(next.edgeColor, routeColor),
-        },
-        geometry: { type: 'LineString', coordinates: coords },
-      });
-    }
+    const segments = [];
+    let currentSegment = [];
+    let currentSegmentId = '';
+    vertices.forEach((vertex, index) => {
+      const vertexSegmentId = typeof vertex.segmentId === 'string' ? vertex.segmentId.trim() : '';
+      const shouldStartNew =
+        index > 0 &&
+        (Boolean(vertex.segmentStart) || (vertexSegmentId && currentSegmentId && vertexSegmentId !== currentSegmentId));
+      if (shouldStartNew && currentSegment.length >= 2) {
+        segments.push(currentSegment);
+        currentSegment = [];
+      }
+      if (!currentSegment.length) currentSegmentId = vertexSegmentId || currentSegmentId || `segment-${segments.length + 1}`;
+      currentSegment.push(vertex);
+    });
+    if (currentSegment.length >= 2) segments.push(currentSegment);
+    if (!segments.length) segments.push(vertices);
+
+    segments.forEach((segmentVertices) => {
+      for (let index = 1; index < segmentVertices.length; index += 1) {
+        const prev = segmentVertices[index - 1];
+        const next = segmentVertices[index];
+        const coords =
+          next.edgeCurve && segmentVertices.length > 2
+            ? buildCurvedSegmentCoords(segmentVertices, index - 1)
+            : [
+                [prev.lng, prev.lat],
+                [next.lng, next.lat],
+              ];
+        if (coords.length < 2) continue;
+        features.push({
+          type: 'Feature',
+          properties: {
+            routeId: Number(route.id) || null,
+            routeName: String(route.name || ''),
+            edgeStyle: ['solid', 'dashed', 'dashdot'].includes(next.edgeStyle) ? next.edgeStyle : 'dashed',
+            edgeColor: normalizeHexColor(next.edgeColor, routeColor),
+          },
+          geometry: { type: 'LineString', coordinates: coords },
+        });
+      }
+    });
   });
   return { type: 'FeatureCollection', features };
 }
@@ -1900,7 +1961,10 @@ export function setMapboxLineToolVisible(visible) {
     syncMapGestureStateForLineTool();
     return true;
   }
-  if (drawMode === 'draw' || drawMode === 'curve') draw.changeMode('draw_line_string');
+  if (drawMode === 'draw' || drawMode === 'curve') {
+    draw.changeMode('simple_select');
+    draw.changeMode('draw_line_string');
+  }
   else if (drawMode === 'edit') draw.changeMode('direct_select');
   else draw.changeMode('simple_select');
   updateCurvePreviewFromDraw();
@@ -1944,6 +2008,7 @@ export function setMapboxLineToolMode(mode = 'draw') {
       draw.changeMode('draw_line_string');
     }
   } else if (drawMode === 'draw') {
+    draw.changeMode('simple_select');
     draw.changeMode('draw_line_string');
   } else if (drawMode === 'edit') {
     const firstLine = getDrawLineFeatures()[0];
@@ -2008,18 +2073,21 @@ export function undoMapboxLineDraft() {
   const snapshot = drawHistory[drawHistory.length - 1] || [];
   clearMapboxLineDraft();
   if (!snapshot.length) return true;
-  const coords = snapshot.map((v) => [Number(v.lng), Number(v.lat)]).filter(([lng, lat]) => Number.isFinite(lat) && Number.isFinite(lng));
-  if (coords.length < 2) return true;
-  const first = snapshot[0] || {};
-  const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(first.edgeStyle) ? first.edgeStyle : drawLineStyle;
-  const edgeColor = /^#[0-9a-f]{6}$/i.test(String(first.edgeColor || '')) ? String(first.edgeColor) : drawLineColor;
-  const edgeCurve = Boolean(first.edgeCurve);
-  const featureId = draw.add({
-    type: 'Feature',
-    properties: { edgeStyle, edgeColor, edgeCurve, edgeCurvePrepared: edgeCurve },
-    geometry: { type: 'LineString', coordinates: edgeCurve ? buildCurveControlCoords(coords) : coords },
-  })?.[0];
-  if (featureId) applyDrawStyleToFeature(featureId, edgeCurve);
+  const segments = splitSnapshotIntoSegments(snapshot);
+  segments.forEach((segment) => {
+    const coords = segment.vertices.map((v) => [Number(v.lng), Number(v.lat)]);
+    if (coords.length < 2) return;
+    const first = segment.vertices[0] || {};
+    const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(first.edgeStyle) ? first.edgeStyle : drawLineStyle;
+    const edgeColor = /^#[0-9a-f]{6}$/i.test(String(first.edgeColor || '')) ? String(first.edgeColor) : drawLineColor;
+    const edgeCurve = Boolean(first.edgeCurve);
+    const featureId = draw.add({
+      type: 'Feature',
+      properties: { edgeStyle, edgeColor, edgeCurve, edgeCurvePrepared: edgeCurve },
+      geometry: { type: 'LineString', coordinates: edgeCurve ? buildCurveControlCoords(coords) : coords },
+    })?.[0];
+    if (featureId) applyDrawStyleToFeature(featureId, edgeCurve);
+  });
   syncDrawLinePaint();
   updateCurvePreviewFromDraw();
   return true;
@@ -2045,25 +2113,21 @@ export function setMapboxLineDraftFromPoints(vertices = []) {
   if (!draw) return false;
   clearMapboxLineDraft();
   const normalized = Array.isArray(vertices) ? vertices : [];
-  const coords = normalized
-    .map((vertex) => [Number(vertex?.lng), Number(vertex?.lat)])
-    .filter(([lng, lat]) => Number.isFinite(lat) && Number.isFinite(lng));
-  if (coords.length < 2) return true;
-  const firstVertex = normalized.find((v) => v && typeof v === 'object') || {};
-  const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(firstVertex.edgeStyle) ? firstVertex.edgeStyle : drawLineStyle;
-  const edgeColor = /^#[0-9a-f]{6}$/i.test(String(firstVertex.edgeColor || '')) ? String(firstVertex.edgeColor) : drawLineColor;
-  const edgeCurve = normalized.some((v) => Boolean(v?.edgeCurve));
-  const startCoord = coords[0];
-  const endCoord = coords[coords.length - 1];
-  if (startCoord[0] !== endCoord[0] || startCoord[1] !== endCoord[1]) {
-    // keep as open polyline
-  }
-  const featureId = draw.add({
-    type: 'Feature',
-    properties: { edgeStyle, edgeColor, edgeCurve, edgeCurvePrepared: edgeCurve },
-    geometry: { type: 'LineString', coordinates: edgeCurve ? buildCurveControlCoords(coords) : coords },
-  })?.[0];
-  if (featureId) applyDrawStyleToFeature(featureId, edgeCurve);
+  const segments = splitSnapshotIntoSegments(normalized);
+  segments.forEach((segment) => {
+    const coords = segment.vertices.map((vertex) => [Number(vertex?.lng), Number(vertex?.lat)]);
+    if (coords.length < 2) return;
+    const firstVertex = segment.vertices.find((v) => v && typeof v === 'object') || {};
+    const edgeStyle = ['solid', 'dashed', 'dashdot'].includes(firstVertex.edgeStyle) ? firstVertex.edgeStyle : drawLineStyle;
+    const edgeColor = /^#[0-9a-f]{6}$/i.test(String(firstVertex.edgeColor || '')) ? String(firstVertex.edgeColor) : drawLineColor;
+    const edgeCurve = segment.vertices.some((v) => Boolean(v?.edgeCurve));
+    const featureId = draw.add({
+      type: 'Feature',
+      properties: { edgeStyle, edgeColor, edgeCurve, edgeCurvePrepared: edgeCurve },
+      geometry: { type: 'LineString', coordinates: edgeCurve ? buildCurveControlCoords(coords) : coords },
+    })?.[0];
+    if (featureId) applyDrawStyleToFeature(featureId, edgeCurve);
+  });
   syncDrawLinePaint();
   updateCurvePreviewFromDraw();
   pushDrawHistory();

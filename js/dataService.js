@@ -129,6 +129,11 @@ function normalizeRoutePathJson(value) {
       edgeStyle,
       edgeColor: edgeColor.toUpperCase(),
       edgeCurve: Boolean(vertex.edgeCurve ?? vertex.edge_curve),
+      segmentId:
+        typeof (vertex.segmentId ?? vertex.segment_id) === "string"
+          ? String(vertex.segmentId ?? vertex.segment_id).trim()
+          : "",
+      segmentStart: Boolean(vertex.segmentStart ?? vertex.segment_start),
     });
   });
   return normalized.slice(0, 4000);
