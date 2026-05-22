@@ -65,9 +65,25 @@ const translations = {
     go_btn: 'Перейти',
     hide_partners: 'ПРИХОВАТИ',
     community_all: 'Усі громади',
-    mapbox_preview_btn: 'MAPBOX MODE',
+    mapbox_preview_btn: 'MAPBOX',
     mapbox_3d_btn: '3D',
     mapbox_2d_btn: '2D',
+    mapbox_style_light: 'Світла',
+    mapbox_style_streets: 'Вулиці',
+    mapbox_style_dark: 'Темна',
+    specialist_panel_title: 'ПАНЕЛЬ СПЕЦІАЛІСТА',
+    logout_btn: 'Вийти',
+    kpi_published: 'Опубліковано',
+    review_queue: 'Черга перевірки',
+    pager_prev: '← Назад',
+    pager_next: 'Далі →',
+    undo_reorder: 'Скасувати зміну порядку',
+    remove_btn: 'Видалити',
+    pick_on_map: '📍 На карті',
+    proposal_link: 'ЗАПРОПОНУВАТИ ТОЧКУ',
+    fullscreen_btn: 'На весь екран',
+    email_label: 'Email або логін',
+    password_label: 'Пароль',
   },
   en: {
     page_title: 'Odesa Region',
@@ -101,9 +117,25 @@ const translations = {
     go_btn: 'Go',
     hide_partners: 'HIDE',
     community_all: 'All communities',
-    mapbox_preview_btn: 'MAPBOX MODE',
+    mapbox_preview_btn: 'MAPBOX',
     mapbox_3d_btn: '3D',
     mapbox_2d_btn: '2D',
+    mapbox_style_light: 'Light',
+    mapbox_style_streets: 'Streets',
+    mapbox_style_dark: 'Dark',
+    specialist_panel_title: 'SPECIALIST PANEL',
+    logout_btn: 'Log Out',
+    kpi_published: 'Published',
+    review_queue: 'Review Queue',
+    pager_prev: '← Back',
+    pager_next: 'Next →',
+    undo_reorder: 'Undo reorder',
+    remove_btn: 'Remove',
+    pick_on_map: '📍 Pick on map',
+    proposal_link: 'PROPOSE A POINT',
+    fullscreen_btn: 'Fullscreen',
+    email_label: 'Email or login',
+    password_label: 'Password',
   },
 };
 
@@ -696,10 +728,6 @@ function updateLanguage(lang) {
 }
 
 function syncMapEngineButton() {
-  const button = document.getElementById('btn-map-engine-toggle');
-  if (button) {
-    button.textContent = 'MAPBOX';
-  }
   const btn3D = document.getElementById('btn-mapbox-3d-toggle');
   if (btn3D) {
     const key3d = getMapboxPerspective?.() ? 'mapbox_2d_btn' : 'mapbox_3d_btn';
@@ -1732,7 +1760,7 @@ function renderRoutePointOrder() {
       (p, index) => `
       <div class="route-point-item" draggable="true" data-index="${index}">
         <span class="t-body">${index + 1}. ${p.title}</span>
-        <button class="btn-flat" data-action="remove-route-point" data-point-id="${p.pointId}">Remove</button>
+        <button class="btn-flat" data-action="remove-route-point" data-point-id="${p.pointId}">${currentLang === 'uk' ? 'Видалити' : 'Remove'}</button>
       </div>
     `
     )
@@ -1995,6 +2023,13 @@ function hydrateNewsCardImages(container) {
   });
 }
 
+function syncPagerButtons(prevId, nextId, currentPage, totalPages) {
+  const prev = document.getElementById(prevId);
+  const next = document.getElementById(nextId);
+  if (prev) prev.disabled = currentPage <= 1;
+  if (next) next.disabled = currentPage >= totalPages;
+}
+
 function renderNews() {
   const newsList = document.getElementById('news-list');
   const newsPager = document.getElementById('news-pager');
@@ -2014,6 +2049,7 @@ function renderNews() {
 
   if (newsPager) newsPager.style.display = '';
   if (newsPageLabel) newsPageLabel.textContent = `${newsPage} / ${pageCount}`;
+  syncPagerButtons('news-prev', 'news-next', newsPage, pageCount);
 
   newsList.innerHTML = visibleNews
     .map(
@@ -2075,6 +2111,7 @@ function renderDashboard(points, routes) {
     const routeSlice = filteredRoutes.slice(routeStart, routeStart + PAGE_SIZE);
     const routePageLabel = document.getElementById('route-page-label');
     if (routePageLabel) routePageLabel.textContent = `${routePage} / ${routePageCount}`;
+    syncPagerButtons('route-prev', 'route-next', routePage, routePageCount);
 
     routeList.innerHTML =
       routeSlice.length > 0
@@ -2091,8 +2128,8 @@ function renderDashboard(points, routes) {
             </div>
             <div class="t-data text-muted">${r.points.length} точок • ${formatIsoDate(r.updatedAt || r.createdAt)}</div>
             <div class="route-actions">
-              <button class="btn-flat" data-action="edit-route" data-route-id="${r.id}">Edit</button>
-              <button class="btn-flat" data-action="advance-route" data-route-id="${r.id}">Next status</button>
+              <button class="btn-flat" data-action="edit-route" data-route-id="${r.id}">${currentLang === 'uk' ? 'Редагувати' : 'Edit'}</button>
+              <button class="btn-flat" data-action="advance-route" data-route-id="${r.id}">${currentLang === 'uk' ? 'Наст. статус' : 'Next status'}</button>
             </div>
           </article>
         `
@@ -2114,8 +2151,8 @@ function renderDashboard(points, routes) {
               <span class="route-status ${r.status}">${r.status}</span>
             </div>
             <div class="route-actions">
-              <button class="btn-flat" data-action="set-route-status" data-route-id="${r.id}" data-status="review">To review</button>
-              <button class="btn-flat" data-action="set-route-status" data-route-id="${r.id}" data-status="published">Publish</button>
+              <button class="btn-flat" data-action="set-route-status" data-route-id="${r.id}" data-status="review">${currentLang === 'uk' ? 'На перевірку' : 'To review'}</button>
+              <button class="btn-flat" data-action="set-route-status" data-route-id="${r.id}" data-status="published">${currentLang === 'uk' ? 'Опублікувати' : 'Publish'}</button>
             </div>
           </article>
         `
@@ -2134,6 +2171,7 @@ function renderDashboard(points, routes) {
     const pointSlice = filteredPoints.slice(pointStart, pointStart + PAGE_SIZE);
     const pointPageLabel = document.getElementById('point-page-label');
     if (pointPageLabel) pointPageLabel.textContent = `${pointPage} / ${pointPageCount}`;
+    syncPagerButtons('point-prev', 'point-next', pointPage, pointPageCount);
 
     pointList.innerHTML =
       pointSlice.length > 0
@@ -2146,7 +2184,7 @@ function renderDashboard(points, routes) {
               <span class="route-status review">${p.pointType.labelUk}</span>
             </div>
             <div class="route-actions">
-              <button class="btn-flat" data-action="edit-point" data-point-id="${p.id}">Edit</button>
+              <button class="btn-flat" data-action="edit-point" data-point-id="${p.id}">${currentLang === 'uk' ? 'Редагувати' : 'Edit'}</button>
             </div>
           </article>
         `
@@ -2192,6 +2230,7 @@ function renderDashboard(points, routes) {
     const pageSlice = dashboardProposals.slice(start, start + PROPOSAL_PAGE_SIZE);
     const pageLabel = document.getElementById('proposal-page-label');
     if (pageLabel) pageLabel.textContent = `${proposalPage} / ${pageCount}`;
+    syncPagerButtons('proposal-prev', 'proposal-next', proposalPage, pageCount);
 
     proposalList.innerHTML =
       pageSlice.length > 0
@@ -2293,8 +2332,55 @@ async function refreshPublicData() {
 
 function bindPublicProposalForm() {
   const btnSubmit = document.getElementById('btn-submit-proposal');
+  const btnPickMap = document.getElementById('btn-proposal-pick-map');
   const feedback = document.getElementById('proposal-feedback');
+  const coordsHint = document.getElementById('proposal-coords-hint');
   if (!btnSubmit) return;
+
+  if (btnPickMap) {
+    btnPickMap.addEventListener('click', () => {
+      const appInterface = document.querySelector('.app-interface');
+      const heroSection = document.querySelector('.hero');
+      if (heroSection && heroSection.style.display !== 'none') {
+        if (appInterface) {
+          heroSection.style.display = 'none';
+          appInterface.style.display = 'flex';
+          appInterface.style.opacity = '1';
+        }
+      }
+      btnPickMap.textContent = currentLang === 'uk' ? '⏳ Клікніть на карті…' : '⏳ Click on map…';
+      btnPickMap.disabled = true;
+      if (coordsHint) {
+        coordsHint.textContent = currentLang === 'uk'
+          ? 'Клікніть на потрібне місце на карті для встановлення координат.'
+          : 'Click the desired location on the map to set coordinates.';
+        coordsHint.style.display = '';
+      }
+      enableMapboxPointPicking?.((lat, lng) => {
+        const latInput = document.getElementById('proposal-lat');
+        const lngInput = document.getElementById('proposal-lng');
+        if (latInput) latInput.value = lat.toFixed(6);
+        if (lngInput) lngInput.value = lng.toFixed(6);
+        btnPickMap.textContent = translations[currentLang]?.pick_on_map || '📍 На карті';
+        btnPickMap.disabled = false;
+        if (coordsHint) {
+          coordsHint.textContent = `✓ ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          coordsHint.style.color = 'var(--c-verdigris)';
+        }
+        const proposalSection = document.getElementById('proposal-section');
+        if (proposalSection) proposalSection.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  }
+
+  document.querySelectorAll('#proposal-section .check-toggle-group').forEach((group) => {
+    group.querySelectorAll('.check-toggle').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('.check-toggle').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  });
 
   const setFeedback = (message, isError = false) => {
     if (!feedback) return;
@@ -2313,8 +2399,9 @@ function bindPublicProposalForm() {
       email: document.getElementById('proposal-contact-email')?.value.trim(),
       photoUrl: document.getElementById('proposal-photo-url')?.value.trim() || null,
       comment: document.getElementById('proposal-comment')?.value.trim() || null,
-      checklist: Array.from(document.querySelectorAll('#proposal-section select[data-check]')).reduce((acc, el) => {
-        acc[el.getAttribute('data-check')] = el.value;
+      checklist: Array.from(document.querySelectorAll('#proposal-section .check-toggle-group[data-check]')).reduce((acc, group) => {
+        const active = group.querySelector('.check-toggle.active');
+        acc[group.getAttribute('data-check')] = active ? active.dataset.value : '';
         return acc;
       }, {}),
     };
@@ -2424,6 +2511,7 @@ function setAuthState(token, user, session = undefined) {
     authBadge.textContent = authUser
       ? `УВІЙШЛИ: ${authUser.fullName} (${authUser.role})`
       : 'НЕ АВТОРИЗОВАНО';
+    authBadge.setAttribute('data-hidden', authUser ? 'false' : 'true');
   }
   if (btnAuth) {
     btnAuth.innerHTML = authUser ? 'ВИЙТИ' : translations[currentLang].login_btn;
@@ -3048,17 +3136,31 @@ function bindFilterMenu() {
       }
     });
 
+    const FILTER_TYPE_MAP = {
+      ramps: ['social_services', 'housing', 'administration'],
+      elevators: ['administration', 'cnap', 'medical', 'education', 'station'],
+      toilets: ['medical', 'sport', 'culture', 'park'],
+      parking: ['fuel_station', 'administration', 'trade_objects'],
+    };
+    const ALL_TYPES = CANONICAL_POINT_TYPES.map((pt) => pt.code);
+
     filterMenu.querySelectorAll('.btn-flat[data-filter]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         filterMenu.querySelectorAll('.btn-flat[data-filter]').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         filterMenu.classList.remove('active');
-        selectedDistrict = '';
-        selectedCommunity = '';
-        if (communitySelect) communitySelect.value = '';
-        clearMapboxFocusBoundary();
-        focusMapboxLocation(ODESA_START_FOCUS.lat, ODESA_START_FOCUS.lng, ODESA_START_FOCUS.zoom);
-        setSpecialistMessage('Точки не приховуються: фільтр використовується для навігації.');
+
+        const filter = btn.getAttribute('data-filter');
+        hiddenPointTypeCodes.clear();
+        if (filter !== 'all') {
+          const visibleTypes = new Set(FILTER_TYPE_MAP[filter] || []);
+          ALL_TYPES.forEach((code) => {
+            if (!visibleTypes.has(code)) hiddenPointTypeCodes.add(code);
+          });
+        }
+        setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
+        mapController?.setHiddenPointTypes?.(Array.from(hiddenPointTypeCodes));
+        renderLegend();
         saveUiState();
       });
     });
@@ -4517,31 +4619,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const contextPanel = document.getElementById('context-panel');
 
   const ensureMapboxControlDock = () => {
-    if (!mapHostView) return;
-    let dock = document.getElementById('mapbox-control-dock');
-    if (!dock) {
-      dock = document.createElement('div');
-      dock.id = 'mapbox-control-dock';
-      dock.className = 'mapbox-control-dock';
-      mapHostView.appendChild(dock);
-    }
-    const nodes = [
-      btnMapbox3DToggle,
-      btnMapboxStyleLight,
-      btnMapboxStyleStreets,
-      btnMapboxStyleDark,
-    ].filter(Boolean);
-    nodes.forEach((node) => {
-      node.classList.add('mapbox-dock-btn');
-      if (node.parentElement !== dock) {
-        dock.appendChild(node);
-      }
-    });
+    // dock is now static in HTML — nothing to create dynamically
   };
   ensureMapboxControlDock();
-  if (btnMapEngineToggle) {
-    btnMapEngineToggle.style.display = 'none';
-  }
+
+  const setDockVisible = (visible) => {
+    const dock = document.getElementById('mapbox-control-dock');
+    if (dock) dock.style.display = visible ? 'flex' : 'none';
+  };
 
   const setMapEngine = async (engine) => {
     const appVisible = appInterface && appInterface.style.display !== 'none';
@@ -4557,10 +4642,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (mapHostView) mapHostView.style.display = 'block';
     if (mapboxPreviewWrap) mapboxPreviewWrap.style.display = isMapbox ? 'block' : 'none';
     if (contextPanel) contextPanel.style.display = '';
-    if (btnMapbox3DToggle) btnMapbox3DToggle.style.display = isMapbox ? 'inline-flex' : 'none';
-    if (btnMapboxStyleLight) btnMapboxStyleLight.style.display = isMapbox ? 'inline-flex' : 'none';
-    if (btnMapboxStyleStreets) btnMapboxStyleStreets.style.display = isMapbox ? 'inline-flex' : 'none';
-    if (btnMapboxStyleDark) btnMapboxStyleDark.style.display = isMapbox ? 'inline-flex' : 'none';
+    setDockVisible(isMapbox);
 
     let pointsForMapbox = [];
     if (!pointsForMapbox.length) {
@@ -4582,6 +4664,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     setMapboxHiddenPointTypes(Array.from(hiddenPointTypeCodes));
     setMapboxPublishedRoutes(dashboardRoutes || []);
     const preview = await ensureMapboxPreview();
+    const mapSkeleton = document.getElementById('map-skeleton');
+    if (mapSkeleton) {
+      mapSkeleton.classList.add('hidden');
+      setTimeout(() => mapSkeleton.remove(), 600);
+    }
+    if (!localStorage.getItem('odesa_map_onboarding_shown')) {
+      const onboarding = document.getElementById('map-onboarding');
+      if (onboarding) {
+        onboarding.style.display = '';
+        localStorage.setItem('odesa_map_onboarding_shown', '1');
+        setTimeout(() => onboarding.remove(), 5000);
+      }
+    }
     if (!preview?.ok) {
       setSpecialistMessage(
         currentLang === 'uk'
@@ -4694,6 +4789,63 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+
+  // Burger menu
+  const burgerBtn = document.getElementById('btn-burger');
+  const mobileNav = document.getElementById('mobile-nav');
+  if (burgerBtn && mobileNav) {
+    burgerBtn.addEventListener('click', () => {
+      const isOpen = mobileNav.classList.toggle('open');
+      burgerBtn.setAttribute('aria-expanded', String(isOpen));
+      mobileNav.setAttribute('aria-hidden', String(!isOpen));
+    });
+    document.addEventListener('click', (e) => {
+      if (mobileNav.classList.contains('open') && !mobileNav.contains(e.target) && !burgerBtn.contains(e.target)) {
+        mobileNav.classList.remove('open');
+        burgerBtn.setAttribute('aria-expanded', 'false');
+        mobileNav.setAttribute('aria-hidden', 'true');
+      }
+    });
+    mobileNav.querySelectorAll('.mobile-nav-link').forEach((link) => {
+      link.addEventListener('click', () => {
+        mobileNav.classList.remove('open');
+        burgerBtn.setAttribute('aria-expanded', 'false');
+        mobileNav.setAttribute('aria-hidden', 'true');
+      });
+    });
+  }
+
+  // Mobile nav mirrors
+  const btnLangToggleMobile = document.getElementById('btn-lang-toggle-mobile');
+  const btnMapEngineToggleMobile = document.getElementById('btn-map-engine-toggle-mobile');
+  const btnAuthMobile = document.getElementById('btn-auth-mobile');
+  if (btnLangToggleMobile) {
+    btnLangToggleMobile.addEventListener('click', (e) => {
+      e.preventDefault();
+      const nextLang = currentLang === 'uk' ? 'en' : 'uk';
+      updateLanguage(nextLang);
+      setAuthState(authToken, authUser);
+      if (mobileNav) { mobileNav.classList.remove('open'); burgerBtn?.setAttribute('aria-expanded', 'false'); }
+    });
+  }
+  if (btnMapEngineToggleMobile) {
+    btnMapEngineToggleMobile.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('btn-map-engine-toggle')?.click();
+      if (mobileNav) { mobileNav.classList.remove('open'); burgerBtn?.setAttribute('aria-expanded', 'false'); }
+    });
+  }
+  if (btnAuthMobile) {
+    btnAuthMobile.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('btn-auth')?.click();
+      if (mobileNav) { mobileNav.classList.remove('open'); burgerBtn?.setAttribute('aria-expanded', 'false'); }
+    });
+  }
+
+  // Legend collapsed by default
+  const mapLegendWrap = document.getElementById('map-legend-wrap');
+  if (mapLegendWrap) mapLegendWrap.classList.add('default-collapsed');
 
   updateLanguage(currentLang);
   syncMapEngineButton();

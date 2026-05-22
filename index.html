@@ -18,6 +18,7 @@
     <!-- Hero Section -->
     <section class="hero" id="hero">
         <video autoplay loop muted playsinline class="hero-bg parallax-deep"
+            poster="./assets/brand/hero-poster.jpg"
             style="object-fit: cover; width: 100%; height: 100%; filter: brightness(0.7);">
             <source src="https://cdn.coverr.co/videos/coverr-moving-around-an-old-european-city-1080p.mp4"
                 type="video/mp4">
@@ -27,16 +28,14 @@
         <div class="hero-parallax-layer hero-glow parallax-front"></div>
         <div class="hero-gradient"></div>
         <img src="./assets/brand/odesa-logo-main.svg" alt="Одещина" class="hero-anchor anchor-logo"
-            onerror="this.style.display='none'" />
+            onerror="this.classList.add('logo-missing')" />
         <h1 class="t-display masked-reveal" id="hero-title" style="color: var(--c-admiralty);">ОДЕСЬКА ОБЛАСТЬ</h1>
         <h2 class="t-h2 reveal" data-i18n="hero_subtitle"
             style="margin-top: 12px; margin-bottom: 32px; font-weight: 300; letter-spacing: 0.25em;">
         </h2>
         <div class="hero-marquee reveal">ОДЕСЬКА ОБЛАСНА ДЕРЖАВНА АДМІНІСТРАЦІЯ · ОФІЦІЙНА КАРТА БЕЗБАРʼЄРНОСТІ</div>
         <p class="t-body text-muted reveal" data-i18n="hero_description"
-            style="max-width: 480px; margin-bottom: 48px; font-size: 16px; color: #1A202C;">
-            Одеська область
-        </p>
+            style="max-width: 480px; margin-bottom: 48px; font-size: 16px; color: #1A202C;"></p>
         <div class="hero-highlights reveal">
             <button type="button" class="hero-highlight-btn" data-hero-target="map">Офіційний реєстр точок
                 безбарʼєрності</button>
@@ -68,37 +67,46 @@
             <div class="logo-lockup" id="btn-logo-home" role="button" tabindex="0"
                 style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
                 <img src="./assets/brand/odesa-logo-main.svg" alt="Одещина" width="48" height="48"
-                    style="object-fit: contain; mix-blend-mode: darken; filter: contrast(1.1) brightness(1.1);">
+                    style="object-fit: contain; mix-blend-mode: darken; filter: contrast(1.1) brightness(1.1);"
+                    onerror="this.classList.add('logo-missing')">
                 <div style="display: flex; flex-direction: column;">
-                    <span class="t-nav" data-i18n="app_title" style="color: var(--c-text-primary);">ОДЕСЬКА
-                        ОБЛАСТЬ</span>
+                    <span class="t-nav" data-i18n="app_title" style="color: var(--c-text-primary);">ОДЕСЬКА ОБЛАСТЬ</span>
                     <span class="t-data text-muted" data-i18n="app_subtitle"></span>
                 </div>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 24px;">
-                <nav style="display: flex; gap: 24px;">
+            <!-- Desktop nav -->
+            <div class="header-right">
+                <nav class="header-nav">
                     <a href="#news-section" id="btn-news-scroll" class="t-nav" data-i18n="news_link" data-magnetic
                         style="text-decoration: none; color: var(--c-text-primary);">НОВИНИ</a>
-                    <a href="#proposal-section" id="btn-proposal-scroll" class="t-nav" data-magnetic
+                    <a href="#proposal-section" id="btn-proposal-scroll" class="t-nav" data-i18n="proposal_link" data-magnetic
                         style="text-decoration: none; color: var(--c-text-primary);">ЗАПРОПОНУВАТИ ТОЧКУ</a>
                     <a href="#" class="t-nav" id="btn-lang-toggle" data-magnetic
                         style="text-decoration: none; color: var(--c-text-primary);">UA / EN</a>
-                    <a href="#" class="t-nav" id="btn-map-engine-toggle" data-magnetic
-                        style="text-decoration: none; color: var(--c-text-primary);">MAPBOX PREVIEW</a>
-                    <a href="#" class="t-nav" id="btn-mapbox-3d-toggle" data-magnetic
-                        style="text-decoration: none; color: var(--c-text-primary); display: none;">3D</a>
-                    <a href="#" class="t-nav" id="btn-mapbox-style-light" data-magnetic
-                        style="text-decoration: none; color: var(--c-text-primary); display: none;">LIGHT</a>
-                    <a href="#" class="t-nav" id="btn-mapbox-style-streets" data-magnetic
-                        style="text-decoration: none; color: var(--c-text-primary); display: none;">STREETS</a>
-                    <a href="#" class="t-nav" id="btn-mapbox-style-dark" data-magnetic
-                        style="text-decoration: none; color: var(--c-text-primary); display: none;">DARK</a>
+                    <a href="#" class="t-nav" id="btn-map-engine-toggle" data-i18n="mapbox_preview_btn" data-magnetic
+                        style="text-decoration: none; color: var(--c-text-primary);">MAPBOX</a>
                 </nav>
-                <div id="auth-state-badge" class="auth-state-badge t-data text-muted">НЕ АВТОРИЗОВАНО</div>
+                <div id="auth-state-badge" class="auth-state-badge t-data text-muted"></div>
                 <button id="btn-auth" class="btn-primary" data-i18n="login_btn" data-magnetic>УВІЙТИ &rarr;</button>
             </div>
+
+            <!-- Burger button (mobile only) -->
+            <button class="burger-btn" id="btn-burger" aria-label="Меню" aria-expanded="false">
+                <span class="burger-line"></span>
+                <span class="burger-line"></span>
+                <span class="burger-line"></span>
+            </button>
         </header>
+
+        <!-- Mobile nav drawer -->
+        <div class="mobile-nav" id="mobile-nav" aria-hidden="true">
+            <a href="#news-section" class="t-nav mobile-nav-link" data-i18n="news_link">НОВИНИ</a>
+            <a href="#proposal-section" class="t-nav mobile-nav-link" data-i18n="proposal_link">ЗАПРОПОНУВАТИ ТОЧКУ</a>
+            <a href="#" class="t-nav mobile-nav-link" id="btn-lang-toggle-mobile">UA / EN</a>
+            <a href="#" class="t-nav mobile-nav-link" id="btn-map-engine-toggle-mobile" data-i18n="mapbox_preview_btn">MAPBOX</a>
+            <button id="btn-auth-mobile" class="btn-primary mobile-nav-auth" data-i18n="login_btn">УВІЙТИ →</button>
+        </div>
 
         <!-- Floating Filter Menu instead of Bar -->
         <div class="filter-menu" id="filter-menu">
@@ -110,8 +118,11 @@
                 </svg>
             </button>
             <div class="filter-options" id="filter-options">
-                <button class="btn-flat active" data-filter="all" data-i18n="filter_all" data-magnetic>Всі
-                    об'єкти</button>
+                <button class="btn-flat active" data-filter="all" data-i18n="filter_all" data-magnetic>Всі об'єкти</button>
+                <button class="btn-flat" data-filter="ramps" data-i18n="filter_ramps" data-magnetic>Пандуси</button>
+                <button class="btn-flat" data-filter="elevators" data-i18n="filter_elevators" data-magnetic>Ліфти</button>
+                <button class="btn-flat" data-filter="toilets" data-i18n="filter_toilets" data-magnetic>Туалети</button>
+                <button class="btn-flat" data-filter="parking" data-i18n="filter_parking" data-magnetic>Паркування</button>
                 <div class="community-filter">
                     <label class="t-data text-muted" for="community-select" data-i18n="community_label">ГРОМАДА</label>
                     <select id="community-select"></select>
@@ -123,11 +134,11 @@
             <button id="btn-hide-specialist" class="float-hide-btn" aria-label="Згорнути панель">⟨</button>
             <div class="specialist-head">
                 <div>
-                    <div class="t-nav">SPECIALIST OPS</div>
-                    <div id="specialist-user" class="t-data text-muted">offline</div>
+                    <div class="t-nav" data-i18n="specialist_panel_title">ПАНЕЛЬ СПЕЦІАЛІСТА</div>
+                    <div id="specialist-user" class="t-data text-muted"></div>
                     <div id="specialist-mode-label" class="t-data text-muted">РЕЖИМ: МЕНЮ</div>
                 </div>
-                <button id="btn-logout" class="btn-flat">Logout</button>
+                <button id="btn-logout" class="btn-flat" data-i18n="logout_btn">Вийти</button>
             </div>
             <div class="specialist-actions" id="specialist-actions">
                 <select id="specialist-action-select">
@@ -154,7 +165,7 @@
                         <div id="kpi-routes" class="ops-kpi-value">0</div>
                     </article>
                     <article class="ops-kpi">
-                        <div class="t-data text-muted">Published</div>
+                        <div class="t-data text-muted" data-i18n="kpi_published">Опубліковано</div>
                         <div id="kpi-published" class="ops-kpi-value">0</div>
                     </article>
                 </div>
@@ -163,13 +174,13 @@
                     <input id="route-search" type="text" placeholder="Пошук маршруту..." />
                     <div id="route-list" class="route-list"></div>
                     <div class="list-pager">
-                        <button id="route-prev" class="btn-flat">Prev</button>
+                        <button id="route-prev" class="btn-flat" data-i18n="pager_prev">← Назад</button>
                         <span id="route-page-label" class="t-data text-muted">1 / 1</span>
-                        <button id="route-next" class="btn-flat">Next</button>
+                        <button id="route-next" class="btn-flat" data-i18n="pager_next">Далі →</button>
                     </div>
                 </div>
                 <div class="specialist-block" id="dashboard-review-block">
-                    <div class="t-label">Review Queue</div>
+                    <div class="t-label" data-i18n="review_queue">Черга перевірки</div>
                     <div id="review-list" class="activity-list"></div>
                 </div>
                 <div class="specialist-block" id="dashboard-points-block">
@@ -177,9 +188,9 @@
                     <input id="point-search" type="text" placeholder="Пошук точки..." />
                     <div id="point-list" class="route-list"></div>
                     <div class="list-pager">
-                        <button id="point-prev" class="btn-flat">Prev</button>
+                        <button id="point-prev" class="btn-flat" data-i18n="pager_prev">← Назад</button>
                         <span id="point-page-label" class="t-data text-muted">1 / 1</span>
-                        <button id="point-next" class="btn-flat">Next</button>
+                        <button id="point-next" class="btn-flat" data-i18n="pager_next">Далі →</button>
                     </div>
                 </div>
                 <div class="specialist-block" id="dashboard-activity-block">
@@ -190,9 +201,9 @@
                     <div class="t-label">Заявки користувачів</div>
                     <div id="proposal-list" class="route-list"></div>
                     <div class="list-pager">
-                        <button id="proposal-prev" class="btn-flat">Prev</button>
+                        <button id="proposal-prev" class="btn-flat" data-i18n="pager_prev">← Назад</button>
                         <span id="proposal-page-label" class="t-data text-muted">1 / 1</span>
-                        <button id="proposal-next" class="btn-flat">Next</button>
+                        <button id="proposal-next" class="btn-flat" data-i18n="pager_next">Далі →</button>
                     </div>
                 </div>
             </div>
@@ -237,7 +248,7 @@
                         <button id="btn-add-route-point" class="btn-flat">Додати</button>
                     </div>
                     <div id="route-point-order" class="route-point-order"></div>
-                    <button id="btn-undo-route-order" class="btn-flat">Undo reorder</button>
+                    <button id="btn-undo-route-order" class="btn-flat" data-i18n="undo_reorder">Скасувати зміну порядку</button>
                     <button id="btn-create-route" class="btn-primary">Створити маршрут</button>
                     <button id="btn-save-route" class="btn-primary">Зберегти маршрут</button>
                     <button id="btn-delete-route" class="btn-flat">Видалити маршрут</button>
@@ -292,11 +303,31 @@
         <!-- Map & Context Container -->
         <div class="map-container section-transition section-current">
             <div class="map-view" id="map">
+                <!-- Map loading skeleton -->
+                <div class="map-skeleton" id="map-skeleton" aria-hidden="true">
+                    <div class="map-skeleton-shimmer"></div>
+                    <div class="map-skeleton-hint">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        Завантаження карти…
+                    </div>
+                </div>
+                <!-- Map onboarding hint (shown once) -->
+                <div class="map-onboarding" id="map-onboarding" style="display:none;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    Клікніть на точку для деталей
+                </div>
                 <div class="map-legend" id="map-legend-wrap">
                     <button id="btn-toggle-legend" class="legend-toggle-btn" aria-label="Згорнути легенду">⟨</button>
                     <div id="map-legend"></div>
                 </div>
-                <button id="btn-map-fullscreen" class="map-fullscreen-btn">На весь екран</button>
+                <button id="btn-map-fullscreen" class="map-fullscreen-btn" data-i18n="fullscreen_btn">На весь екран</button>
+                <!-- Mapbox controls dock — visible only when Mapbox engine is active -->
+                <div id="mapbox-control-dock" class="mapbox-control-dock" style="display:none;">
+                    <button id="btn-mapbox-3d-toggle" class="mapbox-dock-btn" data-i18n="mapbox_3d_btn">3D</button>
+                    <button id="btn-mapbox-style-light" class="mapbox-dock-btn" data-i18n="mapbox_style_light">Світла</button>
+                    <button id="btn-mapbox-style-streets" class="mapbox-dock-btn" data-i18n="mapbox_style_streets">Вулиці</button>
+                    <button id="btn-mapbox-style-dark" class="mapbox-dock-btn" data-i18n="mapbox_style_dark">Темна</button>
+                </div>
                 <div class="partner-logos" id="partner-panel"
                     style="position: absolute; bottom: 16px; left: 16px; background: #FFFFFF; border-radius: 8px; padding: 10px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid var(--c-divider); display: flex; align-items: center; gap: 20px; transition: all 0.5s ease; width: fit-content; max-width: 80vw;">
                     <button id="btn-hide-partners" data-i18n="hide_partners"
@@ -373,9 +404,9 @@
             <h2 class="t-h2 reveal" data-i18n="news_title" style="margin-bottom: 48px;">ОСТАННІ НОВИНИ</h2>
             <div id="news-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 1000px; width: 100%;"></div>
             <div id="news-pager" class="list-pager" style="margin-top: 22px; max-width: 1000px; width: 100%;">
-                <button id="news-prev" class="btn-flat">Prev</button>
+                <button id="news-prev" class="btn-flat" data-i18n="pager_prev">← Назад</button>
                 <span id="news-page-label" class="t-data text-muted">1 / 1</span>
-                <button id="news-next" class="btn-flat">Next</button>
+                <button id="news-next" class="btn-flat" data-i18n="pager_next">Далі →</button>
             </div>
         </section>
 
@@ -397,19 +428,58 @@
                     </select>
                     <input id="proposal-district" type="text" placeholder="Район / громада*" />
                     <input id="proposal-address" type="text" placeholder="Адреса*" />
-                    <input id="proposal-lat" type="number" step="0.000001" placeholder="Широта*" />
-                    <input id="proposal-lng" type="number" step="0.000001" placeholder="Довгота*" />
+                    <div class="proposal-coords-row">
+                        <input id="proposal-lat" type="number" step="0.000001" placeholder="Широта*" />
+                        <input id="proposal-lng" type="number" step="0.000001" placeholder="Довгота*" />
+                        <button id="btn-proposal-pick-map" class="btn-flat proposal-pick-btn" type="button" data-i18n="pick_on_map">📍 На карті</button>
+                    </div>
+                    <div id="proposal-coords-hint" class="t-data text-muted proposal-coords-hint" style="display:none;"></div>
                     <input id="proposal-contact-email" type="email" placeholder="Email для сповіщень*" />
                     <input id="proposal-photo-url" type="text" placeholder="Посилання на фото (опційно)" />
                 </div>
                 <textarea id="proposal-comment" placeholder="Короткий опис проблеми/стану доступності"></textarea>
                 <div class="proposal-checklist">
                     <div class="t-label">Міні-чеклист (первинна оцінка)</div>
-                    <label><span>Доступний вхід без барʼєрів</span><select data-check="entry"><option value="yes">так</option><option value="no">ні</option><option value="na">не застосовується</option></select></label>
-                    <label><span>Безпечний шлях руху до обʼєкта</span><select data-check="path"><option value="yes">так</option><option value="no">ні</option><option value="na">не застосовується</option></select></label>
-                    <label><span>Контрастне маркування/навігація</span><select data-check="navigation"><option value="yes">так</option><option value="no">ні</option><option value="na">не застосовується</option></select></label>
-                    <label><span>Доступний санітарний вузол (за наявності)</span><select data-check="toilet"><option value="yes">так</option><option value="no">ні</option><option value="na">не застосовується</option></select></label>
-                    <label><span>Транспортна доступність поблизу</span><select data-check="transport"><option value="yes">так</option><option value="no">ні</option><option value="na">не застосовується</option></select></label>
+                    <div class="check-row">
+                        <span class="check-label">Доступний вхід без барʼєрів</span>
+                        <div class="check-toggle-group" data-check="entry">
+                            <button type="button" class="check-toggle" data-value="yes">Так</button>
+                            <button type="button" class="check-toggle" data-value="no">Ні</button>
+                            <button type="button" class="check-toggle" data-value="na">Н/З</button>
+                        </div>
+                    </div>
+                    <div class="check-row">
+                        <span class="check-label">Безпечний шлях руху до обʼєкта</span>
+                        <div class="check-toggle-group" data-check="path">
+                            <button type="button" class="check-toggle" data-value="yes">Так</button>
+                            <button type="button" class="check-toggle" data-value="no">Ні</button>
+                            <button type="button" class="check-toggle" data-value="na">Н/З</button>
+                        </div>
+                    </div>
+                    <div class="check-row">
+                        <span class="check-label">Контрастне маркування/навігація</span>
+                        <div class="check-toggle-group" data-check="navigation">
+                            <button type="button" class="check-toggle" data-value="yes">Так</button>
+                            <button type="button" class="check-toggle" data-value="no">Ні</button>
+                            <button type="button" class="check-toggle" data-value="na">Н/З</button>
+                        </div>
+                    </div>
+                    <div class="check-row">
+                        <span class="check-label">Доступний санітарний вузол (за наявності)</span>
+                        <div class="check-toggle-group" data-check="toilet">
+                            <button type="button" class="check-toggle" data-value="yes">Так</button>
+                            <button type="button" class="check-toggle" data-value="no">Ні</button>
+                            <button type="button" class="check-toggle" data-value="na">Н/З</button>
+                        </div>
+                    </div>
+                    <div class="check-row">
+                        <span class="check-label">Транспортна доступність поблизу</span>
+                        <div class="check-toggle-group" data-check="transport">
+                            <button type="button" class="check-toggle" data-value="yes">Так</button>
+                            <button type="button" class="check-toggle" data-value="no">Ні</button>
+                            <button type="button" class="check-toggle" data-value="na">Н/З</button>
+                        </div>
+                    </div>
                 </div>
                 <button id="btn-submit-proposal" class="btn-primary" style="margin-top: 10px;">Надіслати заявку</button>
             </div>
@@ -421,27 +491,20 @@
             <div class="card card-3d auth-card"
                 style="width: 420px; padding: 56px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: var(--shadow-float);">
                 <img src="./assets/brand/odesa-logo-main.svg" alt="Одещина" class="auth-logo-img"
-                    onerror="this.style.display='none'" />
+                    onerror="this.classList.add('logo-missing')" />
                 <div class="t-nav" data-i18n="app_title" style="color: var(--c-text-primary);">ОДЕСЬКА ОБЛАСТЬ</div>
                 <div class="t-data text-muted" data-i18n="app_subtitle"></div>
                 <hr style="width: 100%; border: 0; border-top: 1px solid var(--c-divider); margin-bottom: 24px;">
 
                 <h2 class="t-h2" style="font-size: 28px; margin-bottom: 32px;">Вхід для спеціалістів</h2>
 
-                <div style="width: 100%; text-align: left; margin-bottom: 16px;">
-                    <label class="t-label text-muted" style="display: block; margin-bottom: 8px;">Email або
-                        логін</label>
-                    <input id="auth-email" type="text"
-                        style="width: 100%; height: 40px; border: 1px solid var(--c-divider); background: transparent; padding: 0 12px; font-family: var(--font-ui); font-size: 14px; outline: none; border-radius: 0; transition: border-color 0.3s;"
-                        onfocus="this.style.borderColor='var(--c-cerulean)'"
-                        onblur="this.style.borderColor='var(--c-divider)'" />
+                <div class="auth-field-group">
+                    <label class="t-label text-muted auth-field-label" data-i18n="email_label">Email або логін</label>
+                    <input id="auth-email" type="text" class="auth-input" autocomplete="username" />
                 </div>
-                <div style="width: 100%; text-align: left; margin-bottom: 32px;">
-                    <label class="t-label text-muted" style="display: block; margin-bottom: 8px;">Пароль</label>
-                    <input id="auth-password" type="password"
-                        style="width: 100%; height: 40px; border: 1px solid var(--c-divider); background: transparent; padding: 0 12px; font-family: var(--font-ui); font-size: 14px; outline: none; border-radius: 0; transition: border-color 0.3s;"
-                        onfocus="this.style.borderColor='var(--c-cerulean)'"
-                        onblur="this.style.borderColor='var(--c-divider)'" />
+                <div class="auth-field-group" style="margin-bottom: 32px;">
+                    <label class="t-label text-muted auth-field-label" data-i18n="password_label">Пароль</label>
+                    <input id="auth-password" type="password" class="auth-input" autocomplete="current-password" />
                 </div>
 
                 <button id="btn-auth-submit" class="btn-primary" style="width: 100%; margin-bottom: 24px;" data-magnetic>УВІЙТИ ДО
