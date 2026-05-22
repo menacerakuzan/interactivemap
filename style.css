@@ -1051,18 +1051,9 @@ body.context-open #btn-show-partners {
   align-items: center;
   justify-content: center;
   text-align: center;
-  background: transparent;
+  background: var(--c-bg);
   overflow: hidden;
   z-index: 10;
-}
-
-/* Dark navy fallback rendered behind the video */
-.hero::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(160deg, #0b2545 0%, #134074 60%, #1e5aa8 100%);
-  z-index: -3;
 }
 
 .hero::before {
@@ -1091,8 +1082,8 @@ body.context-open #btn-show-partners {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(120deg, rgba(11, 37, 69, 0.35) 0%, rgba(11, 37, 69, 0.12) 40%, transparent 65%),
-    linear-gradient(to bottom, transparent 40%, rgba(11, 37, 69, 0.55) 100%);
+    linear-gradient(120deg, rgba(11, 37, 69, 0.25) 0%, rgba(11, 37, 69, 0.08) 30%, transparent 55%),
+    linear-gradient(to bottom, rgba(248, 250, 252, 0.08) 0%, var(--c-bg) 100%);
   z-index: -1;
 }
 
@@ -1133,8 +1124,8 @@ body.context-open #btn-show-partners {
   width: 196px;
   height: 196px;
   margin-bottom: 30px;
-  color: #fff;
-  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.35)) brightness(10);
+  color: var(--c-admiralty);
+  filter: drop-shadow(0 10px 24px rgba(11, 37, 69, 0.16));
 }
 
 #hero-title {

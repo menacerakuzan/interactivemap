@@ -18,7 +18,6 @@
     <!-- Hero Section -->
     <section class="hero" id="hero">
         <video autoplay loop muted playsinline class="hero-bg parallax-deep"
-            poster="./assets/brand/hero-poster.jpg"
             style="object-fit: cover; width: 100%; height: 100%; filter: brightness(0.7);">
             <source src="https://cdn.coverr.co/videos/coverr-moving-around-an-old-european-city-1080p.mp4"
                 type="video/mp4">
@@ -28,14 +27,16 @@
         <div class="hero-parallax-layer hero-glow parallax-front"></div>
         <div class="hero-gradient"></div>
         <img src="./assets/brand/odesa-logo-main.svg" alt="Одещина" class="hero-anchor anchor-logo"
-            onerror="this.classList.add('logo-missing')" />
-        <h1 class="t-display masked-reveal" id="hero-title" style="color: #fff;">ОДЕСЬКА ОБЛАСТЬ</h1>
+            onerror="this.style.display='none'" />
+        <h1 class="t-display masked-reveal" id="hero-title" style="color: var(--c-admiralty);">ОДЕСЬКА ОБЛАСТЬ</h1>
         <h2 class="t-h2 reveal" data-i18n="hero_subtitle"
-            style="margin-top: 12px; margin-bottom: 32px; font-weight: 300; letter-spacing: 0.25em; color: rgba(255,255,255,0.82);">
+            style="margin-top: 12px; margin-bottom: 32px; font-weight: 300; letter-spacing: 0.25em;">
         </h2>
         <div class="hero-marquee reveal">ОДЕСЬКА ОБЛАСНА ДЕРЖАВНА АДМІНІСТРАЦІЯ · ОФІЦІЙНА КАРТА БЕЗБАРʼЄРНОСТІ</div>
         <p class="t-body text-muted reveal" data-i18n="hero_description"
-            style="max-width: 480px; margin-bottom: 48px; font-size: 16px; color: rgba(255,255,255,0.78);"></p>
+            style="max-width: 480px; margin-bottom: 48px; font-size: 16px; color: #1A202C;">
+            Одеська область
+        </p>
         <div class="hero-highlights reveal">
             <button type="button" class="hero-highlight-btn" data-hero-target="map">Офіційний реєстр точок
                 безбарʼєрності</button>
@@ -45,7 +46,7 @@
                 оновлення</button>
         </div>
         <div id="hero-enter-trigger" class="reveal"
-            style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; cursor: pointer; color: rgba(255,255,255,0.72);">
+            style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; cursor: pointer; color: var(--c-admiralty);">
             <div class="t-nav" data-i18n="swipe_hint" style="margin-bottom: 8px;">СВАЙП АБО КЛІК ДЛЯ ПЕРЕХОДУ</div>
             <button class="btn-primary" id="btn-enter" data-magnetic>&darr;</button>
         </div>
