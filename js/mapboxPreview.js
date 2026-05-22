@@ -820,18 +820,34 @@ function bindDrawEvents() {
     pushDrawHistory();
     syncDrawLinePaint();
     updateCurvePreviewFromDraw();
+    // After finishing a curve line, auto-enter direct_select for node dragging
+    if (drawMode === 'curve') {
+      const created = event?.features?.[0];
+      if (created?.id) {
+        setTimeout(() => {
+          try { draw.changeMode('direct_select', { featureId: String(created.id) }); } catch (_e) {}
+        }, 0);
+      }
+    }
   });
   map.on('draw.update', (event) => {
     if (drawMutating) return;
     const features = event?.features || [];
     features.forEach((feature) => {
       if (feature?.geometry?.type === 'LineString' && Array.isArray(feature?.geometry?.coordinates)) {
+        const isCurve = Boolean(feature?.properties?.edgeCurve) || drawMode === 'curve';
         const snappedCoordinates = snapLineCoordinates(feature.geometry.coordinates);
         if (snappedCoordinates.length >= 2) {
           upsertDrawFeature({
             ...feature,
+            properties: {
+              ...(feature.properties || {}),
+              edgeCurve: isCurve,
+              edgeCurvePrepared: isCurve,
+            },
             geometry: { ...feature.geometry, coordinates: snappedCoordinates },
           });
+          if (feature?.id) applyDrawStyleToFeature(feature.id, isCurve);
         }
       }
     });
@@ -1988,25 +2004,10 @@ export function setMapboxLineToolMode(mode = 'draw') {
     return true;
   }
   if (drawMode === 'curve') {
-    const firstLine = getDrawLineFeatures()[0];
-    if (firstLine?.id) {
-      const baseCoords = Array.isArray(firstLine.geometry?.coordinates) ? firstLine.geometry.coordinates : [];
-      const coords = buildCurveControlCoords(baseCoords);
-      upsertDrawFeature({
-        type: 'Feature',
-        id: firstLine.id,
-        properties: {
-          ...(firstLine.properties || {}),
-          edgeCurve: true,
-          edgeCurvePrepared: true,
-        },
-        geometry: { type: 'LineString', coordinates: coords },
-      });
-      applyDrawStyleToFeature(firstLine.id, true);
-      draw.changeMode('direct_select', { featureId: firstLine.id });
-    } else {
-      draw.changeMode('draw_line_string');
-    }
+    // Always start drawing — curve works like draw but marks edgeCurve=true on create.
+    // After draw.create fires, the handler below switches to direct_select for node editing.
+    draw.changeMode('simple_select');
+    draw.changeMode('draw_line_string');
   } else if (drawMode === 'draw') {
     draw.changeMode('simple_select');
     draw.changeMode('draw_line_string');
