@@ -3285,6 +3285,7 @@ function bindFloatingUiControls() {
 
   if (btnToggleLegend && legendWrap) {
     btnToggleLegend.addEventListener('click', () => {
+      legendWrap.classList.remove('default-collapsed');
       const isCollapsed = legendWrap.classList.toggle('collapsed');
       btnToggleLegend.textContent = isCollapsed ? '⟩' : '⟨';
     });
@@ -4843,9 +4844,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Legend collapsed by default
+  // Legend collapsed by default — show toggle arrow in "expand" state
   const mapLegendWrap = document.getElementById('map-legend-wrap');
-  if (mapLegendWrap) mapLegendWrap.classList.add('default-collapsed');
+  const legendToggleBtn = document.getElementById('btn-toggle-legend');
+  if (mapLegendWrap) {
+    mapLegendWrap.classList.add('default-collapsed');
+    if (legendToggleBtn) legendToggleBtn.textContent = '⟩';
+  }
 
   updateLanguage(currentLang);
   syncMapEngineButton();

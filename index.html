@@ -29,13 +29,13 @@
         <div class="hero-gradient"></div>
         <img src="./assets/brand/odesa-logo-main.svg" alt="Одещина" class="hero-anchor anchor-logo"
             onerror="this.classList.add('logo-missing')" />
-        <h1 class="t-display masked-reveal" id="hero-title" style="color: var(--c-admiralty);">ОДЕСЬКА ОБЛАСТЬ</h1>
+        <h1 class="t-display masked-reveal" id="hero-title" style="color: #fff;">ОДЕСЬКА ОБЛАСТЬ</h1>
         <h2 class="t-h2 reveal" data-i18n="hero_subtitle"
-            style="margin-top: 12px; margin-bottom: 32px; font-weight: 300; letter-spacing: 0.25em;">
+            style="margin-top: 12px; margin-bottom: 32px; font-weight: 300; letter-spacing: 0.25em; color: rgba(255,255,255,0.82);">
         </h2>
         <div class="hero-marquee reveal">ОДЕСЬКА ОБЛАСНА ДЕРЖАВНА АДМІНІСТРАЦІЯ · ОФІЦІЙНА КАРТА БЕЗБАРʼЄРНОСТІ</div>
         <p class="t-body text-muted reveal" data-i18n="hero_description"
-            style="max-width: 480px; margin-bottom: 48px; font-size: 16px; color: #1A202C;"></p>
+            style="max-width: 480px; margin-bottom: 48px; font-size: 16px; color: rgba(255,255,255,0.78);"></p>
         <div class="hero-highlights reveal">
             <button type="button" class="hero-highlight-btn" data-hero-target="map">Офіційний реєстр точок
                 безбарʼєрності</button>
@@ -45,7 +45,7 @@
                 оновлення</button>
         </div>
         <div id="hero-enter-trigger" class="reveal"
-            style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; cursor: pointer; color: var(--c-admiralty);">
+            style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; cursor: pointer; color: rgba(255,255,255,0.72);">
             <div class="t-nav" data-i18n="swipe_hint" style="margin-bottom: 8px;">СВАЙП АБО КЛІК ДЛЯ ПЕРЕХОДУ</div>
             <button class="btn-primary" id="btn-enter" data-magnetic>&darr;</button>
         </div>
@@ -84,8 +84,6 @@
                         style="text-decoration: none; color: var(--c-text-primary);">ЗАПРОПОНУВАТИ ТОЧКУ</a>
                     <a href="#" class="t-nav" id="btn-lang-toggle" data-magnetic
                         style="text-decoration: none; color: var(--c-text-primary);">UA / EN</a>
-                    <a href="#" class="t-nav" id="btn-map-engine-toggle" data-i18n="mapbox_preview_btn" data-magnetic
-                        style="text-decoration: none; color: var(--c-text-primary);">MAPBOX</a>
                 </nav>
                 <div id="auth-state-badge" class="auth-state-badge t-data text-muted"></div>
                 <button id="btn-auth" class="btn-primary" data-i18n="login_btn" data-magnetic>УВІЙТИ &rarr;</button>
@@ -104,7 +102,6 @@
             <a href="#news-section" class="t-nav mobile-nav-link" data-i18n="news_link">НОВИНИ</a>
             <a href="#proposal-section" class="t-nav mobile-nav-link" data-i18n="proposal_link">ЗАПРОПОНУВАТИ ТОЧКУ</a>
             <a href="#" class="t-nav mobile-nav-link" id="btn-lang-toggle-mobile">UA / EN</a>
-            <a href="#" class="t-nav mobile-nav-link" id="btn-map-engine-toggle-mobile" data-i18n="mapbox_preview_btn">MAPBOX</a>
             <button id="btn-auth-mobile" class="btn-primary mobile-nav-auth" data-i18n="login_btn">УВІЙТИ →</button>
         </div>
 
@@ -118,11 +115,6 @@
                 </svg>
             </button>
             <div class="filter-options" id="filter-options">
-                <button class="btn-flat active" data-filter="all" data-i18n="filter_all" data-magnetic>Всі об'єкти</button>
-                <button class="btn-flat" data-filter="ramps" data-i18n="filter_ramps" data-magnetic>Пандуси</button>
-                <button class="btn-flat" data-filter="elevators" data-i18n="filter_elevators" data-magnetic>Ліфти</button>
-                <button class="btn-flat" data-filter="toilets" data-i18n="filter_toilets" data-magnetic>Туалети</button>
-                <button class="btn-flat" data-filter="parking" data-i18n="filter_parking" data-magnetic>Паркування</button>
                 <div class="community-filter">
                     <label class="t-data text-muted" for="community-select" data-i18n="community_label">ГРОМАДА</label>
                     <select id="community-select"></select>
@@ -355,6 +347,9 @@
                         <button id="btn-line-draw" class="btn-flat active" type="button" title="Перо">
                             <span class="tool-glyph">✎</span><span class="tool-label">Перо</span>
                         </button>
+                        <button id="btn-line-curve" class="btn-flat" type="button" title="Крива Безьє">
+                            <span class="tool-glyph">〜</span><span class="tool-label">Крива</span>
+                        </button>
                         <button id="btn-line-edit" class="btn-flat" type="button" title="Редагувати вузли">
                             <span class="tool-glyph">◌</span><span class="tool-label">Редаг.</span>
                         </button>
@@ -383,6 +378,9 @@
                         <button id="btn-line-apply-route" class="btn-primary" type="button" title="Застосувати в маршрут">
                             <span class="tool-glyph">↪</span><span class="tool-label">В маршрут</span>
                         </button>
+                        <button id="btn-line-density" class="btn-flat" type="button" title="Compact / Pro режим">
+                            <span class="tool-glyph">⊞</span><span class="tool-label">Compact</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -392,7 +390,7 @@
                     <p class="t-body text-muted">Оберіть об'єкт на карті для детальної інформації.</p>
                 </div>
             </div>
-            <div class="mapbox-preview-wrap" id="mapbox-preview-wrap" style="display:none;">
+            <div class="mapbox-preview-wrap" id="mapbox-preview-wrap" data-lenis-prevent style="display:none;">
                 <div id="mapbox-map"></div>
                 <div id="mapbox-status" class="mapbox-status" style="display:none;"></div>
             </div>
