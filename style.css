@@ -1121,10 +1121,11 @@ body.context-open #btn-show-partners {
 }
 
 .hero-anchor {
-  width: 196px;
-  height: 196px;
-  margin-bottom: 30px;
+  width: 140px;
+  height: 140px;
+  margin-bottom: 40px;
   color: var(--c-admiralty);
+  mix-blend-mode: darken;
   filter: drop-shadow(0 10px 24px rgba(11, 37, 69, 0.16));
 }
 
